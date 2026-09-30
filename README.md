@@ -35,7 +35,8 @@ kinfolk.publishableKey=sb_publishable_…
 kinfolk.emergencyUrl=https://<custom domain>/<path that proxies the emergency function>
 ```
 
-Leave them out to use the local stack. Going live: `docs/whatsapp-templates.md` → Produksi.
+Leave them out to use the local stack. Going live: run `bash scripts/go-live.sh` (Git Bash), which walks through
+`docs/whatsapp-templates.md` → Produksi step by step and fills these in.
 
 ### Running the apps
 
