@@ -2,7 +2,6 @@ package id.kinfolk
 
 import androidx.compose.ui.graphics.Color
 import id.kinfolk.ui.home.DutyDay
-import id.kinfolk.ui.home.FeedItem
 import id.kinfolk.ui.home.HomeState
 import id.kinfolk.ui.home.NextAppointment
 import id.kinfolk.ui.home.Person
@@ -36,10 +35,6 @@ object SampleData {
         dutyLegend = "Telepon cek malam, 19.00. Malam ini giliran Anda.",
         medsToday = 4,
         nextMed = "Omeprazole · sebelum sarapan",
-        feed = listOf(
-            FeedItem(budi, "Obat pagi diberikan: clopidogrel, amlodipine.", "Hari ini, 08.05"),
-            FeedItem(budi, "Konfirmasi via SMS: mengantar ke neurologi jam 13.45.", "Hari ini, 07.40"),
-            FeedItem(budi, "Telepon malam: tensi 132/84, sudah makan malam, jalan ke teras pakai tongkat. Suasana hati baik.", "Sen, 19.10"),
-        ),
+        feed = emptyList(),
     )
 }

@@ -165,13 +165,13 @@ fun DashedButton(text: String, onClick: () -> Unit) {
 
 private val DashLine = Color(0x4022261F) // rgba(34,38,31,.25)
 
-/** border:1.5px dashed rgba(34,38,31,.25); border-radius:16px. */
-fun Modifier.dashed() = drawBehind {
+/** border:1.5px dashed rgba(34,38,31,.25); border-radius:16px, unless given. */
+fun Modifier.dashed(color: Color = DashLine, radius: Dp = 16.dp) = drawBehind {
     val w = 1.5.dp.toPx()
     // ponytail: Chrome's dash rhythm for a 1.5px border (dashes and gaps ~3x the width), matched by eye.
     drawRoundRect(
-        DashLine, topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w),
-        cornerRadius = CornerRadius(16.dp.toPx() - w / 2),
+        color, topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w),
+        cornerRadius = CornerRadius(radius.toPx() - w / 2),
         style = Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * w, 3 * w))),
     )
 }

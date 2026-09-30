@@ -77,6 +77,10 @@ suspend fun SupabaseClient.nextAppointment(circleId: String, since: Instant): Ap
         limit(1)
     }.decodeList<Appointment>().firstOrNull()
 
+/** Null once cancelled. */
+suspend fun SupabaseClient.appointment(id: String): Appointment? =
+    from("appointments").select(withProvider) { filter { eq("id", id); exact("cancelled_at", null) } }.decodeList<Appointment>().firstOrNull()
+
 /** Every Appointment with this Provider that wasn't cancelled, wherever it took place, latest first. */
 suspend fun SupabaseClient.appointmentsWith(providerId: String): List<Appointment> =
     from("appointments").select(withProvider) {

@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -164,9 +165,10 @@ fun HomeScreen(
             Text("›", color = Kf.Muted, fontSize = 18.sp)
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Hidden until the Timeline has something (approved in #8).
+        if (s.feed.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionHeader(stringResource(Res.string.latest), stringResource(Res.string.see_all), onTimeline)
-            Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp))) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Kf.Card)) {
                 s.feed.forEach { e ->
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Avatar(e.by.initial, e.by.color, 30.dp, 12.sp)

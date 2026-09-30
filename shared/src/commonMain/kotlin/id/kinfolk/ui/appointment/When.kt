@@ -51,3 +51,13 @@ fun countdown(startsAt: Instant, now: Instant, tz: TimeZone): String {
         else -> "${mins / 60} jam ${mins % 60} mnt lagi"
     }
 }
+
+/** When a Timeline entry happened: "Hari ini, 15.10", "Sen, 19.10" within the week, else "24 Sept" (approved in #8). */
+fun ago(at: Instant, now: Instant, tz: TimeZone): String {
+    val t = at.toLocalDateTime(tz)
+    return when (t.date.daysUntil(now.toLocalDateTime(tz).date)) {
+        0 -> "Hari ini, ${hm(t.time)}"
+        in 1..6 -> "${shortDays[t.date.dayOfWeek.ordinal]}, ${hm(t.time)}"
+        else -> dayMonth(t.date)
+    }
+}

@@ -85,6 +85,9 @@ import id.kinfolk.data.questions
 import id.kinfolk.data.saveVisitNote
 import id.kinfolk.data.visitNote
 import id.kinfolk.data.addProvider
+import id.kinfolk.data.appointment
+import id.kinfolk.data.TimelineEntry
+import id.kinfolk.data.timeline
 import id.kinfolk.data.cancelAppointment
 import id.kinfolk.data.careRecipients
 import id.kinfolk.data.editAppointment
@@ -108,6 +111,7 @@ import id.kinfolk.ui.emergency.QrScreen
 import id.kinfolk.ui.appointment.ApptFormScreen
 import id.kinfolk.ui.appointment.ApptScreen
 import id.kinfolk.ui.appointment.VisitNoteScreen
+import id.kinfolk.ui.appointment.ago
 import id.kinfolk.ui.appointment.countdown
 import id.kinfolk.ui.appointment.hm
 import id.kinfolk.ui.appointment.longDate
@@ -127,6 +131,7 @@ import id.kinfolk.data.promoteToAdmin
 import id.kinfolk.data.removeMember
 import id.kinfolk.ui.contacts.ContactFormScreen
 import id.kinfolk.ui.contacts.ContactsScreen
+import id.kinfolk.ui.home.FeedItem
 import id.kinfolk.ui.home.HomeScreen
 import id.kinfolk.ui.home.NextAppointment
 import id.kinfolk.ui.home.Person
@@ -139,6 +144,9 @@ import id.kinfolk.ui.onboarding.PhoneScreen
 import id.kinfolk.ui.onboarding.e164
 import id.kinfolk.ui.records.MedFormScreen
 import id.kinfolk.ui.records.RecordsScreen
+import id.kinfolk.ui.timeline.TimelineRow
+import id.kinfolk.ui.timeline.TimelineScreen
+import id.kinfolk.ui.timeline.text
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.exceptions.RestException
 import kinfolk.shared.generated.resources.Res
@@ -187,6 +195,9 @@ private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
 
+/** An Appointment with its Questions and Visit Note, as `appt` and `summary` show it. */
+private class Visit(val appointment: Appointment, val questions: List<Question>, val note: VisitNote?)
+
 @Composable
 @Preview
 fun App() {
@@ -202,6 +213,9 @@ fun App() {
         var next by remember { mutableStateOf<Appointment?>(null) }
         var questions by remember { mutableStateOf(emptyList<Question>()) } // on next
         var note by remember { mutableStateOf<VisitNote?>(null) } // of next
+        var opened by remember { mutableStateOf<Visit?>(null) } // from the Timeline; `appt` and `summary` show next while null
+        var timeline by remember { mutableStateOf(emptyList<TimelineEntry>()) }
+        var opening by remember { mutableStateOf<Job?>(null) }
         var editing by remember { mutableStateOf<Appointment?>(null) }
         var providers by remember { mutableStateOf(emptyList<Provider>()) }
         var meds by remember { mutableStateOf(emptyList<Medication>()) }
@@ -243,6 +257,13 @@ fun App() {
             val name = m.name.orEmpty()
             return Person(if (m.leftAt != null) former.replace("%1\$s", name) else name, colorOf(id))
         }
+        // On the Timeline yourself too by name, in Sri's green (#8, like the prototype).
+        fun author(e: TimelineEntry): Person {
+            val m = members.firstOrNull { it.userId == e.by }
+            val name = m?.name ?: e.byName.orEmpty()
+            return Person(if (m?.leftAt != null) former.replace("%1\$s", name) else name, colorOf(e.by))
+        }
+        fun visit() = opened ?: next?.let { Visit(it, questions, note) }
         fun circleMembers() = members.filter { it.leftAt == null }.sortedBy { it.userId != me() }.map {
             CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me())
         }
@@ -250,6 +271,17 @@ fun App() {
         suspend fun loadVisit() {
             questions = next?.let { a -> retrying { supabase.questions(a.id) } }.orEmpty()
             note = next?.let { a -> retrying { supabase.visitNote(a.id) } }
+            opened?.appointment?.let { a -> opened = Visit(a, retrying { supabase.questions(a.id) }, retrying { supabase.visitNote(a.id) }) }
+        }
+        // Not retried: offline, the tap does nothing rather than jumping there later. The latest tap wins.
+        fun openFromTimeline(e: TimelineEntry) {
+            opening?.cancel()
+            opening = scope.launch {
+                val v = attempt { listOfNotNull(supabase.appointment(e.appointmentId)).map { a -> Visit(a, supabase.questions(a.id), supabase.visitNote(a.id)) } }
+                    ?.firstOrNull() ?: return@launch // unreachable, or cancelled meanwhile
+                opened = v
+                go(if (e.kind == TimelineEntry.Kind.visit_note) Screen.VisitNote else Screen.Appt)
+            }
         }
         suspend fun loadHome() {
             val c = circle ?: return
@@ -261,6 +293,7 @@ fun App() {
             meds = retrying { supabase.medications(c.id) }
             sent = retrying { if (supabase.roleIn(c.id) == Role.admin) supabase.invitations(c.id) else null }
             members = retrying { supabase.members(c.id) }
+            timeline = retrying { supabase.timeline(c.id) }
         }
         suspend fun land(how: Nav) {
             circle = retrying { supabase.myCareCircle() }
@@ -364,7 +397,7 @@ fun App() {
                             Invitee(inv) { attempt { supabase.acceptInvitation(inv.id) }?.let { land(Nav.Tab) } != null }
                         }
                         Screen.Home -> when (t) {
-                            // ponytail: header, Appointment and Medications are real; the rest is prototype sample data until its tickets land.
+                            // ponytail: header, Appointment, Medications and Terbaru are real; the rest is prototype sample data until its tickets land.
                             Tab.Home -> HomeScreen(
                                 s = SampleData.home.copy(
                                     todayLabel = longDate(now.toLocalDateTime(tz).date),
@@ -382,15 +415,17 @@ fun App() {
                                     nextMed = meds.current().next(now.toLocalDateTime(tz).time)
                                         ?.let { m -> listOf(m.name, m.schedule).filter { it.isNotBlank() }.joinToString(" · ") }
                                         ?: stringResource(Res.string.no_meds),
+                                    feed = timeline.take(3).map { FeedItem(author(it), text(it, tz), ago(it.at, now, tz)) },
                                 ),
-                                onSos = { openEmergency() }, onOpenAppointment = { go(Screen.Appt) }, onAddAppointment = { openForm(null) },
+                                onSos = { openEmergency() }, onOpenAppointment = { opened = null; go(Screen.Appt) }, onAddAppointment = { openForm(null) },
                                 // Only the Attendee writes the Visit Note; the others add Questions until it's ready.
-                                onWriteNote = { go(if (note != null || next?.attendeeId == me()) Screen.VisitNote else Screen.Appt) },
+                                onWriteNote = { opened = null; go(if (note != null || next?.attendeeId == me()) Screen.VisitNote else Screen.Appt) },
                                 onRota = { nav = Nav.Tab; tab = Tab.Rota }, onRecords = { nav = Nav.Tab; tab = Tab.Records },
                                 onTimeline = { nav = Nav.Tab; tab = Tab.Timeline },
                                 onInvite = { go(Screen.Onb2) },
                                 onFillEmergency = { openEmergencyForm(Screen.Home) },
                             )
+                            Tab.Timeline -> TimelineScreen(timeline.map { e -> TimelineRow(author(e), ago(e.at, now, tz), text(e, tz)) { openFromTimeline(e) } })
                             Tab.Records -> RecordsScreen(meds) { editingMed = it; go(Screen.MedForm) }
                             Tab.Circle -> CircleScreen(
                                 circle?.name.orEmpty(), circleMembers(), onSos = { openEmergency() },
@@ -398,21 +433,23 @@ fun App() {
                             ) { scope.launch { loadContacts(); go(Screen.Contacts) } }
                             else -> {}
                         }
-                        Screen.Appt -> next?.let { a ->
+                        Screen.Appt -> visit()?.let { v ->
+                            val a = v.appointment
                             ApptScreen(
-                                a, questions, note != null, now, tz, ::person, ::colorOf, a.attendeeId == me(), recipient?.name.orEmpty(),
+                                a, v.questions, v.note != null, now, tz, ::person, ::colorOf, a.attendeeId == me(), recipient?.name.orEmpty(),
                                 onBack = { go(Screen.Home, Nav.Back) }, onEdit = { openForm(a) },
                                 // Not retried: adding is not idempotent.
                                 ask = { text -> attempt { supabase.askQuestion(a.circleId, a.id, text); loadVisit() } != null },
                                 onNote = { go(Screen.VisitNote) },
                             )
                         }
-                        Screen.VisitNote -> next?.let { a ->
+                        Screen.VisitNote -> visit()?.let { v ->
+                            val a = v.appointment
                             VisitNoteScreen(
-                                a, questions, note, editable = a.attendeeId == me(), recipient?.name.orEmpty(), now, tz, ::colorOf,
+                                a, v.questions, v.note, editable = a.attendeeId == me(), recipient?.name.orEmpty(), now, tz, ::colorOf,
                                 onHome = { go(Screen.Home, Nav.Back) },
                                 save = { answers, steps, notes ->
-                                    attempt { supabase.saveVisitNote(a.id, answers, steps, notes); loadVisit() }
+                                    attempt { supabase.saveVisitNote(a.id, answers, steps, notes); loadHome() }
                                         .also { if (it != null) go(Screen.Home, Nav.Back) } != null
                                 },
                             )

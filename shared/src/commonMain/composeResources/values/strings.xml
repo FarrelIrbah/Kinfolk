@@ -189,4 +189,9 @@
     <string name="leave_confirm">Keluar</string>
     <string name="last_admin">Jadikan orang lain pengatur dulu sebelum keluar.</string>
     <string name="cancel">Batal</string>
+
+    <!-- timeline -->
+    <string name="same_history">Semua melihat riwayat yang sama</string>
+    <string name="kind_visit">Kunjungan</string>
+    <string name="timeline_empty">Linimasa masih kosong. Akan terisi saat keluarga mencatat kunjungan, obat, dan cek malam.</string>
 </resources>
