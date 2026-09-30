@@ -1,5 +1,19 @@
 package id.kinfolk.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -196,5 +210,26 @@ fun Toggle(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
             Box(Modifier.size(24.dp).shadow(1.dp, CircleShape).background(Color.White, CircleShape))
         }
         Text(label, fontSize = 14.sp)
+    }
+}
+
+/** Prototype toast: #22261F, radius 14, 14px/1.4, 20 from the sides; rises in over 280ms and leaves after 2.6s. */
+@Composable
+fun Toast(text: String?, modifier: Modifier = Modifier) {
+    val shown = remember { MutableTransitionState(false) }.apply { targetState = text != null }
+    var last by remember { mutableStateOf("") }
+    if (text != null) last = text
+    val rise = with(LocalDensity.current) { 16.dp.roundToPx() }
+    AnimatedVisibility(
+        shown, modifier.padding(start = 20.dp, end = 20.dp, bottom = 40.dp),
+        enter = fadeIn(tween(280, easing = KfEase)) + scaleIn(tween(280, easing = KfEase), initialScale = .97f) + slideInVertically(tween(280, easing = KfEase)) { rise },
+        exit = ExitTransition.None,
+    ) {
+        Text(
+            last, color = Kf.Paper, fontSize = 14.sp, lineHeight = (14 * 1.4).sp,
+            modifier = Modifier.fillMaxWidth()
+                .dropShadow(RoundedCornerShape(14.dp), Shadow(24.dp, Color(0x33000000), offset = DpOffset(0.dp, 8.dp)))
+                .background(Kf.Ink, RoundedCornerShape(14.dp)).padding(horizontal = 16.dp, vertical = 14.dp),
+        )
     }
 }

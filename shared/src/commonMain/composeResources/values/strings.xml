@@ -145,4 +145,26 @@
     <string name="answer_hint">Jawaban dokter…</string>
     <string name="add_step">Tambah langkah…</string>
     <string name="carried_from">Dari kunjungan %1$s</string>
+
+    <!-- emergency, qr, empty row 4 -->
+    <string name="em_title">Info darurat</string>
+    <string name="close">Tutup</string>
+    <string name="allergies">Alergi</string>
+    <string name="conditions">Kondisi</string>
+    <string name="current_meds">Obat saat ini</string>
+    <string name="call">Telepon</string>
+    <string name="qr_title">QR untuk paramedis</string>
+    <string name="qr_sub">Membuka halaman ini tanpa login. Untuk dompet dan kulkas.</string>
+    <string name="qr_head">Kartu dompet &amp; kulkas</string>
+    <string name="qr_body">Paramedis memindai kode dan melihat halaman darurat, tanpa ponsel keluarga. Tanpa login, tanpa app.</string>
+    <string name="qr_scan">Pindai · tanpa login</string>
+    <string name="qr_revoke">Cabut &amp; buat baru</string>
+    <string name="qr_meta">Tautan kartu v%1$d · halaman tersimpan, tetap jalan saat sinyal buruk · terakhir dipindai: %2$s</string>
+    <string name="never">belum pernah</string>
+    <string name="qr_revoked">Tautan kartu lama dicabut. Cetak kartu baru.</string>
+    <string name="fill_emergency">Isi info darurat</string>
+    <string name="fill_emergency_sub">Alergi, pengencer darah, keinginan</string>
+
+    <!-- Emergency Info: approved deviation (issue #12, docs/screen-map.md) -->
+    <string name="share_link">Bagikan tautan</string>
 </resources>

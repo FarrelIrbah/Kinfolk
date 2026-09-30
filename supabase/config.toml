@@ -413,6 +413,10 @@ verify_jwt = false
 [functions.invitation]
 verify_jwt = false
 
+# Opened from the QR card by paramedics, without login (ADR 0003).
+[functions.emergency]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

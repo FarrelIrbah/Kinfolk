@@ -1,5 +1,6 @@
 package id.kinfolk.ui
 
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -35,7 +36,15 @@ object Kf {
     val Border = Color(0x1A22261F) // rgba(34,38,31,.1)
     val TabBorder = Color(0x1422261F) // rgba(34,38,31,.08)
     val InputBorder = Color(0x2E22261F) // rgba(34,38,31,.18)
+    val Night = Color(0xFF15130F) // `emergency` and the QR card
+    val NightInk = Color(0xFFFFF8EE)
+    val NightTile = Color(0x14FFF8EE) // rgba(255,248,238,.08)
+    val NightPill = Color(0x1FFFF8EE) // rgba(255,248,238,.12)
+    val Peach = Color(0xFFF2A27C)
 }
+
+/** The prototype's `ease` for transitions: cubic-bezier(.2,.8,.2,1). */
+val KfEase = CubicBezierEasing(.2f, .8f, .2f, 1f)
 
 @Composable
 fun sans(): FontFamily = FontFamily(

@@ -31,6 +31,8 @@ import kinfolk.shared.generated.resources.add_appt_sub
 import kinfolk.shared.generated.resources.add_meds
 import kinfolk.shared.generated.resources.add_meds_sub
 import kinfolk.shared.generated.resources.invite_siblings
+import kinfolk.shared.generated.resources.fill_emergency
+import kinfolk.shared.generated.resources.fill_emergency_sub
 import kinfolk.shared.generated.resources.joined_of
 import kinfolk.shared.generated.resources.drives_no_time
 import kinfolk.shared.generated.resources.no_driver
@@ -96,6 +98,7 @@ fun HomeScreen(
     onRecords: () -> Unit,
     onTimeline: () -> Unit,
     onInvite: () -> Unit,
+    onFillEmergency: () -> Unit,
 ) {
     // design: padding:4px 20px; gap:22px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -120,6 +123,7 @@ fun HomeScreen(
             s.invites?.let { (joined, total) ->
                 EmptyStep(3, stringResource(Res.string.invite_siblings), stringResource(Res.string.joined_of, joined, total).takeIf { total > 0 }, part = total > 0, onInvite)
             }
+            EmptyStep(4, stringResource(Res.string.fill_emergency), stringResource(Res.string.fill_emergency_sub), part = false, onFillEmergency)
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -213,7 +217,7 @@ private fun AppointmentCard(a: NextAppointment, onOpen: () -> Unit, onWriteNote:
     }
 }
 
-/** Rows 1-3 of the v3 `empty` screen, shown on Home while nothing is upcoming (docs/screen-map.md). */
+/** Rows 1-4 of the v3 `empty` screen, shown on Home while nothing is upcoming (docs/screen-map.md). */
 @Composable
 private fun EmptyStep(num: Int, title: String, sub: String?, part: Boolean, onClick: () -> Unit) {
     Row(

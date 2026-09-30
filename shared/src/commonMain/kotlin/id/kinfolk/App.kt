@@ -2,7 +2,6 @@ package id.kinfolk
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
@@ -54,6 +53,10 @@ import id.kinfolk.data.CareCircle
 import id.kinfolk.data.CareContact
 import id.kinfolk.data.CareContactDraft
 import id.kinfolk.data.CareRecipient
+import id.kinfolk.data.EmergencyCard
+import id.kinfolk.data.emergencyCard
+import id.kinfolk.data.reissueEmergencyCard
+import id.kinfolk.data.saveEmergencyInfo
 import id.kinfolk.data.Invitation
 import id.kinfolk.data.InvitationToMe
 import id.kinfolk.data.Role
@@ -94,8 +97,14 @@ import id.kinfolk.data.myCareCircle
 import id.kinfolk.data.sendSignInCode
 import id.kinfolk.data.verifySignInCode
 import id.kinfolk.ui.Kf
+import id.kinfolk.ui.KfEase
 import id.kinfolk.ui.KinfolkTheme
 import id.kinfolk.ui.SvgPath
+import id.kinfolk.ui.Toast
+import id.kinfolk.ui.rememberShare
+import id.kinfolk.ui.emergency.EmergencyFormScreen
+import id.kinfolk.ui.emergency.EmergencyScreen
+import id.kinfolk.ui.emergency.QrScreen
 import id.kinfolk.ui.appointment.ApptFormScreen
 import id.kinfolk.ui.appointment.ApptScreen
 import id.kinfolk.ui.appointment.VisitNoteScreen
@@ -128,10 +137,13 @@ import kinfolk.shared.generated.resources.tab_records
 import kinfolk.shared.generated.resources.tab_rota
 import kinfolk.shared.generated.resources.tab_timeline
 import kinfolk.shared.generated.resources.no_meds
+import kinfolk.shared.generated.resources.never
+import kinfolk.shared.generated.resources.qr_revoked
 import kinfolk.shared.generated.resources.you
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
@@ -148,7 +160,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -176,6 +188,13 @@ fun App() {
         var editingContact by remember { mutableStateOf<CareContact?>(null) }
         var invitation by remember { mutableStateOf<InvitationToMe?>(null) }
         var sent by remember { mutableStateOf<List<Invitation>?>(null) } // null unless admin
+        var card by remember { mutableStateOf<EmergencyCard?>(null) }
+        var formBack by remember { mutableStateOf(Screen.Emergency) } // where the Emergency Info form returns to
+        var emergencyLoad by remember { mutableStateOf<Job?>(null) }
+        var toast by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(toast) { if (toast != null) { delay(2600); toast = null } }
+        val share = rememberShare()
+        val revoked = stringResource(Res.string.qr_revoked)
         val tz = remember { TimeZone.currentSystemDefault() }
         val now by produceState(Clock.System.now()) { while (true) { delay(30_000); value = Clock.System.now() } }
         // ponytail: Budi's avatar color from the prototype, since Sri's green vanishes on the green Home card; #5 gives each Member a color.
@@ -216,6 +235,16 @@ fun App() {
         suspend fun loadContacts() {
             contacts = circle?.let { c -> retrying { supabase.careContacts(c.id) } }.orEmpty()
         }
+        // SOS opens at once, even offline, with what Home already loaded; contacts and the card follow when reachable.
+        fun openEmergency() {
+            go(Screen.Emergency)
+            emergencyLoad?.cancel()
+            emergencyLoad = scope.launch {
+                loadContacts()
+                card = recipient?.let { r -> retrying { supabase.emergencyCard(r.id) } }
+            }
+        }
+        fun openEmergencyForm(from: Screen) { formBack = from; go(Screen.EmergencyForm) }
         suspend fun sendCode(sms: Boolean): Boolean = attempt {
             supabase.sendSignInCode(e164(phone), sms)
         } != null
@@ -243,7 +272,7 @@ fun App() {
             ) { (s, t) ->
                 // design: scroll container padding 60px top (under iOS status bar), 96px bottom when tab bar shows, else 30px
                 Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().imePadding()
+                    Modifier.fillMaxSize().background(if (s == Screen.Emergency) Kf.Night else Kf.Paper).verticalScroll(rememberScrollState()).statusBarsPadding().imePadding()
                         .padding(bottom = if (s == Screen.Home) 96.dp else 30.dp),
                 ) {
                     when (s) {
@@ -308,15 +337,16 @@ fun App() {
                                         ?.let { m -> listOf(m.name, m.schedule).filter { it.isNotBlank() }.joinToString(" · ") }
                                         ?: stringResource(Res.string.no_meds),
                                 ),
-                                onSos = {}, onOpenAppointment = { go(Screen.Appt) }, onAddAppointment = { openForm(null) },
+                                onSos = { openEmergency() }, onOpenAppointment = { go(Screen.Appt) }, onAddAppointment = { openForm(null) },
                                 // Only the Attendee writes the Visit Note; the others add Questions until it's ready.
                                 onWriteNote = { go(if (note != null || next?.attendeeId == me()) Screen.VisitNote else Screen.Appt) },
                                 onRota = { nav = Nav.Tab; tab = Tab.Rota }, onRecords = { nav = Nav.Tab; tab = Tab.Records },
                                 onTimeline = { nav = Nav.Tab; tab = Tab.Timeline },
                                 onInvite = { go(Screen.Onb2) },
+                                onFillEmergency = { openEmergencyForm(Screen.Home) },
                             )
                             Tab.Records -> RecordsScreen(meds) { editingMed = it; go(Screen.MedForm) }
-                            Tab.Circle -> CircleScreen(circle?.name.orEmpty(), circle?.memberCount ?: 0, onSos = {}) { scope.launch { loadContacts(); go(Screen.Contacts) } }
+                            Tab.Circle -> CircleScreen(circle?.name.orEmpty(), circle?.memberCount ?: 0, onSos = { openEmergency() }) { scope.launch { loadContacts(); go(Screen.Contacts) } }
                             else -> {}
                         }
                         Screen.Appt -> next?.let { a ->
@@ -381,15 +411,40 @@ fun App() {
                                 attempt { editingContact?.let { supabase.removeCareContact(it.id) }; loadContacts() }.also { if (it != null) go(Screen.Contacts, Nav.Back) } != null
                             },
                         )
+                        Screen.Emergency -> recipient?.let { r ->
+                            EmergencyScreen(
+                                r.name, r.allergies, r.conditions, meds, contacts, card,
+                                onClose = { go(Screen.Home, Nav.Back) }, onEdit = { openEmergencyForm(Screen.Emergency) },
+                                // Refreshes "terakhir dipindai" when reachable; the card on screen already works.
+                                onQr = { go(Screen.Qr); scope.launch { attempt { supabase.emergencyCard(r.id) }?.let { card = it } } },
+                            )
+                        }
+                        Screen.Qr -> recipient?.let { r ->
+                            card?.let { c ->
+                                QrScreen(
+                                    r.name, r.allergies, c, c.lastScannedAt?.let { whenLabel(it, now, tz) } ?: stringResource(Res.string.never),
+                                    admin = sent != null, onBack = { go(Screen.Emergency, Nav.Back) }, onShare = { share(c.url) },
+                                    revoke = { attempt { card = supabase.reissueEmergencyCard(r.id); toast = revoked } != null },
+                                )
+                            }
+                        }
+                        Screen.EmergencyForm -> recipient?.let { r ->
+                            EmergencyFormScreen(r.allergies, r.conditions, onBack = { go(formBack, Nav.Back) }) { allergies, conditions ->
+                                attempt {
+                                    supabase.saveEmergencyInfo(r.id, allergies, conditions)
+                                    recipient = r.copy(allergies = allergies, conditions = conditions)
+                                }.also { if (it != null) go(formBack, Nav.Back) } != null
+                            }
+                        }
                     }
                 }
             }
+            Toast(toast, Modifier.align(Alignment.BottomCenter))
             if (screen == Screen.Home) TabBar(tab, { nav = Nav.Tab; tab = it }, Modifier.align(Alignment.BottomCenter))
         }
     }
 }
 
-private val KfEase = CubicBezierEasing(.2f, .8f, .2f, 1f)
 
 private suspend fun <T : Any> attempt(block: suspend () -> T): T? =
     try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { null }

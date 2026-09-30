@@ -26,7 +26,14 @@ enum class Role { admin, sibling, parent, viewer }
 data class CareCircle(val id: String, val name: String, val memberCount: Int)
 
 @Serializable
-data class CareRecipient(val id: String, @SerialName("circle_id") val circleId: String, val name: String, val relation: String? = null)
+data class CareRecipient(
+    val id: String,
+    @SerialName("circle_id") val circleId: String,
+    val name: String,
+    val relation: String? = null,
+    val allergies: String = "", // Emergency Info: "Penisilin"
+    val conditions: String = "", // Emergency Info: "Stroke iskemik, April 2026. …"
+)
 
 @Serializable
 private data class CircleRow(val id: String, val name: String, val members: List<Count>) {
