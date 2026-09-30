@@ -2,6 +2,39 @@
 
 Sumber: `design/Kinfolk_ Family Care Coordination/Kinfolk v3.dc.html`. Nama layar = nilai `screen` di prototype. Copy UI pakai string Bahasa Indonesia dari prototype.
 
+## Target: paritas 1:1 dengan v3
+
+Diputuskan pemilik pada 1 Okt 2026 (celah lengkap di `docs/gap-v3.md`). Semua layar dan sheet v3 dibangun 1:1, termasuk yang dulu "Ditunda". Aturan di bawah mengalahkan tabel v1 yang lebih lama.
+
+### Deviasi yang dipertahankan
+
+- Login nomor HP + OTP (L1, L2), tautan "Masuk" di `onb0`, "Nama Anda" di `onb1`, daftar `onb2` yang mulai kosong, copy `onb3` (#2, #4, #9).
+- WhatsApp menggantikan SMS di semua copy ("via SMS" → "via WhatsApp", "SMS" → "WhatsApp"), ADR 0002.
+- Nama Care Recipient menggantikan "Bapak"/"Tukiman" di copy (#9).
+- Form tambah/ubah: Janji dokter, Obat, Giliran, Kontak, Info darurat, plus pil "Ubah" yang membukanya (#6, #10, #11, #12).
+- Halaman web Undangan dan Info darurat (#4, #12).
+- Visit Note manual (#7) sebagai jalur "Catat manual saja" dan untuk lingkaran tanpa langganan.
+- `invitee`: kartu kunjungan terakhir tetap disembunyikan sebelum menerima (#8).
+- Teks tanggal dan hitung mundur (#6).
+- Bahasa Indonesia saja.
+
+### Deviasi baru
+
+- Harga paywall dari toko (harga lokal), ADR 0006.
+- Biaya dalam Rupiah ("Rp 250.000"), placeholder jumlah "Rp".
+- Tautan "Hapus rekaman" (gaya "Batalkan janji", warna SOS) di bawah tombol serah terima `summary`, lewat lembar konfirmasi.
+- Tombol putus-putus "+ Tambah tugas" di `tasks` dan form Tugas (Tugas, Pemilik, Tenggat); ketuk tugas untuk mengubah.
+- Form Obat: "Catatan", sakelar "Pengencer darah", "Isi ulang" (tanggal + pemilik). Form Info darurat: tanggal lahir, berat badan, keinginan tindakan. Halaman `member` (admin): sakelar "Kontak darurat" dan kolom "Jarak dari rumah".
+- Mode Bapak "Butuh bantuan": "Menghubungi Sri dan Budi sekarang." tanpa "N menit dari sini" kecuali kolom jarak terisi.
+- "Tampilan SMS Rina" jadi pratinjau WhatsApp hanya-baca (ringkasan Minggu terakhir), tanpa pilihan balas. "Yang dilihat saudara baru" dibuang.
+- "Ulangi onboarding" (admin saja) membuka `onb2` → `onb3`.
+- Sub kanal Member: "App + WhatsApp" / "Hanya WhatsApp".
+- Tab bar blur: `RenderEffect` di Android 12+, selain itu 94% opak.
+
+### Deviasi v1 yang dibatalkan (kembali ke v3)
+
+Beranda lengkap (lonceng inbox, cari, baris Tugas, baris ringkasan Minggu, varian kartu pagi/sebelum/sesudah/malam, cincin dosis), layar `empty` penuh, giliran per hari (menggantikan #10 mingguan), `records` 4 tab dengan tanda dosis, Linimasa semua jenis + filter + "Catatan", `rotation` tampilan bulan + away, `circle` penuh ("Cara lain", "Paket", "Ulangi onboarding", baris Care Recipient), `member` 6 Data Category + riwayat perubahan + catatan kaki + toast "· tercatat", Info darurat dan kartu QR lengkap ("Cetak kartu"), kontak darurat dari Member, pil "Darurat" di Kontak dihapus, baris catatan Kontak, offline dengan antrean tulis ("Offline · dikirim saat tersambung lagi"), rekaman + transkripsi + paywall (ADR 0005, 0006), dan semua layar yang dulu ditunda.
+
 ## Dibuat di v1
 
 | Layar v3 | v1 | Catatan |
@@ -31,7 +64,4 @@ Sumber: `design/Kinfolk_ Family Care Coordination/Kinfolk v3.dc.html`. Nama laya
 
 ## Ditunda
 
-- Transkripsi: `consent`, `recording`, `processing`, `recfail`, `paywall`
-- `checkin`, `bapak`, `handoff`, `tasks`, `away`, `notes`, `export`, `inbox`, `search`
-- `records`: tab dokumen, tren, biaya; `rotation`: tampilan bulan; centang dosis obat
-- `a11y`: ukuran font sistem sudah diikuti Compose
+Tidak ada lagi: semua masuk target paritas v3 di atas.
