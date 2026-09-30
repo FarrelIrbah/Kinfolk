@@ -44,6 +44,8 @@ data class Appointment(
     @SerialName("driver_id") val driverId: String? = null,
     @SerialName("attendee_id") val attendeeId: String? = null,
     val bring: String = "",
+    /** When the Driver said YA on WhatsApp. */
+    @SerialName("driver_confirmed_at") val driverConfirmedAt: Instant? = null,
 ) {
     fun draft() = AppointmentDraft(circleId, recipientId, provider.id, title, location, startsAt, departsAt, driverId, attendeeId, bring)
 }

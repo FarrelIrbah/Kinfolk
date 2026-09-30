@@ -55,6 +55,7 @@ import kinfolk.shared.generated.resources.add_duty
 import kinfolk.shared.generated.resources.back
 import kinfolk.shared.generated.resources.day_done
 import kinfolk.shared.generated.resources.delete_duty
+import kinfolk.shared.generated.resources.drive_confirmed
 import kinfolk.shared.generated.resources.drive_task
 import kinfolk.shared.generated.resources.duty_form_head
 import kinfolk.shared.generated.resources.duty_order
@@ -66,6 +67,7 @@ import kinfolk.shared.generated.resources.not_this_week
 import kinfolk.shared.generated.resources.save
 import kinfolk.shared.generated.resources.swap
 import kinfolk.shared.generated.resources.swap_asked
+import kinfolk.shared.generated.resources.swap_sub
 import kinfolk.shared.generated.resources.swap_title
 import kinfolk.shared.generated.resources.swap_waiting
 import kinfolk.shared.generated.resources.take_it
@@ -159,7 +161,11 @@ fun RotaScreen(
                         val id = a.driverId ?: return@forEach
                         val p = people[id] ?: return@forEach
                         val at = (a.departsAt ?: a.startsAt).toLocalDateTime(tz).time
-                        Slot(p, stringResource(Res.string.drive_task, a.title.replaceFirstChar { it.lowercase() }, hm(at)), sub(id), Kf.Muted, null, {}) {}
+                        val confirmed = a.driverConfirmedAt != null
+                        Slot(
+                            p, stringResource(Res.string.drive_task, a.title.replaceFirstChar { it.lowercase() }, hm(at)),
+                            if (confirmed) stringResource(Res.string.drive_confirmed) else sub(id), if (confirmed) Kf.Green else Kf.Muted, null, {},
+                        ) {}
                     }
                     turns.forEach { t ->
                         val id = t.holder ?: return@forEach
@@ -208,10 +214,11 @@ private fun Slot(p: Person, task: String, sub: String, subColor: Color, action: 
     }
 }
 
-/** SWAP SHEET body: the other Members with their load this week. The prototype's SMS line waits for #13. */
+/** SWAP SHEET body: the other Members with their load this week. */
 @Composable
 fun ColumnScope.SwapSheet(turn: DutyTurn, others: Map<String, Person>, load: (String) -> Int, onPick: (String) -> Unit) {
     Text(stringResource(Res.string.swap_title, turn.inSentence()), style = serifStyle(22f, 1.2f))
+    Text(stringResource(Res.string.swap_sub), fontSize = 14.sp, color = Kf.Ink2)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         others.forEach { (id, p) ->
             Row(

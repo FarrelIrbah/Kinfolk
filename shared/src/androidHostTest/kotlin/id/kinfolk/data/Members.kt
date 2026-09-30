@@ -25,7 +25,8 @@ private val jvmAuth: AuthConfig.() -> Unit = {
 
 /** Stands in for Meta and Twilio: the local Edge Functions post here (see supabase/config.toml). */
 object Providers {
-    data class Message(val channel: String, val phone: String, val text: String) {
+    /** [id]: Meta's id for a WhatsApp message. */
+    data class Message(val channel: String, val phone: String, val text: String, val id: String = "") {
         val code get() = Regex("""\d{6}""").findAll(text).last().value // the phone number comes first
         val link get() = Regex("""http://[^"\s]+""").find(text)!!.value
     }
@@ -38,8 +39,10 @@ object Providers {
                 val body = ex.requestBody.readBytes().decodeToString()
                 val phone = Regex(""""to":"(\d+)"""").find(body)!!.groupValues[1]
                 val ok = phone !in notOnWhatsApp
-                if (ok) synchronized(sent) { sent += Message("whatsapp", phone, body) }
-                ex.sendResponseHeaders(if (ok) 200 else 400, -1); ex.close()
+                if (!ok) { ex.sendResponseHeaders(400, -1); ex.close(); return@createContext }
+                val id = synchronized(sent) { "wamid.${sent.size + 1}".also { sent += Message("whatsapp", phone, body, it) } }
+                val reply = """{"messages":[{"id":"$id"}]}""".toByteArray()
+                ex.sendResponseHeaders(200, reply.size.toLong()); ex.responseBody.use { it.write(reply) }
             }
             createContext("/twilio") { ex ->
                 val form = ex.requestBody.readBytes().decodeToString().split("&")

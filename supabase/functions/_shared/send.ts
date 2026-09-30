@@ -4,19 +4,26 @@
 export const env = (key: string) => Deno.env.get(key) ?? "";
 
 /** Sends a Meta-approved template (docs/whatsapp-templates.md) to [phone], digits with country code. */
-export async function viaWhatsApp(phone: string, name: string, components: unknown[]): Promise<boolean> {
+export const viaWhatsApp = (phone: string, name: string, components: unknown[]) =>
+  whatsApp({ to: phone, type: "template", template: { name, language: { code: "id" }, components } });
+
+/** Free-form text: only within 24 hours of the person's last message. */
+export const viaWhatsAppText = (phone: string, body: string) => whatsApp({ to: phone, type: "text", text: { body } });
+
+/** Accepted by Meta, with its message id; null when refused. */
+async function whatsApp(message: object): Promise<{ id?: string } | null> {
   const url = env("WHATSAPP_API_URL") || "https://graph.facebook.com/v23.0";
   try {
     const res = await fetch(`${url}/${env("WHATSAPP_PHONE_NUMBER_ID")}/messages`, {
       method: "POST",
       headers: { authorization: `Bearer ${env("WHATSAPP_TOKEN")}`, "content-type": "application/json" },
-      body: JSON.stringify({ messaging_product: "whatsapp", to: phone, type: "template", template: { name, language: { code: "id" }, components } }),
+      body: JSON.stringify({ messaging_product: "whatsapp", ...message }),
     });
     if (!res.ok) console.error("WhatsApp refused", res.status, await res.text());
-    return res.ok;
+    return res.ok ? { id: (await res.json().catch(() => ({}))).messages?.[0]?.id } : null;
   } catch (e) {
     console.error("WhatsApp unreachable", e);
-    return false;
+    return null;
   }
 }
 
@@ -45,5 +52,6 @@ export async function rpc(name: string, args: unknown, authorization?: string) {
     headers: { apikey: authorization ? env("SUPABASE_ANON_KEY") : service, authorization: authorization ?? `Bearer ${service}`, "content-type": "application/json" },
     body: JSON.stringify(args),
   });
-  return { ok: res.ok, status: res.status, body: res.ok ? await res.json() : await res.text() };
+  const text = await res.text(); // empty for a void function
+  return { ok: res.ok, status: res.status, body: res.ok && text ? JSON.parse(text) : text };
 }

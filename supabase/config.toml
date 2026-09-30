@@ -401,6 +401,9 @@ TWILIO_ACCOUNT_SID = "local"
 TWILIO_AUTH_TOKEN = "local"
 TWILIO_FROM = "Kinfolk"
 INVITATION_URL = "http://127.0.0.1:54321/functions/v1/invitation"
+WHATSAPP_APP_SECRET = "local"
+WHATSAPP_VERIFY_TOKEN = "local"
+NOTIFY_SECRET = "local"
 
 [functions.send-otp]
 verify_jwt = false
@@ -411,6 +414,10 @@ verify_jwt = false
 
 # Opened from WhatsApp by people without the app.
 [functions.invitation]
+verify_jwt = false
+
+# Called by Meta (signed with the app secret) and by the minute job (NOTIFY_SECRET).
+[functions.whatsapp]
 verify_jwt = false
 
 # Opened from the QR card by paramedics, without login (ADR 0003).
