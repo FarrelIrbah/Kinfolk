@@ -75,6 +75,12 @@ import id.kinfolk.data.medications
 import id.kinfolk.data.next
 import id.kinfolk.data.removeCareContact
 import id.kinfolk.data.Provider
+import id.kinfolk.data.Question
+import id.kinfolk.data.VisitNote
+import id.kinfolk.data.askQuestion
+import id.kinfolk.data.questions
+import id.kinfolk.data.saveVisitNote
+import id.kinfolk.data.visitNote
 import id.kinfolk.data.addProvider
 import id.kinfolk.data.cancelAppointment
 import id.kinfolk.data.careRecipients
@@ -92,6 +98,7 @@ import id.kinfolk.ui.KinfolkTheme
 import id.kinfolk.ui.SvgPath
 import id.kinfolk.ui.appointment.ApptFormScreen
 import id.kinfolk.ui.appointment.ApptScreen
+import id.kinfolk.ui.appointment.VisitNoteScreen
 import id.kinfolk.ui.appointment.countdown
 import id.kinfolk.ui.appointment.hm
 import id.kinfolk.ui.appointment.longDate
@@ -141,7 +148,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, MedForm, Contacts, ContactForm }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -159,6 +166,8 @@ fun App() {
         var circle by remember { mutableStateOf<CareCircle?>(null) }
         var recipient by remember { mutableStateOf<CareRecipient?>(null) }
         var next by remember { mutableStateOf<Appointment?>(null) }
+        var questions by remember { mutableStateOf(emptyList<Question>()) } // on next
+        var note by remember { mutableStateOf<VisitNote?>(null) } // of next
         var editing by remember { mutableStateOf<Appointment?>(null) }
         var providers by remember { mutableStateOf(emptyList<Provider>()) }
         var meds by remember { mutableStateOf(emptyList<Medication>()) }
@@ -171,14 +180,20 @@ fun App() {
         val now by produceState(Clock.System.now()) { while (true) { delay(30_000); value = Clock.System.now() } }
         // ponytail: Budi's avatar color from the prototype, since Sri's green vanishes on the green Home card; #5 gives each Member a color.
         val you = Person(stringResource(Res.string.you), Color(0xFFB0643A))
-        fun person(id: String?) = you.takeIf { id != null && id == supabase.auth.currentUserOrNull()?.id }
+        fun me() = supabase.auth.currentUserOrNull()?.id
+        fun person(id: String?) = you.takeIf { id != null && id == me() }
         fun go(to: Screen, how: Nav = Nav.Push) { nav = how; screen = to }
+        suspend fun loadVisit() {
+            questions = next?.let { a -> retrying { supabase.questions(a.id) } }.orEmpty()
+            note = next?.let { a -> retrying { supabase.visitNote(a.id) } }
+        }
         suspend fun loadHome() {
             val c = circle ?: return
             // The card stays until the day ends: its "Tulis catatan" button is for after the visit.
             val today = Clock.System.now().toLocalDateTime(tz).date.atStartOfDayIn(tz)
             recipient = retrying { supabase.careRecipients(c.id).firstOrNull() }
             next = retrying { supabase.nextAppointment(c.id, since = today) }
+            loadVisit()
             meds = retrying { supabase.medications(c.id) }
             sent = retrying { if (supabase.roleIn(c.id) == Role.admin) supabase.invitations(c.id) else null }
         }
@@ -284,7 +299,7 @@ fun App() {
                                             whenLabel(a.startsAt, now, tz), countdown(a.startsAt, now, tz), a.title,
                                             a.withWhom(),
                                             person(a.driverId), a.departsAt?.let { hm(it.toLocalDateTime(tz).time) },
-                                            questionCount = 0, noteReady = false, // ponytail: both come with #7
+                                            questionCount = questions.size, noteReady = note != null,
                                         )
                                     },
                                     invites = sent?.let { all -> all.count { !it.pending } to all.size },
@@ -293,7 +308,9 @@ fun App() {
                                         ?.let { m -> listOf(m.name, m.schedule).filter { it.isNotBlank() }.joinToString(" · ") }
                                         ?: stringResource(Res.string.no_meds),
                                 ),
-                                onSos = {}, onOpenAppointment = { go(Screen.Appt) }, onAddAppointment = { openForm(null) }, onWriteNote = {},
+                                onSos = {}, onOpenAppointment = { go(Screen.Appt) }, onAddAppointment = { openForm(null) },
+                                // Only the Attendee writes the Visit Note; the others add Questions until it's ready.
+                                onWriteNote = { go(if (note != null || next?.attendeeId == me()) Screen.VisitNote else Screen.Appt) },
                                 onRota = { nav = Nav.Tab; tab = Tab.Rota }, onRecords = { nav = Nav.Tab; tab = Tab.Records },
                                 onTimeline = { nav = Nav.Tab; tab = Tab.Timeline },
                                 onInvite = { go(Screen.Onb2) },
@@ -303,7 +320,23 @@ fun App() {
                             else -> {}
                         }
                         Screen.Appt -> next?.let { a ->
-                            ApptScreen(a, now, tz, ::person, recipient?.name.orEmpty(), onBack = { go(Screen.Home, Nav.Back) }, onEdit = { openForm(a) })
+                            ApptScreen(
+                                a, questions, note != null, now, tz, ::person, a.attendeeId == me(), recipient?.name.orEmpty(),
+                                onBack = { go(Screen.Home, Nav.Back) }, onEdit = { openForm(a) },
+                                // Not retried: adding is not idempotent.
+                                ask = { text -> attempt { supabase.askQuestion(a.circleId, a.id, text); loadVisit() } != null },
+                                onNote = { go(Screen.VisitNote) },
+                            )
+                        }
+                        Screen.VisitNote -> next?.let { a ->
+                            VisitNoteScreen(
+                                a, questions, note, editable = a.attendeeId == me(), recipient?.name.orEmpty(), now, tz,
+                                onHome = { go(Screen.Home, Nav.Back) },
+                                save = { answers, steps, notes ->
+                                    attempt { supabase.saveVisitNote(a.id, answers, steps, notes); loadVisit() }
+                                        .also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                                },
+                            )
                         }
                         Screen.ApptForm -> ApptFormScreen(
                             editing, providers, supabase.auth.currentUserOrNull()?.id.orEmpty(), tz,

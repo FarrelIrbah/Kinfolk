@@ -39,6 +39,7 @@ import kinfolk.shared.generated.resources.drives
 import kinfolk.shared.generated.resources.latest
 import kinfolk.shared.generated.resources.meds_today
 import kinfolk.shared.generated.resources.note_ready
+import kinfolk.shared.generated.resources.open_summary
 import kinfolk.shared.generated.resources.questions_count
 import kinfolk.shared.generated.resources.see_all
 import kinfolk.shared.generated.resources.see_rota
@@ -207,7 +208,7 @@ private fun AppointmentCard(a: NextAppointment, onOpen: () -> Unit, onWriteNote:
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CardButton(stringResource(Res.string.questions_count, a.questionCount), CreamBtn, Cream, onOpen, Modifier.weight(1f))
-            CardButton(stringResource(Res.string.write_note), Cream, Kf.Green, onWriteNote, Modifier.weight(1f))
+            CardButton(stringResource(if (a.noteReady) Res.string.open_summary else Res.string.write_note), Cream, Kf.Green, onWriteNote, Modifier.weight(1f))
         }
     }
 }

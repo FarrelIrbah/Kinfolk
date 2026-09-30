@@ -2,6 +2,7 @@ package id.kinfolk.ui.appointment
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -43,6 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import id.kinfolk.data.Appointment
 import id.kinfolk.data.Provider
+import id.kinfolk.data.Question
+import id.kinfolk.ui.AddRow
+import id.kinfolk.ui.Card
+import id.kinfolk.ui.Hairline
 import id.kinfolk.ui.Avatar
 import id.kinfolk.ui.ErrorText
 import id.kinfolk.ui.Field
@@ -57,6 +62,15 @@ import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
 import kinfolk.shared.generated.resources.appt_form_head
+import kinfolk.shared.generated.resources.write_note
+import kinfolk.shared.generated.resources.visit_note_card_sub
+import kinfolk.shared.generated.resources.visit_note_card
+import kinfolk.shared.generated.resources.questions_to_ask
+import kinfolk.shared.generated.resources.open_summary
+import kinfolk.shared.generated.resources.from_all
+import kinfolk.shared.generated.resources.carried_from
+import kinfolk.shared.generated.resources.add_question
+import kinfolk.shared.generated.resources.add
 import kinfolk.shared.generated.resources.back
 import kinfolk.shared.generated.resources.bring
 import kinfolk.shared.generated.resources.cancel_appt
@@ -84,9 +98,29 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 import org.jetbrains.compose.resources.stringResource
 
-/** `appt` from design v3, without Questions and the record card until #7 (docs/screen-map.md). */
+/**
+ * `appt` from design v3 (docs/screen-map.md). The record card became the Visit Note card (#7): "Tulis catatan" for the
+ * Attendee, "Buka ringkasan" for everyone once it's saved. [ask] returns false when the server couldn't be reached.
+ */
 @Composable
-fun ApptScreen(a: Appointment, now: Instant, tz: TimeZone, person: (String?) -> Person?, recipientName: String, onBack: () -> Unit, onEdit: () -> Unit) {
+fun ApptScreen(
+    a: Appointment,
+    questions: List<Question>,
+    noteReady: Boolean,
+    now: Instant,
+    tz: TimeZone,
+    person: (String?) -> Person?,
+    isAttendee: Boolean,
+    recipientName: String,
+    onBack: () -> Unit,
+    onEdit: () -> Unit,
+    ask: suspend (String) -> Boolean,
+    onNote: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var draft by rememberSaveable { mutableStateOf("") }
+    var failed by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -113,9 +147,54 @@ fun ApptScreen(a: Appointment, now: Instant, tz: TimeZone, person: (String?) -> 
                 Text(room, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(Res.string.questions_to_ask), style = serifStyle(20f), modifier = Modifier.alignByBaseline())
+                Text(stringResource(Res.string.from_all), fontSize = 13.sp, color = Kf.Muted, modifier = Modifier.alignByBaseline())
+            }
+            Card {
+                questions.forEach { q ->
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Avatar(q.askedByName.orEmpty().take(1), AskerColor, 26.dp, 11.sp)
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(q.text, fontSize = 15.sp, lineHeight = (15 * 1.4).sp)
+                            if (q.carried) Text(
+                                stringResource(Res.string.carried_from, dayMonth(q.askedFor.toLocalDateTime(tz).date)),
+                                fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Kf.Muted,
+                            )
+                        }
+                    }
+                    Hairline()
+                }
+                // Once the Visit Note is saved, new Questions belong to the next visit.
+                if (!noteReady) AddRow(draft, { draft = it }, stringResource(Res.string.add_question), stringResource(Res.string.add), Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                    val text = draft.trim()
+                    if (text.isNotEmpty() && !busy) scope.launch {
+                        busy = true
+                        failed = !ask(text)
+                        if (!failed && draft.trim() == text) draft = ""
+                        busy = false
+                    }
+                }
+            }
+            if (failed) ErrorText(stringResource(Res.string.no_connection))
+        }
         if (a.bring.isNotBlank()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(Res.string.bring), style = serifStyle(20f))
             Text(a.bring, fontSize = 15.sp, lineHeight = (15 * 1.5).sp, color = Kf.Ink2)
+        }
+        if (noteReady || isAttendee) Column(
+            Modifier.fillMaxWidth().background(Kf.CardAlt, RoundedCornerShape(18.dp)).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(stringResource(Res.string.visit_note_card), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(Res.string.visit_note_card_sub), fontSize = 14.sp, lineHeight = (14 * 1.45).sp, color = Kf.Ink2)
+            Box(
+                Modifier.padding(top = 6.dp).fillMaxWidth().height(50.dp).background(Kf.Green, RoundedCornerShape(14.dp)).tap(onNote),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(if (noteReady) Res.string.open_summary else Res.string.write_note), color = Kf.Paper, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }

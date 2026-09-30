@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -33,6 +35,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -139,23 +142,48 @@ fun SectionLabel(text: String) =
 /** "+ Unggah dokumen" / "+ Tambah kontak": height 50, radius 16, 1.5px dashed rgba(34,38,31,.25), 15px 500. */
 @Composable
 fun DashedButton(text: String, onClick: () -> Unit) {
-    Box(
-        Modifier.fillMaxWidth().height(50.dp).drawBehind {
-            val w = 1.5.dp.toPx()
-            // ponytail: Chrome's dash rhythm for a 1.5px border (dashes and gaps ~3x the width), matched by eye.
-            drawRoundRect(
-                DashLine, topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w),
-                cornerRadius = CornerRadius(16.dp.toPx() - w / 2),
-                style = Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * w, 3 * w))),
-            )
-        }.tap(onClick),
-        contentAlignment = Alignment.Center,
-    ) {
+    Box(Modifier.fillMaxWidth().height(50.dp).dashed().tap(onClick), contentAlignment = Alignment.Center) {
         Text(text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
     }
 }
 
 private val DashLine = Color(0x4022261F) // rgba(34,38,31,.25)
+
+/** border:1.5px dashed rgba(34,38,31,.25); border-radius:16px. */
+fun Modifier.dashed() = drawBehind {
+    val w = 1.5.dp.toPx()
+    // ponytail: Chrome's dash rhythm for a 1.5px border (dashes and gaps ~3x the width), matched by eye.
+    drawRoundRect(
+        DashLine, topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w),
+        cornerRadius = CornerRadius(16.dp.toPx() - w / 2),
+        style = Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * w, 3 * w))),
+    )
+}
+
+/** A bare text input showing [hint] in the muted color while empty. */
+@Composable
+fun HintedInput(value: String, onValue: (String) -> Unit, hint: String, style: TextStyle, modifier: Modifier = Modifier, singleLine: Boolean = false) =
+    BasicTextField(
+        value, onValue, modifier.fillMaxWidth(), textStyle = style, singleLine = singleLine,
+        decorationBox = { field -> Box { if (value.isEmpty()) Text(hint, style = style.copy(color = Kf.Muted)); field() } },
+    )
+
+/** `appt` "Tambah pertanyaan…" row: 44px input (white, 1px rgba(34,38,31,.14), radius 12) and a dark "Tambah" button. */
+@Composable
+fun AddRow(value: String, onValue: (String) -> Unit, hint: String, button: String, modifier: Modifier = Modifier, onAdd: () -> Unit) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier.weight(1f).height(44.dp).background(Color.White, RoundedCornerShape(12.dp))
+                .border(1.dp, Color(0x2422261F), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            HintedInput(value, onValue, hint, LocalTextStyle.current.copy(fontSize = 15.sp, color = Kf.Ink), singleLine = true)
+        }
+        Box(Modifier.height(44.dp).background(Kf.Ink, RoundedCornerShape(12.dp)).tap(onAdd).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+            Text(button, color = Kf.Paper, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
 
 /** Switch from `notes`/`member`: 50x30 track (#2F5D4A on, #D6CEBF off), 24px white knob; label 14px, gap 10. */
 @Composable

@@ -25,15 +25,20 @@ fun parseHm(digits: String): LocalTime? {
     return if (h < 24 && m < 60) LocalTime(h, m) else null
 }
 
-fun whenLabel(startsAt: Instant, now: Instant, tz: TimeZone): String {
-    val at = startsAt.toLocalDateTime(tz)
-    val day = when (now.toLocalDateTime(tz).date.daysUntil(at.date)) {
+/** "24 Sept", for "Dari kunjungan 24 Sept" (approved in #7). */
+fun dayMonth(d: LocalDate) = "${d.day} ${months[d.month.ordinal]}"
+
+/** "Hari ini", "Besok" or "Kam, 1 Okt". */
+fun dayLabel(startsAt: Instant, now: Instant, tz: TimeZone): String {
+    val at = startsAt.toLocalDateTime(tz).date
+    return when (now.toLocalDateTime(tz).date.daysUntil(at)) {
         0 -> "Hari ini"
         1 -> "Besok"
-        else -> shortDate(at.date)
+        else -> shortDate(at)
     }
-    return "$day · ${hm(at.time)}"
 }
+
+fun whenLabel(startsAt: Instant, now: Instant, tz: TimeZone) = "${dayLabel(startsAt, now, tz)} · ${hm(startsAt.toLocalDateTime(tz).time)}"
 
 fun countdown(startsAt: Instant, now: Instant, tz: TimeZone): String {
     if (startsAt <= now) return "Sedang berlangsung"

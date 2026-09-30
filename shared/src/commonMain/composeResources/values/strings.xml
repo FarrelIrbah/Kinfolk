@@ -126,4 +126,23 @@
     <string name="will_send">Kirim WA ✓</string>
     <string name="cancel_invite">Batalkan</string>
     <string name="send_invites">Kirim %1$d undangan WhatsApp</string>
+
+    <!-- appt Questions and summary (Visit Note) -->
+    <string name="questions_to_ask">Pertanyaan untuk dokter</string>
+    <string name="from_all">dari semua</string>
+    <string name="add_question">Tambah pertanyaan…</string>
+    <string name="add">Tambah</string>
+    <string name="open_summary">Buka ringkasan</string>
+    <string name="back_home">‹ Beranda</string>
+    <string name="asked_answered">Ditanyakan &amp; dijawab</string>
+    <string name="next_steps">Langkah berikutnya</string>
+    <string name="not_answered">Belum terjawab saat kunjungan</string>
+    <string name="carried_to">Ditambahkan ke pertanyaan untuk kunjungan %1$s berikutnya dengan %2$s.</string>
+
+    <!-- Visit Note: approved deviation (issue #7, docs/screen-map.md) -->
+    <string name="visit_note_card">Catatan kunjungan</string>
+    <string name="visit_note_card_sub">Pertanyaan, jawaban dokter, dan langkah berikutnya ditulis untuk semua.</string>
+    <string name="answer_hint">Jawaban dokter…</string>
+    <string name="add_step">Tambah langkah…</string>
+    <string name="carried_from">Dari kunjungan %1$s</string>
 </resources>
