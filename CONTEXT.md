@@ -31,7 +31,7 @@ Posisi Member di Care Circle (admin, sibling, parent, viewer) yang menentukan ak
 _Avoid_: permission level, type
 
 **Data Category**:
-Kelompok data kesehatan yang aksesnya bisa dibatasi per Member di luar akses dasar Role-nya. Di v1: janji dokter (beserta Question), Visit Note, Medication. UI: "Janji dokter", "Catatan kunjungan", "Obat".
+Kelompok data kesehatan yang aksesnya bisa dibatasi per Member di luar akses dasar Role-nya. Ada enam: janji dokter (beserta Question), rekaman kunjungan (Recording, Transcript, Visit Note), Medication, Document, dokumen keinginan & hukum, Expense. UI: "Janji dokter", "Rekaman kunjungan", "Obat", "Dokumen", "Keinginan & hukum", "Tagihan & uang".
 _Avoid_: tag, section
 
 ### Perawatan
@@ -61,7 +61,7 @@ Orang di luar Care Circle yang relevan untuk perawatan; sebagian ditandai sebaga
 _Avoid_: contact person, emergency contact (sebagai istilah terpisah)
 
 **Visit Note**:
-Catatan hasil satu Appointment, ditulis Attendee: Questions beserta jawabannya, Next Steps, dan catatan bebas. UI: "Catatan Kunjungan".
+Catatan hasil satu Appointment: Questions beserta jawabannya, Next Steps, dan catatan bebas. Dihasilkan dari Transcript lalu dicek dan dibagikan Attendee, atau ditulis Attendee dengan tangan. UI: "Ringkasan" (dari rekaman), "Catatan kunjungan" (manual).
 _Avoid_: summary, report, notes
 
 **Question**:
@@ -69,13 +69,58 @@ Hal yang ingin ditanyakan ke tenaga kesehatan. Jika tak terjawab, terbawa ke App
 _Avoid_: agenda item, topic
 
 **Next Step**:
-Tindak lanjut yang disepakati di sebuah Appointment. UI: "Langkah Berikutnya".
+Tindak lanjut yang disepakati di sebuah Appointment, dengan satu Member pemilik dan tenggat; setiap Next Step juga menjadi Task. UI: "Langkah Berikutnya".
 _Avoid_: action item, follow-up
 
 **Duty**:
-Tugas perawatan berulang yang bergilir antar Member (mis. cek malam, belanja obat). Berbeda dari penugasan mengantar ke Appointment yang sekali jalan. UI: "Giliran".
+Tugas perawatan berulang yang bergilir antar Member setiap hari (mis. telepon cek malam). Satu hari dipegang satu Member, dan bisa ditukar per hari. Berbeda dari penugasan mengantar ke Appointment yang sekali jalan. UI: "Giliran".
 _Avoid_: task, chore, rota
 
 **Emergency Info**:
-Ringkasan tetap tentang Care Recipient untuk paramedis (alergi, obat aktif, kondisi, kontak darurat), bisa dibuka siapa saja yang memegang link-nya, tanpa login. Tidak tunduk pada Data Category.
+Ringkasan tetap tentang Care Recipient untuk paramedis (alergi, kondisi, obat aktif, pengencer darah, umur, berat badan, keinginan tindakan, kontak darurat), bisa dibuka siapa saja yang memegang link-nya, tanpa login. Tidak tunduk pada Data Category.
 _Avoid_: SOS page, medical ID
+
+**Dose Log**:
+Tanda bahwa satu jadwal Medication sudah diberikan pada hari tertentu, beserta siapa yang menandai. UI: "Diberikan".
+_Avoid_: intake, adherence record
+
+**Check-in**:
+Catatan harian tetap tentang Care Recipient setelah telepon malam: tekanan darah, makan malam, berjalan, suasana hati, catatan bebas. Kumpulannya menjadi tren kondisi. UI: "Cek malam".
+_Avoid_: vitals, daily log
+
+**Task**:
+Pekerjaan sekali jalan dengan satu Member pemilik dan tenggat; berasal dari Next Step, pengingat isi ulang Medication, atau ditambahkan Member. UI: "Tugas".
+_Avoid_: to-do, action item, Duty
+
+**Expense**:
+Catatan siapa membayar apa untuk perawatan, dalam Rupiah. Kinfolk tidak menagih siapa pun. UI: "Biaya".
+_Avoid_: bill, payment, reimbursement
+
+**Document**:
+Berkas tentang Care Recipient (laporan, asuransi, identitas, surat hukum) yang disimpan terenkripsi per Care Circle; setiap unggahan ulang menjadi versi baru. UI: "Dokumen".
+_Avoid_: file, attachment
+
+**Note**:
+Tulisan bebas seorang Member, dibagikan ke Care Circle atau hanya untuk penulisnya. UI: "Catatan".
+_Avoid_: memo, Visit Note
+
+**Recording**:
+Audio sebuah Appointment yang direkam dengan izin semua orang di ruangan; hasilnya Transcript, lalu Visit Note. UI: "Rekaman".
+_Avoid_: audio file, voice memo
+
+**Transcript**:
+Teks Recording per segmen berlabel pembicara dan waktu, menjadi rujukan setiap baris Visit Note. UI: "Transkrip".
+_Avoid_: captions
+
+**Handoff**:
+Ringkasan pendek sebuah Appointment untuk Member yang tidak ada di ruangan, dikirim lewat WhatsApp. UI: "Serah terima".
+_Avoid_: update, recap
+
+**Away**:
+Status Member yang tidak bisa memegang Duty sampai akhir minggu; hari-harinya ditawarkan ke Member lain. UI: "Berhalangan".
+_Avoid_: vacation, leave
+
+**Subscription**:
+Langganan satu Care Circle (paket keluarga dan add-on transkripsi), dibayar oleh Member mana pun. UI: "Paket".
+_Avoid_: plan per user, account
+
