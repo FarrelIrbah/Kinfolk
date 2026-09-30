@@ -17,4 +17,42 @@
     <string name="meds_today">Obat hari ini</string>
     <string name="latest">Terbaru</string>
     <string name="see_all">Lihat semua</string>
+
+    <!-- onb0, onb1 -->
+    <string name="onb_head">Satu tempat bagi kalian berlima untuk merawat Bapak.</string>
+    <string name="onb_sub">Janji dokter, obat, dokumen, dan siapa mengerjakan apa minggu ini. Semua melihat riwayat yang sama.</string>
+    <string name="onb_create">Buat lingkaran perawatan</string>
+    <string name="onb_invited">Saya diundang</string>
+    <string name="onb1_head">Siapa yang Anda rawat?</string>
+    <string name="their_name">Namanya</string>
+    <string name="they_are">Beliau adalah</string>
+    <string name="main_need">Apa yang paling sering perlu dikoordinasi?</string>
+    <string name="continue_">Lanjut</string>
+    <string name="relation_father">Ayah</string>
+    <string name="relation_mother">Ibu</string>
+    <string name="relation_grandparent">Kakek/Nenek</string>
+    <string name="relation_spouse">Pasangan</string>
+    <string name="need_visits">Kunjungan dokter</string>
+    <string name="need_medicines">Obat</string>
+    <string name="need_check_ins">Cek harian</string>
+    <string name="need_paperwork">Dokumen</string>
+    <string name="back">‹ Kembali</string>
+
+    <!-- Sign-in: approved deviation (issue #2, docs/screen-map.md) -->
+    <string name="onb_sign_in">Sudah bergabung? Masuk</string>
+    <string name="phone_head">Nomor WhatsApp Anda</string>
+    <string name="phone_sub">Kami kirim kode masuk lewat WhatsApp. Tanpa kata sandi.</string>
+    <string name="phone_label">Nomor HP</string>
+    <string name="send_code">Kirim kode</string>
+    <string name="sms_fallback">Kalau WhatsApp tidak masuk, kami kirim lewat SMS.</string>
+    <string name="code_head">Masukkan kode</string>
+    <string name="code_sub">Dikirim ke WhatsApp %1$s.</string>
+    <string name="code_sub_sms">Dikirim lewat SMS ke %1$s.</string>
+    <string name="no_connection">Tidak tersambung. Coba lagi.</string>
+    <string name="code_label">Kode 6 angka</string>
+    <string name="code_wrong">Kode salah. Coba lagi.</string>
+    <string name="resend_in">Kirim ulang (%1$s)</string>
+    <string name="resend">Kirim ulang</string>
+    <string name="send_sms">Kirim lewat SMS</string>
+    <string name="sign_in">Masuk</string>
 </resources>

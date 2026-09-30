@@ -34,6 +34,7 @@ object Kf {
     val Hairline = Color(0x1222261F) // rgba(34,38,31,.07)
     val Border = Color(0x1A22261F) // rgba(34,38,31,.1)
     val TabBorder = Color(0x1422261F) // rgba(34,38,31,.08)
+    val InputBorder = Color(0x2E22261F) // rgba(34,38,31,.18)
 }
 
 @Composable
@@ -45,19 +46,19 @@ fun sans(): FontFamily = FontFamily(
 
 // ponytail: browser applies Newsreader's optical size automatically (opsz = font-size); Compose doesn't, so pass it per size.
 @Composable
-fun serif(size: Float): FontFamily = FontFamily(
+fun serif(size: Float, weight: Int = 500): FontFamily = FontFamily(
     Font(
         Res.font.newsreader,
-        FontWeight.Medium,
-        variationSettings = FontVariation.Settings(FontVariation.weight(500), FontVariation.Setting("opsz", size.coerceIn(6f, 72f))),
+        FontWeight(weight),
+        variationSettings = FontVariation.Settings(FontVariation.weight(weight), FontVariation.Setting("opsz", size.coerceIn(6f, 72f))),
     )
 )
 
-/** `font:500 {size}px/{lineHeight} 'Newsreader'` from the design. */
+/** `font:{weight} {size}px/{lineHeight} 'Newsreader'` from the design. */
 @Composable
-fun serifStyle(size: Float, lineHeight: Float? = null): TextStyle = TextStyle(
-    fontFamily = serif(size),
-    fontWeight = FontWeight.Medium,
+fun serifStyle(size: Float, lineHeight: Float? = null, weight: Int = 500): TextStyle = TextStyle(
+    fontFamily = serif(size, weight),
+    fontWeight = FontWeight(weight),
     fontSize = size.sp,
     lineHeight = lineHeight?.let { (size * it).sp } ?: TextUnit.Unspecified,
     color = Kf.Ink,

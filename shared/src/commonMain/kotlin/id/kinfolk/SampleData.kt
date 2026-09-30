@@ -20,7 +20,7 @@ object SampleData {
 
     val home = HomeState(
         todayLabel = "Selasa, 29 Sept",
-        recipientName = "Tukiman",
+        circleName = "Tukiman",
         memberCount = 6,
         next = NextAppointment(
             whenLabel = "Hari ini · 14.30",

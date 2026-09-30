@@ -58,7 +58,7 @@ data class FeedItem(val by: Person, val text: String, val whenLabel: String)
 
 data class HomeState(
     val todayLabel: String,
-    val recipientName: String,
+    val circleName: String,
     val memberCount: Int,
     val next: NextAppointment?,
     val week: List<DutyDay>,
@@ -87,7 +87,7 @@ fun HomeScreen(
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(Res.string.circle_name, s.recipientName, s.memberCount), fontSize = 13.sp, color = Kf.Muted)
+                Text(stringResource(Res.string.circle_name, s.circleName, s.memberCount), fontSize = 13.sp, color = Kf.Muted)
                 Text(s.todayLabel, style = serifStyle(30f, 1.1f))
             }
             // ponytail: inbox bell hidden until in-app notifications ship (docs/screen-map.md).
