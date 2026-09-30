@@ -8,7 +8,7 @@ Sumber: `design/Kinfolk_ Family Care Coordination/Kinfolk v3.dc.html`. Nama laya
 |---|---|---|
 | `onb0`–`onb3` | Onboarding: buat Care Circle, tambah Care Recipient, kirim Invitation | |
 | `invitee` | Terima Invitation | Web tipis untuk yang tanpa app |
-| `home` | Beranda | Satu versi, tanpa varian waktu (pagi/sebelum/sesudah/malam). Obat hari ini tampil sebagai jadwal, tanpa centang dosis |
+| `home` | Beranda | Satu versi (kartu "sebelum kunjungan"), tanpa varian waktu. Disembunyikan: lonceng inbox, pencarian, baris Tugas, baris ringkasan mingguan. Lingkaran obat penuh + jumlah obat hari ini (tanpa progres dosis). Tombol "Rekam" → "Tulis catatan"; badge jadi "Catatan siap" setelah Visit Note tersimpan. Tab bar tanpa backdrop blur (Compose tak punya) |
 | `appt` | Detail Appointment | Driver + Attendee, daftar Question, kolom teks "Bawa" |
 | `summary` | Visit Note | Tata letak dipakai sebagai form isian manual (tanpa transkrip) |
 | `rotation` | Duty + tukar giliran | Tampilan minggu saja |
