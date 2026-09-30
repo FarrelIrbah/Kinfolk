@@ -400,8 +400,17 @@ TWILIO_API_URL = "http://host.docker.internal:54399/twilio"
 TWILIO_ACCOUNT_SID = "local"
 TWILIO_AUTH_TOKEN = "local"
 TWILIO_FROM = "Kinfolk"
+INVITATION_URL = "http://127.0.0.1:54321/functions/v1/invitation"
 
 [functions.send-otp]
+verify_jwt = false
+
+# The admin's token is checked by the database (the invite function saves the Invitation as them).
+[functions.invite]
+verify_jwt = false
+
+# Opened from WhatsApp by people without the app.
+[functions.invitation]
 verify_jwt = false
 
 [analytics]

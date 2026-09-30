@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -60,6 +61,15 @@ fun Avatar(initial: String, color: Color, size: Dp, fontSize: TextUnit) {
         Text(initial, color = Color.White, fontSize = fontSize, fontWeight = FontWeight.SemiBold)
     }
 }
+
+/** List card from `contacts`/`circle`/onb2: #FBF8F2, radius 18, rows clipped. */
+@Composable
+fun Card(content: @Composable () -> Unit) =
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Kf.Card)) { content() }
+
+/** border-bottom:1px solid rgba(34,38,31,.07) on each row. */
+@Composable
+fun Hairline() = Box(Modifier.fillMaxWidth().height(1.dp).background(Kf.Hairline))
 
 /** Back pill from `appt`/`handoff`: height 40, #FBF8F2, 14px. */
 @Composable

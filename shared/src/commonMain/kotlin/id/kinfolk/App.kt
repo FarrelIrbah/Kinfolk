@@ -54,6 +54,15 @@ import id.kinfolk.data.CareCircle
 import id.kinfolk.data.CareContact
 import id.kinfolk.data.CareContactDraft
 import id.kinfolk.data.CareRecipient
+import id.kinfolk.data.Invitation
+import id.kinfolk.data.InvitationToMe
+import id.kinfolk.data.Role
+import id.kinfolk.data.acceptInvitation
+import id.kinfolk.data.cancelInvitation
+import id.kinfolk.data.invitations
+import id.kinfolk.data.invite
+import id.kinfolk.data.myInvitations
+import id.kinfolk.data.roleIn
 import id.kinfolk.data.Medication
 import id.kinfolk.data.MedicationDraft
 import id.kinfolk.data.addCareContact
@@ -96,7 +105,9 @@ import id.kinfolk.ui.home.NextAppointment
 import id.kinfolk.ui.home.Person
 import id.kinfolk.ui.onboarding.CodeScreen
 import id.kinfolk.ui.onboarding.Onb0
+import id.kinfolk.ui.onboarding.Invitee
 import id.kinfolk.ui.onboarding.Onb1
+import id.kinfolk.ui.onboarding.Onb2
 import id.kinfolk.ui.onboarding.PhoneScreen
 import id.kinfolk.ui.onboarding.e164
 import id.kinfolk.ui.records.MedFormScreen
@@ -130,7 +141,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Home, Appt, ApptForm, MedForm, Contacts, ContactForm }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, MedForm, Contacts, ContactForm }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -154,6 +165,8 @@ fun App() {
         var editingMed by remember { mutableStateOf<Medication?>(null) }
         var contacts by remember { mutableStateOf(emptyList<CareContact>()) }
         var editingContact by remember { mutableStateOf<CareContact?>(null) }
+        var invitation by remember { mutableStateOf<InvitationToMe?>(null) }
+        var sent by remember { mutableStateOf<List<Invitation>?>(null) } // null unless admin
         val tz = remember { TimeZone.currentSystemDefault() }
         val now by produceState(Clock.System.now()) { while (true) { delay(30_000); value = Clock.System.now() } }
         // ponytail: Budi's avatar color from the prototype, since Sri's green vanishes on the green Home card; #5 gives each Member a color.
@@ -167,11 +180,18 @@ fun App() {
             recipient = retrying { supabase.careRecipients(c.id).firstOrNull() }
             next = retrying { supabase.nextAppointment(c.id, since = today) }
             meds = retrying { supabase.medications(c.id) }
+            sent = retrying { if (supabase.roleIn(c.id) == Role.admin) supabase.invitations(c.id) else null }
         }
         suspend fun land(how: Nav) {
             circle = retrying { supabase.myCareCircle() }
             loadHome()
-            go(if (circle != null) Screen.Home else Screen.Onb1, if (circle != null) Nav.Tab else how)
+            // Whoever signs in without a Care Circle but with a pending Invitation to their number sees `invitee`.
+            invitation = if (circle == null) retrying { supabase.myInvitations() }.firstOrNull() else null
+            when {
+                circle != null -> go(Screen.Home, Nav.Tab)
+                invitation != null -> go(Screen.Invitee, how)
+                else -> go(Screen.Onb1, how)
+            }
         }
         fun openForm(a: Appointment?) = scope.launch {
             editing = a
@@ -215,7 +235,7 @@ fun App() {
                         null -> {}
                         Screen.Onb0 -> Onb0(
                             onCreate = { go(Screen.Phone) },
-                            // ponytail: the invited path lands like any sign-in until the invitee ticket adds its screen.
+                            // Signing in finds the Invitation to this number (see land).
                             onInvited = { go(Screen.Phone) },
                             onSignIn = { go(Screen.Phone) },
                         )
@@ -238,9 +258,20 @@ fun App() {
                                 }
                             },
                         )
-                        Screen.Onb1 -> Onb1 { name, relation, needs ->
+                        Screen.Onb1 -> Onb1 { myName, name, relation, needs ->
                             // Not retried: creating is not idempotent.
-                            (attempt { supabase.createCareCircle(name, relation, needs) } != null).also { if (it) land(Nav.Tab) }
+                            (attempt { supabase.createCareCircle(name, relation, needs, myName) } != null).also {
+                                if (it) { circle = retrying { supabase.myCareCircle() }; loadHome(); go(Screen.Onb2) }
+                            }
+                        }
+                        Screen.Onb2 -> Onb2(
+                            sent.orEmpty().filter { it.pending },
+                            cancel = { inv -> attempt { supabase.cancelInvitation(inv.id) } != null },
+                            send = { name, phone -> attempt { supabase.invite(circle!!.id, name, phone) } != null },
+                            onDone = { scope.launch { loadHome(); go(Screen.Home, Nav.Tab) } },
+                        )
+                        Screen.Invitee -> invitation?.let { inv ->
+                            Invitee(inv) { attempt { supabase.acceptInvitation(inv.id) }?.let { land(Nav.Tab) } != null }
                         }
                         Screen.Home -> when (t) {
                             // ponytail: header, Appointment and Medications are real; the rest is prototype sample data until its tickets land.
@@ -256,6 +287,7 @@ fun App() {
                                             questionCount = 0, noteReady = false, // ponytail: both come with #7
                                         )
                                     },
+                                    invites = sent?.let { all -> all.count { !it.pending } to all.size },
                                     medsToday = meds.current().size,
                                     nextMed = meds.current().next(now.toLocalDateTime(tz).time)
                                         ?.let { m -> listOf(m.name, m.schedule).filter { it.isNotBlank() }.joinToString(" · ") }
@@ -264,6 +296,7 @@ fun App() {
                                 onSos = {}, onOpenAppointment = { go(Screen.Appt) }, onAddAppointment = { openForm(null) }, onWriteNote = {},
                                 onRota = { nav = Nav.Tab; tab = Tab.Rota }, onRecords = { nav = Nav.Tab; tab = Tab.Records },
                                 onTimeline = { nav = Nav.Tab; tab = Tab.Timeline },
+                                onInvite = { go(Screen.Onb2) },
                             )
                             Tab.Records -> RecordsScreen(meds) { editingMed = it; go(Screen.MedForm) }
                             Tab.Circle -> CircleScreen(circle?.name.orEmpty(), circle?.memberCount ?: 0, onSos = {}) { scope.launch { loadContacts(); go(Screen.Contacts) } }

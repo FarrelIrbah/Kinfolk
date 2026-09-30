@@ -28,6 +28,10 @@ import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
 import kinfolk.shared.generated.resources.add_appt
 import kinfolk.shared.generated.resources.add_appt_sub
+import kinfolk.shared.generated.resources.add_meds
+import kinfolk.shared.generated.resources.add_meds_sub
+import kinfolk.shared.generated.resources.invite_siblings
+import kinfolk.shared.generated.resources.joined_of
 import kinfolk.shared.generated.resources.drives_no_time
 import kinfolk.shared.generated.resources.no_driver
 import kinfolk.shared.generated.resources.circle_name
@@ -71,6 +75,8 @@ data class HomeState(
     val medsToday: Int,
     val nextMed: String,
     val feed: List<FeedItem>,
+    /** Joined and total non-cancelled Invitations for `empty` row 3; null hides the row (admins only). */
+    val invites: Pair<Int, Int>? = null,
 )
 
 private val Cream = Color(0xFFF3EEE4)
@@ -88,6 +94,7 @@ fun HomeScreen(
     onRota: () -> Unit,
     onRecords: () -> Unit,
     onTimeline: () -> Unit,
+    onInvite: () -> Unit,
 ) {
     // design: padding:4px 20px; gap:22px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -106,7 +113,13 @@ fun HomeScreen(
         }
         // ponytail: search bar, tasks row and weekly digest row hidden until those features ship.
 
-        s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) } ?: AddAppointmentRow(onAddAppointment)
+        s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) } ?: Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            EmptyStep(1, stringResource(Res.string.add_appt), stringResource(Res.string.add_appt_sub), part = false, onAddAppointment)
+            EmptyStep(2, stringResource(Res.string.add_meds), stringResource(Res.string.add_meds_sub), part = false, onRecords)
+            s.invites?.let { (joined, total) ->
+                EmptyStep(3, stringResource(Res.string.invite_siblings), stringResource(Res.string.joined_of, joined, total).takeIf { total > 0 }, part = total > 0, onInvite)
+            }
+        }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionHeader(stringResource(Res.string.this_week), stringResource(Res.string.see_rota), onRota)
@@ -199,20 +212,24 @@ private fun AppointmentCard(a: NextAppointment, onOpen: () -> Unit, onWriteNote:
     }
 }
 
-/** First row of the v3 `empty` screen, shown on Home while nothing is upcoming (docs/screen-map.md). */
+/** Rows 1-3 of the v3 `empty` screen, shown on Home while nothing is upcoming (docs/screen-map.md). */
 @Composable
-private fun AddAppointmentRow(onClick: () -> Unit) {
+private fun EmptyStep(num: Int, title: String, sub: String?, part: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).tap(onClick).padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(32.dp).border(1.5.dp, Color(0x4022261F), CircleShape), contentAlignment = Alignment.Center) {
-            Text("1", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Box(
+            Modifier.size(32.dp).background(if (part) Kf.FlagBg else Color.Transparent, CircleShape)
+                .border(1.5.dp, if (part) Color(0xFFC9A77C) else Color(0x4022261F), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(num.toString(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(Res.string.add_appt), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(stringResource(Res.string.add_appt_sub), fontSize = 13.sp, color = Kf.Muted)
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            sub?.let { Text(it, fontSize = 13.sp, color = Kf.Muted) }
         }
         Text("›", color = Kf.Muted, fontSize = 18.sp)
     }

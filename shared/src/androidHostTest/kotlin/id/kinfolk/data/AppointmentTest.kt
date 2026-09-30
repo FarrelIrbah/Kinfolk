@@ -80,7 +80,7 @@ class AppointmentTest {
     fun `the Driver and the Attendee may be the same Member, or two different ones`() = runBlocking {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet())
-        val budi = joinedMember(circle)
+        val budi = joinedMember(sri, circle)
         val tukiman = sri.careRecipients(circle).single()
         val rao = sri.addProvider(circle, "Dr. Anand Rao")
         val appt = sri.scheduleAppointment(AppointmentDraft(circle, tukiman.id, rao.id, "Kontrol", null, now + 1.days, driverId = budi, attendeeId = budi))

@@ -4,6 +4,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.AuthConfig
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.serializer.KotlinXSerializer
 import kotlinx.serialization.json.Json
@@ -21,4 +22,5 @@ fun kinfolkClient(url: String = localSupabaseUrl, auth: AuthConfig.() -> Unit = 
         defaultSerializer = KotlinXSerializer(Json { encodeDefaults = true; ignoreUnknownKeys = true })
         install(Auth, auth)
         install(Postgrest)
+        install(Functions)
     }

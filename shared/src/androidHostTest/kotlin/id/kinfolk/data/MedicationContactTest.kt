@@ -14,7 +14,7 @@ class MedicationContactTest {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet())
         val tukiman = sri.careRecipients(circle).single().id
-        val budi = signedInSibling(circle)
+        val budi = signedInSibling(sri, circle)
 
         sri.addMedication(MedicationDraft(circle, tukiman, "Atorvastatin", "20 mg", "malam, 21.00", LocalTime(21, 0)))
         sri.addMedication(MedicationDraft(circle, tukiman, "Clopidogrel", "75 mg", "pagi, sesudah makan", LocalTime(7, 0)))

@@ -1,16 +1,19 @@
 package id.kinfolk.data
 
+import com.sun.net.httpserver.HttpServer
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.AuthConfig
 import io.github.jan.supabase.auth.MemoryCodeVerifierCache
 import io.github.jan.supabase.auth.MemorySessionManager
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import java.net.InetSocketAddress
+import java.net.URLDecoder
 import kotlin.random.Random
 
 // Test seam: the Supabase API of the local stack (`npx supabase start`), used as a specific Member.
 
-private const val URL = "http://127.0.0.1:54321"
+const val URL = "http://127.0.0.1:54321"
 
 private val jvmAuth: AuthConfig.() -> Unit = {
     sessionManager = MemorySessionManager()
@@ -19,6 +22,39 @@ private val jvmAuth: AuthConfig.() -> Unit = {
     autoLoadFromStorage = false
     enableLifecycleCallbacks = false
 }
+
+/** Stands in for Meta and Twilio: the local Edge Functions post here (see supabase/config.toml). */
+object Providers {
+    data class Message(val channel: String, val phone: String, val text: String) {
+        val code get() = Regex("""\d{6}""").findAll(text).last().value // the phone number comes first
+        val link get() = Regex("""http://[^"\s]+""").find(text)!!.value
+    }
+    val sent = mutableListOf<Message>()
+    val notOnWhatsApp = mutableSetOf<String>()
+
+    init {
+        HttpServer.create(InetSocketAddress(54399), 0).apply {
+            createContext("/whatsapp") { ex ->
+                val body = ex.requestBody.readBytes().decodeToString()
+                val phone = Regex(""""to":"(\d+)"""").find(body)!!.groupValues[1]
+                val ok = phone !in notOnWhatsApp
+                if (ok) synchronized(sent) { sent += Message("whatsapp", phone, body) }
+                ex.sendResponseHeaders(if (ok) 200 else 400, -1); ex.close()
+            }
+            createContext("/twilio") { ex ->
+                val form = ex.requestBody.readBytes().decodeToString().split("&")
+                    .associate { it.substringBefore("=") to URLDecoder.decode(it.substringAfter("="), "UTF-8") }
+                synchronized(sent) { sent += Message("sms", form.getValue("To").removePrefix("+"), form.getValue("Body")) }
+                ex.sendResponseHeaders(201, -1); ex.close()
+            }
+            start()
+        }
+    }
+
+    fun to(phone: String) = synchronized(sent) { sent.filter { it.phone == phone.removePrefix("+") } }
+}
+
+fun newNumber() = "+628129" + Random.nextLong(10_000_000, 99_999_999)
 
 // ponytail: test users sign up by email (confirmations are off locally), so tests need no secret key;
 // the app itself signs in by phone.
@@ -33,19 +69,22 @@ suspend fun signedInNewcomer(): SupabaseClient = kinfolkClient(URL, jvmAuth).app
 /** Nobody signed in. */
 fun signedOut(): SupabaseClient = kinfolkClient(URL, jvmAuth)
 
+/** Whoever owns [phone], signed in with the code WhatsApp brought them. */
+suspend fun signedInAs(phone: String): SupabaseClient = signedOut().apply {
+    Providers.to(phone) // start the fake providers before any code is sent
+    sendSignInCode(phone, sms = false)
+    verifySignInCode(phone, Providers.to(phone).last { "kinfolk_otp" in it.text }.code)
+}
+
 fun SupabaseClient.me(): String = auth.currentUserOrNull()!!.id
 
-// ponytail: joins straight in the local database until Invitation (#4) gives Members a real way in; switch to that then.
-/** Someone who has joined [circleId] as a sibling. Returns their user id. */
-suspend fun joinedMember(circleId: String): String = signedInSibling(circleId).me()
-
-/** Someone who has joined [circleId] as a sibling, signed in. */
-suspend fun signedInSibling(circleId: String): SupabaseClient {
-    val client = signedInNewcomer()
-    val id = client.me()
-    val sql = "insert into public.members (circle_id, user_id, role) values ('$circleId', '$id', 'sibling')"
-    val psql = ProcessBuilder("docker", "exec", "supabase_db_Kinfolk", "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql)
-        .redirectErrorStream(true).start()
-    check(psql.waitFor() == 0) { psql.inputStream.bufferedReader().readText() }
-    return client
+/** Someone [admin] invited to [circleId] who accepted in the app, signed in. */
+suspend fun signedInSibling(admin: SupabaseClient, circleId: String, role: Role = Role.sibling): SupabaseClient {
+    val phone = newNumber()
+    Providers.to(phone) // start the fake providers before the invitation is sent
+    admin.invite(circleId, "Budi", phone, role)
+    return signedInAs(phone).apply { acceptInvitation(myInvitations().single().id) }
 }
+
+/** Someone [admin] invited to [circleId] who accepted as a sibling. Returns their user id. */
+suspend fun joinedMember(admin: SupabaseClient, circleId: String): String = signedInSibling(admin, circleId).me()

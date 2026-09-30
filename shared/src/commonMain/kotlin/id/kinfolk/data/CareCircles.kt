@@ -36,9 +36,10 @@ private data class CircleRow(val id: String, val name: String, val members: List
 @Serializable
 private data class MemberRow(@SerialName("user_id") val userId: String, val role: Role)
 
-/** Creates a Care Circle for [recipientName]; the signed-in user becomes its admin. Returns the circle id. */
-suspend fun SupabaseClient.createCareCircle(recipientName: String, relation: Relation?, needs: Set<Need>): String =
+/** Creates a Care Circle for [recipientName]; the signed-in user becomes its admin, named [myName]. Returns the circle id. */
+suspend fun SupabaseClient.createCareCircle(recipientName: String, relation: Relation?, needs: Set<Need>, myName: String? = null): String =
     postgrest.rpc("create_care_circle", buildJsonObject {
+        put("my_name", myName)
         put("recipient_name", recipientName)
         put("relation", relation?.key)
         putJsonArray("needs") { needs.forEach { add(it.key) } }

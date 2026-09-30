@@ -88,11 +88,12 @@ import kinfolk.shared.generated.resources.sign_in
 import kinfolk.shared.generated.resources.sms_fallback
 import kinfolk.shared.generated.resources.their_name
 import kinfolk.shared.generated.resources.they_are
+import kinfolk.shared.generated.resources.your_name
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
-// onb0 and onb1 copied from design v3; L1 Nomor and L2 Kode are the approved sign-in deviation (docs/screen-map.md).
+// onb0 and onb1 copied from design v3; L1 Nomor, L2 Kode and onb1 "Nama Anda" are approved deviations (docs/screen-map.md).
 
 /** Digits of an Indonesian mobile number after +62, however it was typed or pasted. */
 fun localDigits(input: String): String = input.filter(Char::isDigit).removePrefix("62").removePrefix("0")
@@ -234,8 +235,9 @@ fun CodeScreen(phone: String, onBack: () -> Unit, send: suspend (sms: Boolean) -
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 /** [onCreate] returns false when the Care Circle couldn't be created. */
-fun Onb1(onCreate: suspend (name: String, relation: Relation, needs: Set<Need>) -> Boolean) {
+fun Onb1(onCreate: suspend (myName: String, name: String, relation: Relation, needs: Set<Need>) -> Boolean) {
     val scope = rememberCoroutineScope()
+    var myName by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var relation by remember { mutableStateOf(Relation.Father) }
     var needs by remember { mutableStateOf(setOf(Need.Visits, Need.Medicines)) }
@@ -257,6 +259,9 @@ fun Onb1(onCreate: suspend (name: String, relation: Relation, needs: Set<Need>) 
             }
         }
         Text(stringResource(Res.string.onb1_head), style = serifStyle(30f, 1.1f))
+        Field(stringResource(Res.string.your_name)) {
+            BasicTextField(myName, { myName = it }, Modifier.fillMaxWidth(), textStyle = LocalTextStyle.current.copy(fontSize = 17.sp), singleLine = true)
+        }
         Field(stringResource(Res.string.their_name)) {
             BasicTextField(name, { name = it }, Modifier.fillMaxWidth(), textStyle = LocalTextStyle.current.copy(fontSize = 17.sp), singleLine = true)
         }
@@ -279,9 +284,9 @@ fun Onb1(onCreate: suspend (name: String, relation: Relation, needs: Set<Need>) 
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PrimaryButton(stringResource(Res.string.continue_), Modifier.padding(top = 12.dp)) {
-                if (name.isNotBlank() && !busy) scope.launch {
+                if (myName.isNotBlank() && name.isNotBlank() && !busy) scope.launch {
                     busy = true
-                    failed = !onCreate(name.trim(), relation, needs)
+                    failed = !onCreate(myName.trim(), name.trim(), relation, needs)
                     busy = false
                 }
             }

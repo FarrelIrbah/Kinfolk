@@ -39,6 +39,8 @@ import id.kinfolk.data.ContactGroup
 import id.kinfolk.ui.DashedButton
 import id.kinfolk.ui.ErrorText
 import id.kinfolk.ui.Field
+import id.kinfolk.ui.Card
+import id.kinfolk.ui.Hairline
 import id.kinfolk.ui.Kf
 import id.kinfolk.ui.Link
 import id.kinfolk.ui.PickChip
@@ -89,7 +91,7 @@ private val ContactGroup.label: StringResource
 fun typedPhone(input: String) = (if (input.startsWith("+")) localDigits(input) else input.filter(Char::isDigit).removePrefix("0")).take(13)
 
 /** "0812 3456 7890" */
-private fun localPhone(e164: String) = "0" + groupDigits(localDigits(e164))
+fun localPhone(e164: String) = "0" + groupDigits(localDigits(e164))
 
 /** `circle`, only its header and the "Cara lain" row to `contacts` until #5 builds the rest (docs/screen-map.md). */
 @Composable
@@ -163,14 +165,6 @@ fun ContactsScreen(contacts: List<CareContact>, onBack: () -> Unit, onOpen: (Car
 }
 
 private val PillRed = Color(0xFFF0DDD3)
-
-@Composable
-private fun Card(content: @Composable () -> Unit) =
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Kf.Card)) { content() }
-
-/** border-bottom:1px solid rgba(34,38,31,.07) on each row. */
-@Composable
-private fun Hairline() = Box(Modifier.fillMaxWidth().height(1.dp).background(Kf.Hairline))
 
 data class ContactForm(val name: String, val relationship: String, val phone: String, val group: ContactGroup, val emergency: Boolean)
 

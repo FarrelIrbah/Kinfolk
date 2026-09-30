@@ -105,4 +105,25 @@
     <string name="resend">Kirim ulang</string>
     <string name="send_sms">Kirim lewat SMS</string>
     <string name="sign_in">Masuk</string>
+
+    <!-- onb2, invitee, empty rows 2-3 -->
+    <string name="onb2_head">Undang saudara Anda</string>
+    <string name="add_person">+ Tambah orang lain</string>
+    <string name="onb2_note">Satu langganan untuk seluruh keluarga. Tidak ada yang perlu patungan.</string>
+    <string name="invite">Undang</string>
+    <string name="skip_for_now">Lewati dulu</string>
+    <string name="inv_head">Selamat datang, %1$s</string>
+    <string name="inv_sub">%1$s menambahkan Anda ke lingkaran perawatan %2$s. Ini keadaan terkini.</string>
+    <string name="open_circle">Buka lingkaran</string>
+    <string name="add_meds">Tambah obat</string>
+    <string name="add_meds_sub">Foto botol obat pun bisa</string>
+    <string name="invite_siblings">Undang saudara</string>
+    <string name="joined_of">%1$d dari %2$d sudah bergabung</string>
+
+    <!-- Invitation: approved deviation (issue #4, docs/screen-map.md) -->
+    <string name="your_name">Nama Anda</string>
+    <string name="onb2_sub">Mereka menerima pesan WhatsApp. Tidak perlu pasang app untuk konfirmasi antar atau membaca ringkasan kunjungan.</string>
+    <string name="will_send">Kirim WA ✓</string>
+    <string name="cancel_invite">Batalkan</string>
+    <string name="send_invites">Kirim %1$d undangan WhatsApp</string>
 </resources>
