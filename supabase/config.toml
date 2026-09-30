@@ -286,14 +286,19 @@ max_frequency = "1s"
 # enabled = true
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
-# Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
-# Local dev only needs a provider to be enabled; test_otp numbers never reach it.
+# OTP goes out through the send-otp Edge Function (WhatsApp, SMS fallback), not a built-in provider.
+# Local-only secret; production sets its own in the dashboard.
+[auth.hook.send_sms]
+enabled = true
+uri = "http://host.docker.internal:54321/functions/v1/send-otp"
+secrets = "v1,whsec_LtbDzk58HqE99zKeA/ZIyHNHTGkHeTBPDCPpM/1+38o="
+
+# Unused (the hook sends instead), but Auth disables phone login without an enabled provider.
 [auth.sms.twilio]
 enabled = true
-account_sid = "local-dev-unused"
-message_service_sid = "local-dev-unused"
-# Production: DO NOT commit the real token; use env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN).
-auth_token = "local-dev-unused"
+account_sid = "unused"
+message_service_sid = "unused"
+auth_token = "unused"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
 [auth.mfa]
@@ -384,8 +389,20 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+# Local dev: providers are faked by the seam tests on the host. Production values are set with
+# `supabase secrets set`, never committed.
+[edge_runtime.secrets]
+SEND_SMS_HOOK_SECRET = "v1,whsec_LtbDzk58HqE99zKeA/ZIyHNHTGkHeTBPDCPpM/1+38o="
+WHATSAPP_API_URL = "http://host.docker.internal:54399/whatsapp"
+WHATSAPP_PHONE_NUMBER_ID = "local"
+WHATSAPP_TOKEN = "local"
+TWILIO_API_URL = "http://host.docker.internal:54399/twilio"
+TWILIO_ACCOUNT_SID = "local"
+TWILIO_AUTH_TOKEN = "local"
+TWILIO_FROM = "Kinfolk"
+
+[functions.send-otp]
+verify_jwt = false
 
 [analytics]
 enabled = true

@@ -51,6 +51,8 @@ import id.kinfolk.data.CareCircle
 import id.kinfolk.data.createCareCircle
 import id.kinfolk.data.kinfolkClient
 import id.kinfolk.data.myCareCircle
+import id.kinfolk.data.sendSignInCode
+import id.kinfolk.data.verifySignInCode
 import id.kinfolk.ui.Kf
 import id.kinfolk.ui.KinfolkTheme
 import id.kinfolk.ui.SvgPath
@@ -60,10 +62,7 @@ import id.kinfolk.ui.onboarding.Onb0
 import id.kinfolk.ui.onboarding.Onb1
 import id.kinfolk.ui.onboarding.PhoneScreen
 import id.kinfolk.ui.onboarding.e164
-import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.providers.builtin.OTP
-import io.github.jan.supabase.auth.providers.builtin.Phone
 import io.github.jan.supabase.exceptions.RestException
 import kinfolk.shared.generated.resources.Res
 import kinfolk.shared.generated.resources.tab_circle
@@ -108,10 +107,7 @@ fun App() {
             go(if (circle != null) Screen.Home else Screen.Onb1, if (circle != null) Nav.Tab else how)
         }
         suspend fun sendCode(sms: Boolean): Boolean = attempt {
-            supabase.auth.signInWith(OTP) {
-                this.phone = e164(phone)
-                channel = if (sms) Phone.Channel.SMS else Phone.Channel.WHATSAPP
-            }
+            supabase.sendSignInCode(e164(phone), sms)
         } != null
         LaunchedEffect(Unit) {
             supabase.auth.awaitInitialization()
@@ -155,7 +151,7 @@ fun App() {
                             phone, onBack = { go(Screen.Phone, Nav.Back) }, send = { sendCode(it) },
                             verify = { code ->
                                 try {
-                                    supabase.auth.verifyPhoneOtp(OtpType.Phone.SMS, e164(phone), code)
+                                    supabase.verifySignInCode(e164(phone), code)
                                     land(Nav.Push)
                                     true
                                 } catch (e: RestException) {
