@@ -25,6 +25,18 @@ npx supabase start
 Schema lives in `supabase/migrations`; `npx supabase db reset` rebuilds the database from them.
 Sign in on the emulator with `812 3456 7890` and code `123456` (test numbers are in `supabase/config.toml`).
 
+### Hosted backend
+
+To point the app at the hosted project (real-number testing, release), add to the gitignored `local.properties`:
+
+```
+kinfolk.supabaseUrl=https://<project>.supabase.co
+kinfolk.publishableKey=sb_publishable_…
+kinfolk.emergencyUrl=https://<custom domain>/<path that proxies the emergency function>
+```
+
+Leave them out to use the local stack. Going live: `docs/whatsapp-templates.md` → Produksi.
+
 ### Running the apps
 
 Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:

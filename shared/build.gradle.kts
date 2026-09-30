@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -6,6 +7,24 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+}
+
+// Hosted project for real-number testing and release (#15), from the gitignored local.properties; blank = local stack.
+val hostedConfig = tasks.register("hostedConfig") {
+    val local = Properties()
+    rootProject.file("local.properties").takeIf { it.exists() }?.reader()?.use(local::load)
+    val values = listOf("supabaseUrl", "publishableKey", "emergencyUrl").associateWith { local.getProperty("kinfolk.$it", "").trim().trimEnd('/') }
+    require(values.values.none { v -> v.any { it in "\"\\$" } }) { "kinfolk.* in local.properties can't contain \", \\ or $" }
+    val out = layout.buildDirectory.dir("generated/hosted")
+    inputs.properties(values)
+    outputs.dir(out)
+    doLast {
+        out.get().file("Hosted.kt").asFile.apply { parentFile.mkdirs() }.writeText(
+            values.entries.joinToString("\n", "package id.kinfolk.data\n\n", "\n") { (k, v) ->
+                "internal const val HOSTED_${k.replace(Regex("([A-Z])"), "_$1").uppercase()} = \"$v\""
+            }
+        )
+    }
 }
 
 kotlin {
@@ -49,6 +68,9 @@ kotlin {
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
+        }
+        commonMain {
+            kotlin.srcDir(hostedConfig)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

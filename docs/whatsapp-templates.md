@@ -82,6 +82,7 @@ curl -X POST "https://graph.facebook.com/v23.0/$WABA_ID/message_templates"   -H 
 
 ## Produksi
 
+0. `npx supabase link --project-ref <project>` lalu `npx supabase db push` (semua migrasi).
 1. Deploy `send-otp` tanpa verifikasi JWT (Auth memanggilnya dengan tanda tangan webhook): `npx supabase functions deploy send-otp --no-verify-jwt`. Deploy juga `invite` dan `invitation` dengan `--no-verify-jwt` (database yang memeriksa admin; halaman web dibuka tanpa login).
 2. Dashboard → Authentication → Hooks → Send SMS: HTTPS ke `https://<project>.supabase.co/functions/v1/send-otp`, buat secret.
 3. Dashboard → Authentication → Phone: aktifkan, masa berlaku OTP 600 detik (sama dengan footer template).
@@ -89,3 +90,5 @@ curl -X POST "https://graph.facebook.com/v23.0/$WABA_ID/message_templates"   -H 
 5. Webhook: deploy `whatsapp` dengan `--no-verify-jwt`; di Meta App → WhatsApp → Configuration, callback `https://<project>.supabase.co/functions/v1/whatsapp`, verify token = `WHATSAPP_VERIFY_TOKEN`, langganan field `messages`. `npx supabase secrets set WHATSAPP_APP_SECRET=… WHATSAPP_VERIFY_TOKEN=… NOTIFY_SECRET=…`
 6. Tiap menit (SQL editor, sekali; butuh ekstensi `pg_cron` dan `pg_net`): `select cron.schedule('whatsapp', '* * * * *', $$ select net.http_post('https://<project>.supabase.co/functions/v1/whatsapp', '{}'::jsonb, headers := '{"authorization": "Bearer <NOTIFY_SECRET>", "content-type": "application/json"}'::jsonb) $$);`
 7. `INVITATION_URL` harus alamat domain sendiri yang meneruskan ke fungsi `invitation`: di domain `*.supabase.co` Edge Function tidak boleh menyajikan HTML (tampil sebagai teks biasa).
+8. Deploy `emergency` dengan `--no-verify-jwt` (halaman QR dibuka paramedis tanpa login). Sama seperti `invitation`, butuh alamat domain sendiri yang meneruskan ke fungsi `emergency`; app memakainya untuk tautan QR.
+9. App: isi `kinfolk.supabaseUrl`, `kinfolk.publishableKey`, dan `kinfolk.emergencyUrl` di `local.properties` (lihat README), lalu build ulang.

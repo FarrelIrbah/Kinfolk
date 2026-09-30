@@ -18,7 +18,12 @@ private data class CardRow(val token: String, val version: Int, @SerialName("las
 @Serializable
 data class EmergencyCard(val url: String, val version: Int, val lastScannedAt: Instant?)
 
-private fun SupabaseClient.card(row: CardRow) = EmergencyCard("$supabaseHttpUrl/functions/v1/emergency?t=${row.token}", row.version, row.lastScannedAt)
+// Hosted *.supabase.co serves function HTML as text/plain, so production links go through a custom domain (#15).
+private val SupabaseClient.emergencyPage
+    get() = HOSTED_EMERGENCY_URL.takeIf { it.isNotEmpty() && supabaseHttpUrl.trimEnd('/') == HOSTED_SUPABASE_URL }
+        ?: "$supabaseHttpUrl/functions/v1/emergency"
+
+private fun SupabaseClient.card(row: CardRow) = EmergencyCard("$emergencyPage?t=${row.token}", row.version, row.lastScannedAt)
 
 /** Made the first time any Member asks. */
 suspend fun SupabaseClient.emergencyCard(recipientId: String): EmergencyCard =
