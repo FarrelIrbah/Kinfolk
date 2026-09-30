@@ -48,6 +48,23 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import id.kinfolk.data.Appointment
+import id.kinfolk.data.DutyTurn
+import id.kinfolk.data.answerSwap
+import id.kinfolk.data.appointmentsBetween
+import id.kinfolk.data.askSwap
+import id.kinfolk.data.deleteDuty
+import id.kinfolk.data.dutyWeek
+import id.kinfolk.data.saveDuty
+import id.kinfolk.data.takeTurn
+import id.kinfolk.data.weekOf
+import id.kinfolk.ui.Sheet
+import id.kinfolk.ui.appointment.shortDay
+import id.kinfolk.ui.home.DutyDay
+import id.kinfolk.ui.rota.DutyFormScreen
+import id.kinfolk.ui.rota.RotaScreen
+import id.kinfolk.ui.rota.SwapSheet
+import id.kinfolk.ui.rota.inSentence
+import id.kinfolk.ui.rota.load
 import id.kinfolk.data.AppointmentDraft
 import id.kinfolk.data.CareCircle
 import id.kinfolk.data.CareContact
@@ -170,13 +187,19 @@ import kinfolk.shared.generated.resources.now_admin
 import kinfolk.shared.generated.resources.remove_body
 import kinfolk.shared.generated.resources.remove_confirm
 import kinfolk.shared.generated.resources.remove_title
+import kinfolk.shared.generated.resources.legend_other
+import kinfolk.shared.generated.resources.legend_you
+import kinfolk.shared.generated.resources.swap_declined
+import kinfolk.shared.generated.resources.swap_taken
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
@@ -190,7 +213,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -232,6 +255,10 @@ fun App() {
         var viewing by rememberSaveable { mutableStateOf<String?>(null) } // on `member`
         var memberError by remember { mutableStateOf<String?>(null) }
         var confirm by remember { mutableStateOf<Confirm?>(null) }
+        var turns by remember { mutableStateOf(emptyList<DutyTurn>()) } // this week
+        var drives by remember { mutableStateOf(emptyList<Appointment>()) } // this week, with a Driver
+        var swapping by remember { mutableStateOf<DutyTurn?>(null) }
+        var editingDuty by remember { mutableStateOf<DutyTurn?>(null) }
         LaunchedEffect(toast) { if (toast != null) { delay(2600); toast = null } }
         val share = rememberShare()
         val revoked = stringResource(Res.string.qr_revoked)
@@ -268,6 +295,16 @@ fun App() {
             CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me())
         }
         fun go(to: Screen, how: Nav = Nav.Push) { nav = how; screen = to }
+        val today = now.toLocalDateTime(tz).date
+        val week = weekOf(today)
+        // The rota and "Minggu ini" show everyone by their own name, yourself first in Sri's green (like `circle`).
+        fun rotaPeople() = circleMembers().associate { it.id to Person(it.name, it.color) }
+        suspend fun loadRota() {
+            val c = circle ?: return
+            turns = retrying { supabase.dutyWeek(c.id, week) }
+            drives = retrying { supabase.appointmentsBetween(c.id, week.atStartOfDayIn(tz), (week + DatePeriod(days = 7)).atStartOfDayIn(tz)) }
+                .filter { it.driverId != null }
+        }
         suspend fun loadVisit() {
             questions = next?.let { a -> retrying { supabase.questions(a.id) } }.orEmpty()
             note = next?.let { a -> retrying { supabase.visitNote(a.id) } }
@@ -294,6 +331,7 @@ fun App() {
             sent = retrying { if (supabase.roleIn(c.id) == Role.admin) supabase.invitations(c.id) else null }
             members = retrying { supabase.members(c.id) }
             timeline = retrying { supabase.timeline(c.id) }
+            loadRota()
         }
         suspend fun land(how: Nav) {
             circle = retrying { supabase.myCareCircle() }
@@ -394,7 +432,14 @@ fun App() {
                             onDone = { scope.launch { loadHome(); go(Screen.Home, Nav.Tab) } },
                         )
                         Screen.Invitee -> invitation?.let { inv ->
-                            Invitee(inv) { attempt { supabase.acceptInvitation(inv.id) }?.let { land(Nav.Tab) } != null }
+                            Invitee(inv) { take ->
+                                attempt { supabase.acceptInvitation(inv.id) }?.let {
+                                    // Joined already, so a turn that can't be taken now must not keep them out.
+                                    // ponytail: dropped silently offline; they can still swap on the rota.
+                                    if (take) inv.dutyId?.let { d -> attempt { supabase.takeTurn(d, week + DatePeriod(days = 7)) } }
+                                    land(Nav.Tab)
+                                } != null
+                            }
                         }
                         Screen.Home -> when (t) {
                             // ponytail: header, Appointment, Medications and Terbaru are real; the rest is prototype sample data until its tickets land.
@@ -415,6 +460,13 @@ fun App() {
                                     nextMed = meds.current().next(now.toLocalDateTime(tz).time)
                                         ?.let { m -> listOf(m.name, m.schedule).filter { it.isNotBlank() }.joinToString(" · ") }
                                         ?: stringResource(Res.string.no_meds),
+                                    week = turns.firstOrNull()?.let { t -> rotaPeople()[t.holder] }?.let { p ->
+                                        (0..6).map { i -> (week + DatePeriod(days = i)).let { d -> DutyDay(shortDay(d), d.day, p, d == today) } }
+                                    }.orEmpty(),
+                                    dutyLegend = turns.firstOrNull()?.let { t ->
+                                        if (t.holder == me()) stringResource(Res.string.legend_you, t.name, hm(t.timeOfDay))
+                                        else stringResource(Res.string.legend_other, t.name, hm(t.timeOfDay), rotaPeople()[t.holder]?.name.orEmpty())
+                                    }.orEmpty(),
                                     feed = timeline.take(3).map { FeedItem(author(it), text(it, tz), ago(it.at, now, tz)) },
                                 ),
                                 onSos = { openEmergency() }, onOpenAppointment = { opened = null; go(Screen.Appt) }, onAddAppointment = { openForm(null) },
@@ -425,13 +477,30 @@ fun App() {
                                 onInvite = { go(Screen.Onb2) },
                                 onFillEmergency = { openEmergencyForm(Screen.Home) },
                             )
+                            Tab.Rota -> {
+                                val taken = turns.map { stringResource(Res.string.swap_taken, it.inSentence()) }
+                                val declined = turns.map { stringResource(Res.string.swap_declined, rotaPeople()[it.holder]?.name.orEmpty()) }
+                                val offline = stringResource(Res.string.no_connection)
+                                RotaScreen(
+                                    week, today, tz, turns, drives, rotaPeople(), me().orEmpty(), admin = sent != null,
+                                    onSwap = { swapping = it },
+                                    onAnswer = { t, yes ->
+                                        val i = turns.indexOf(t)
+                                        // Not retried: offline, the answer waits for another tap.
+                                        scope.launch {
+                                            toast = if (attempt { supabase.answerSwap(t.swapId!!, yes); loadRota() } != null) (if (yes) taken else declined)[i] else offline
+                                        }
+                                    },
+                                    onAdd = { editingDuty = null; go(Screen.DutyForm) },
+                                    onEdit = { editingDuty = it; go(Screen.DutyForm) },
+                                )
+                            }
                             Tab.Timeline -> TimelineScreen(timeline.map { e -> TimelineRow(author(e), ago(e.at, now, tz), text(e, tz)) { openFromTimeline(e) } })
                             Tab.Records -> RecordsScreen(meds) { editingMed = it; go(Screen.MedForm) }
                             Tab.Circle -> CircleScreen(
                                 circle?.name.orEmpty(), circleMembers(), onSos = { openEmergency() },
                                 onMember = { viewing = it.id; memberError = null; go(Screen.Member) },
                             ) { scope.launch { loadContacts(); go(Screen.Contacts) } }
-                            else -> {}
                         }
                         Screen.Appt -> visit()?.let { v ->
                             val a = v.appointment
@@ -483,6 +552,17 @@ fun App() {
                                 loadHome()
                             }.also { if (it != null) go(Screen.Home, Nav.Back) } != null
                         }
+                        Screen.DutyForm -> DutyFormScreen(
+                            editingDuty, rotaPeople(), onBack = { go(Screen.Home, Nav.Back) },
+                            // Not retried: adding is not idempotent.
+                            save = { f ->
+                                attempt { supabase.saveDuty(circle!!.id, f.name, f.timeOfDay, f.order, week, editingDuty?.dutyId); loadRota() }
+                                    .also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                            },
+                            delete = {
+                                attempt { editingDuty?.let { supabase.deleteDuty(it.dutyId) }; loadRota() }.also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                            },
+                        )
                         Screen.Contacts -> ContactsScreen(contacts, onBack = { go(Screen.Home, Nav.Back) }) { editingContact = it; go(Screen.ContactForm) }
                         Screen.ContactForm -> ContactFormScreen(
                             editingContact, onBack = { go(Screen.Contacts, Nav.Back) },
@@ -569,9 +649,18 @@ fun App() {
                     }
                 }
             }
-            Toast(toast, Modifier.align(Alignment.BottomCenter))
             ConfirmSheet(confirm, stringResource(Res.string.cancel)) { confirm = null }
             if (screen == Screen.Home) TabBar(tab, { nav = Nav.Tab; tab = it }, Modifier.align(Alignment.BottomCenter))
+            Toast(toast, Modifier.align(Alignment.BottomCenter), overTabs = screen == Screen.Home)
+            swapping?.let { t ->
+                val offline = stringResource(Res.string.no_connection)
+                Sheet(t, { swapping = null }) {
+                    SwapSheet(t, rotaPeople().filterKeys { it != me() }, { load(it, turns, drives) }) { to ->
+                        swapping = null
+                        scope.launch { if (attempt { supabase.askSwap(t.dutyId, week, to); loadRota() } == null) toast = offline }
+                    }
+                }
+            }
         }
     }
 }

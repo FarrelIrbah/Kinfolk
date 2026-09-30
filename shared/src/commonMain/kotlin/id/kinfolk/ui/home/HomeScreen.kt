@@ -74,6 +74,7 @@ data class HomeState(
     val circleName: String,
     val memberCount: Int,
     val next: NextAppointment?,
+    /** Who holds the first Duty each day of this week; empty hides "Minggu ini". */
     val week: List<DutyDay>,
     val dutyLegend: String,
     val medsToday: Int,
@@ -127,7 +128,8 @@ fun HomeScreen(
             EmptyStep(4, stringResource(Res.string.fill_emergency), stringResource(Res.string.fill_emergency_sub), part = false, onFillEmergency)
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Hidden until the Care Circle has a Duty (approved in #10).
+        if (s.week.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionHeader(stringResource(Res.string.this_week), stringResource(Res.string.see_rota), onRota)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 s.week.forEach { d ->

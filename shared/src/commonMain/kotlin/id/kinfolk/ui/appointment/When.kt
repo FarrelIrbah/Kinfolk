@@ -14,6 +14,8 @@ private val shortDays = listOf("Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min")
 private val months = listOf("Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sept", "Okt", "Nov", "Des")
 
 fun longDate(d: LocalDate) = "${days[d.dayOfWeek.ordinal]}, ${d.day} ${months[d.month.ordinal]}"
+/** "Sen" */
+fun shortDay(d: LocalDate) = shortDays[d.dayOfWeek.ordinal]
 fun shortDate(d: LocalDate) = "${shortDays[d.dayOfWeek.ordinal]}, ${d.day} ${months[d.month.ordinal]}"
 fun hm(t: LocalTime) = "${t.hour.toString().padStart(2, '0')}.${t.minute.toString().padStart(2, '0')}"
 

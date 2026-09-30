@@ -1,21 +1,13 @@
 package id.kinfolk
 
 import androidx.compose.ui.graphics.Color
-import id.kinfolk.ui.home.DutyDay
 import id.kinfolk.ui.home.HomeState
 import id.kinfolk.ui.home.NextAppointment
 import id.kinfolk.ui.home.Person
 
 // Initial state of the v3 prototype (Bahasa Indonesia). Replaced by Supabase data later.
 object SampleData {
-    private val sri = Person("Sri", Color(0xFF2F5D4A))
     private val budi = Person("Budi", Color(0xFFB0643A))
-    private val dewi = Person("Dewi", Color(0xFF6C5A8E))
-    private val agus = Person("Agus", Color(0xFF3E6E8E))
-    private val rina = Person("Rina", Color(0xFF9A7A2F))
-
-    private val evening = listOf(budi, sri, dewi, agus, rina, budi, sri)
-    private val days = listOf("Sen" to 28, "Sel" to 29, "Rab" to 30, "Kam" to 1, "Jum" to 2, "Sab" to 3, "Min" to 4)
 
     val home = HomeState(
         todayLabel = "Selasa, 29 Sept",
@@ -31,8 +23,8 @@ object SampleData {
             questionCount = 4,
             noteReady = false,
         ),
-        week = days.mapIndexed { i, (dow, num) -> DutyDay(dow, num, evening[i], isToday = i == 1) },
-        dutyLegend = "Telepon cek malam, 19.00. Malam ini giliran Anda.",
+        week = emptyList(),
+        dutyLegend = "",
         medsToday = 4,
         nextMed = "Omeprazole · sebelum sarapan",
         feed = emptyList(),

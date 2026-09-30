@@ -1,6 +1,7 @@
 package id.kinfolk.ui.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,12 @@ import kinfolk.shared.generated.resources.cancel_invite
 import kinfolk.shared.generated.resources.inv_head
 import kinfolk.shared.generated.resources.inv_sub
 import kinfolk.shared.generated.resources.invite
+import kinfolk.shared.generated.resources.inv_ask_body
+import kinfolk.shared.generated.resources.inv_ask_title
+import kinfolk.shared.generated.resources.inv_skipped
+import kinfolk.shared.generated.resources.inv_took
+import kinfolk.shared.generated.resources.not_this_week
+import kinfolk.shared.generated.resources.take_it
 import kinfolk.shared.generated.resources.no_connection
 import kinfolk.shared.generated.resources.onb2_head
 import kinfolk.shared.generated.resources.onb2_note
@@ -172,12 +179,16 @@ private fun InviteRow(name: String, phone: String, color: Color, label: String, 
     Hairline()
 }
 
-/** `invitee`: head and button only until last visit (#7), Duty ask (#10) and sharing (#9) land. [accept] returns false when offline. */
+/**
+ * `invitee`: head, the Duty ask (#10) and the button; last visit (#7) stays hidden and sharing waits for #9.
+ * "Saya ambil" is kept until [accept] joins, since only Members hold turns. [accept] returns false when offline.
+ */
 @Composable
-fun Invitee(invitation: InvitationToMe, accept: suspend () -> Boolean) {
+fun Invitee(invitation: InvitationToMe, accept: suspend (takeTurn: Boolean) -> Boolean) {
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    var took by remember { mutableStateOf<Boolean?>(null) }
     // design: padding 4px 20px, gap 18
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Text("Kinfolk", style = serifStyle(20f, weight = 600))
@@ -188,9 +199,35 @@ fun Invitee(invitation: InvitationToMe, accept: suspend () -> Boolean) {
                 fontSize = 15.sp, lineHeight = (15 * 1.5).sp, color = Kf.Ink2,
             )
         }
+        val duty = invitation.duty
+        val holder = invitation.dutyHolder
+        if (duty != null && holder != null) Column(
+            Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(20.dp)).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            val task = duty.replaceFirstChar { it.lowercase() }
+            Text(stringResource(Res.string.inv_ask_title), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(Res.string.inv_ask_body, duty, holder), fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Kf.Ink2)
+            when (took) {
+                null -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        Modifier.weight(1f).height(46.dp).background(Kf.Green, RoundedCornerShape(12.dp)).tap { took = true },
+                        contentAlignment = Alignment.Center,
+                    ) { Text(stringResource(Res.string.take_it), color = Kf.Paper, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                    Box(
+                        Modifier.weight(1f).height(46.dp).border(1.dp, Kf.InputBorder, RoundedCornerShape(12.dp)).tap { took = false },
+                        contentAlignment = Alignment.Center,
+                    ) { Text(stringResource(Res.string.not_this_week), fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                }
+                else -> Text(
+                    if (took == true) stringResource(Res.string.inv_took, task) else stringResource(Res.string.inv_skipped, invitation.inviter.orEmpty()),
+                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Kf.Green,
+                )
+            }
+        }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PrimaryButton(stringResource(Res.string.open_circle)) {
-                if (!busy) scope.launch { busy = true; failed = !accept(); busy = false }
+                if (!busy) scope.launch { busy = true; failed = !accept(took == true); busy = false }
             }
             if (failed) ErrorText(stringResource(Res.string.no_connection))
         }

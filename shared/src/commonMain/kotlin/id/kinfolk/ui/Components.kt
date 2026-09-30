@@ -21,6 +21,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -215,15 +216,18 @@ fun Toggle(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
     }
 }
 
-/** Prototype toast: #22261F, radius 14, 14px/1.4, 20 from the sides; rises in over 280ms and leaves after 2.6s. */
+/**
+ * Prototype toast: #22261F, radius 14, 14px/1.4, 20 from the sides; rises in over 280ms and leaves after 2.6s.
+ * [overTabs]: bottom 104 instead of 40, i.e. above the tab bar (its 30px home-indicator padding is the nav bar here).
+ */
 @Composable
-fun Toast(text: String?, modifier: Modifier = Modifier) {
+fun Toast(text: String?, modifier: Modifier = Modifier, overTabs: Boolean = false) {
     val shown = remember { MutableTransitionState(false) }.apply { targetState = text != null }
     var last by remember { mutableStateOf("") }
     if (text != null) last = text
     val rise = with(LocalDensity.current) { 16.dp.roundToPx() }
     AnimatedVisibility(
-        shown, modifier.padding(start = 20.dp, end = 20.dp, bottom = 40.dp),
+        shown, (if (overTabs) modifier.navigationBarsPadding().padding(bottom = 74.dp) else modifier.padding(bottom = 40.dp)).padding(horizontal = 20.dp),
         enter = fadeIn(tween(280, easing = KfEase)) + scaleIn(tween(280, easing = KfEase), initialScale = .97f) + slideInVertically(tween(280, easing = KfEase)) { rise },
         exit = ExitTransition.None,
     ) {
@@ -243,10 +247,29 @@ class Confirm(val title: String, val body: String, val action: String, val run: 
 @Composable
 fun ConfirmSheet(confirm: Confirm?, cancel: String, onDismiss: () -> Unit) {
     confirm ?: return
+    Sheet(confirm, onDismiss) {
+        Text(confirm.title, style = serifStyle(22f, 1.2f))
+        Text(confirm.body, fontSize = 14.sp, lineHeight = (14 * 1.45).sp, color = Kf.Ink2)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                Modifier.weight(1f).height(50.dp).border(1.dp, Color(0x2E22261F), RoundedCornerShape(16.dp)).tap(onDismiss),
+                contentAlignment = Alignment.Center,
+            ) { Text(cancel, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+            Box(
+                Modifier.weight(1f).height(50.dp).background(Kf.Sos, RoundedCornerShape(16.dp)).tap { onDismiss(); confirm.run() },
+                contentAlignment = Alignment.Center,
+            ) { Text(confirm.action, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+        }
+    }
+}
+
+/** The prototype's bottom sheet (confirm, swap), with its handle; a new [key] slides it up again. */
+@Composable
+fun Sheet(key: Any, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(Color(0x5915130F)).tap(onDismiss))
         AnimatedVisibility(
-            remember(confirm) { MutableTransitionState(false) }.apply { targetState = true }, Modifier.align(Alignment.BottomCenter),
+            remember(key) { MutableTransitionState(false) }.apply { targetState = true }, Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(tween(340, easing = KfEase)) { it }, exit = ExitTransition.None,
         ) {
             Column(
@@ -255,18 +278,7 @@ fun ConfirmSheet(confirm: Confirm?, cancel: String, onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Box(Modifier.size(40.dp, 5.dp).background(Kf.Line, RoundedCornerShape(3.dp)).align(Alignment.CenterHorizontally))
-                Text(confirm.title, style = serifStyle(22f, 1.2f))
-                Text(confirm.body, fontSize = 14.sp, lineHeight = (14 * 1.45).sp, color = Kf.Ink2)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        Modifier.weight(1f).height(50.dp).border(1.dp, Color(0x2E22261F), RoundedCornerShape(16.dp)).tap(onDismiss),
-                        contentAlignment = Alignment.Center,
-                    ) { Text(cancel, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
-                    Box(
-                        Modifier.weight(1f).height(50.dp).background(Kf.Sos, RoundedCornerShape(16.dp)).tap { onDismiss(); confirm.run() },
-                        contentAlignment = Alignment.Center,
-                    ) { Text(confirm.action, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
-                }
+                content()
             }
         }
     }

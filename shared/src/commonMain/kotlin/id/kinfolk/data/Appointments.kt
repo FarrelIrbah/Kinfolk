@@ -87,3 +87,10 @@ suspend fun SupabaseClient.appointmentsWith(providerId: String): List<Appointmen
         filter { eq("provider_id", providerId); exact("cancelled_at", null) }
         order("starts_at", Order.DESCENDING)
     }.decodeList()
+
+/** Appointments in [circleId] starting from [from] until before [until] that weren't cancelled, earliest first. */
+suspend fun SupabaseClient.appointmentsBetween(circleId: String, from: Instant, until: Instant): List<Appointment> =
+    from("appointments").select(withProvider) {
+        filter { eq("circle_id", circleId); gte("starts_at", from.toString()); lt("starts_at", until.toString()); exact("cancelled_at", null) }
+        order("starts_at", Order.ASCENDING)
+    }.decodeList()

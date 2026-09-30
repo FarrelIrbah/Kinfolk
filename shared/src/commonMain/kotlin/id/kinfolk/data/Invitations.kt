@@ -29,7 +29,16 @@ data class Invitation(
 
 /** An Invitation to the signed-in person's own number, as `invitee` shows it. */
 @Serializable
-data class InvitationToMe(val id: String, val name: String, val inviter: String? = null, val circle: String)
+data class InvitationToMe(
+    val id: String,
+    val name: String,
+    val inviter: String? = null,
+    val circle: String,
+    /** The Care Circle's first Duty and who holds it next week, for "Satu hal kecil, jika bisa" (#10). */
+    @SerialName("duty_id") val dutyId: String? = null,
+    val duty: String? = null,
+    @SerialName("duty_holder") val dutyHolder: String? = null,
+)
 
 /** Admins only: saves the Invitation and sends its link to [phone] (E.164) on WhatsApp, or SMS when that fails. */
 suspend fun SupabaseClient.invite(circleId: String, name: String, phone: String, role: Role = Role.sibling) {
