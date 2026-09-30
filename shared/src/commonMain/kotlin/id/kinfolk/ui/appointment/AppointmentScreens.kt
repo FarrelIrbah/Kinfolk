@@ -290,7 +290,7 @@ private val TimeDots = VisualTransformation { text ->
 }
 
 @Composable
-private fun TimeInput(digits: String, onDigits: (String) -> Unit) = BasicTextField(
+fun TimeInput(digits: String, onDigits: (String) -> Unit) = BasicTextField(
     digits, { onDigits(it.filter(Char::isDigit).take(4)) }, Modifier.fillMaxWidth(),
     textStyle = LocalTextStyle.current.copy(fontSize = 17.sp),
     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

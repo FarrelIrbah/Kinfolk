@@ -37,11 +37,15 @@ fun SupabaseClient.me(): String = auth.currentUserOrNull()!!.id
 
 // ponytail: joins straight in the local database until Invitation (#4) gives Members a real way in; switch to that then.
 /** Someone who has joined [circleId] as a sibling. Returns their user id. */
-suspend fun joinedMember(circleId: String): String {
-    val id = signedInNewcomer().me()
+suspend fun joinedMember(circleId: String): String = signedInSibling(circleId).me()
+
+/** Someone who has joined [circleId] as a sibling, signed in. */
+suspend fun signedInSibling(circleId: String): SupabaseClient {
+    val client = signedInNewcomer()
+    val id = client.me()
     val sql = "insert into public.members (circle_id, user_id, role) values ('$circleId', '$id', 'sibling')"
     val psql = ProcessBuilder("docker", "exec", "supabase_db_Kinfolk", "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql)
         .redirectErrorStream(true).start()
     check(psql.waitFor() == 0) { psql.inputStream.bufferedReader().readText() }
-    return id
+    return client
 }

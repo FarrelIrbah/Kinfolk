@@ -71,6 +71,9 @@ class AppointmentTest {
         assertEquals("dr. Lim", edited.provider.name)
         assertEquals("Kartu BPJS", edited.bring)
         assertEquals((now + 2.days).epochSeconds, edited.startsAt.epochSeconds)
+
+        sri.editAppointment(appt.id, edited.draft().copy(bring = ""))
+        assertEquals("", sri.nextAppointment(circle, since = now)!!.bring)
     }
 
     @Test
@@ -86,6 +89,9 @@ class AppointmentTest {
 
         sri.editAppointment(appt.id, appt.draft().copy(attendeeId = sri.me()))
         assertEquals(budi to sri.me(), sri.nextAppointment(circle, now)!!.let { it.driverId to it.attendeeId })
+
+        sri.editAppointment(appt.id, appt.draft().copy(driverId = null, attendeeId = null))
+        assertEquals(null to null, sri.nextAppointment(circle, now)!!.let { it.driverId to it.attendeeId })
     }
 
     @Test

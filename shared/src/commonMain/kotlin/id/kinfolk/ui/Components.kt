@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -19,7 +20,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -30,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
 /** Draws a design SVG path (`viewBox="0 0 24 24"`, round caps/joins) at [size]. */
@@ -111,5 +118,45 @@ fun Link(text: String, color: Color, onClick: () -> Unit, modifier: Modifier = M
 fun PrimaryButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(modifier.fillMaxWidth().height(54.dp).background(Kf.Green, RoundedCornerShape(16.dp)).tap(onClick), contentAlignment = Alignment.Center) {
         Text(text, color = Kf.Paper, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** Uppercase group label from `contacts`/`circle`: 12px, 600, letter-spacing .08em, muted. */
+@Composable
+fun SectionLabel(text: String) =
+    Text(text.uppercase(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.08.em, color = Kf.Muted)
+
+/** "+ Unggah dokumen" / "+ Tambah kontak": height 50, radius 16, 1.5px dashed rgba(34,38,31,.25), 15px 500. */
+@Composable
+fun DashedButton(text: String, onClick: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().height(50.dp).drawBehind {
+            val w = 1.5.dp.toPx()
+            // ponytail: Chrome's dash rhythm for a 1.5px border (dashes and gaps ~3x the width), matched by eye.
+            drawRoundRect(
+                DashLine, topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w),
+                cornerRadius = CornerRadius(16.dp.toPx() - w / 2),
+                style = Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * w, 3 * w))),
+            )
+        }.tap(onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+private val DashLine = Color(0x4022261F) // rgba(34,38,31,.25)
+
+/** Switch from `notes`/`member`: 50x30 track (#2F5D4A on, #D6CEBF off), 24px white knob; label 14px, gap 10. */
+@Composable
+fun Toggle(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.tap { onChange(!on) }, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(50.dp, 30.dp).background(if (on) Kf.Green else Kf.Line, CircleShape).padding(3.dp),
+            contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
+        ) {
+            Box(Modifier.size(24.dp).shadow(1.dp, CircleShape).background(Color.White, CircleShape))
+        }
+        Text(label, fontSize = 14.sp)
     }
 }

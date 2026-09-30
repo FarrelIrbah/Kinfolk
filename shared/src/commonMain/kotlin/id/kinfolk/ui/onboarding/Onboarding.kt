@@ -102,7 +102,7 @@ fun groupDigits(local: String) = listOf(local.take(3), local.drop(3).take(4), lo
 /** `+62 812-3456-7890`, as shown in the L2 subtitle. */
 fun prettyPhone(local: String) = "+62 " + groupDigits(local).replace(' ', '-')
 
-private val PhoneGrouping = VisualTransformation { text ->
+val PhoneGrouping = VisualTransformation { text ->
     // Spaces go after the 3rd and 7th digit.
     fun spacesBefore(o: Int) = (if (o > 3) 1 else 0) + (if (o > 7) 1 else 0)
     val out = groupDigits(text.text)

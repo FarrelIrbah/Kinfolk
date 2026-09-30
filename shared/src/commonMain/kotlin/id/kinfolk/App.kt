@@ -51,7 +51,20 @@ import androidx.compose.ui.unit.sp
 import id.kinfolk.data.Appointment
 import id.kinfolk.data.AppointmentDraft
 import id.kinfolk.data.CareCircle
+import id.kinfolk.data.CareContact
+import id.kinfolk.data.CareContactDraft
 import id.kinfolk.data.CareRecipient
+import id.kinfolk.data.Medication
+import id.kinfolk.data.MedicationDraft
+import id.kinfolk.data.addCareContact
+import id.kinfolk.data.addMedication
+import id.kinfolk.data.careContacts
+import id.kinfolk.data.current
+import id.kinfolk.data.editCareContact
+import id.kinfolk.data.editMedication
+import id.kinfolk.data.medications
+import id.kinfolk.data.next
+import id.kinfolk.data.removeCareContact
 import id.kinfolk.data.Provider
 import id.kinfolk.data.addProvider
 import id.kinfolk.data.cancelAppointment
@@ -75,6 +88,9 @@ import id.kinfolk.ui.appointment.hm
 import id.kinfolk.ui.appointment.longDate
 import id.kinfolk.ui.appointment.whenLabel
 import id.kinfolk.ui.appointment.withWhom
+import id.kinfolk.ui.contacts.CircleScreen
+import id.kinfolk.ui.contacts.ContactFormScreen
+import id.kinfolk.ui.contacts.ContactsScreen
 import id.kinfolk.ui.home.HomeScreen
 import id.kinfolk.ui.home.NextAppointment
 import id.kinfolk.ui.home.Person
@@ -83,6 +99,8 @@ import id.kinfolk.ui.onboarding.Onb0
 import id.kinfolk.ui.onboarding.Onb1
 import id.kinfolk.ui.onboarding.PhoneScreen
 import id.kinfolk.ui.onboarding.e164
+import id.kinfolk.ui.records.MedFormScreen
+import id.kinfolk.ui.records.RecordsScreen
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.exceptions.RestException
 import kinfolk.shared.generated.resources.Res
@@ -91,6 +109,7 @@ import kinfolk.shared.generated.resources.tab_home
 import kinfolk.shared.generated.resources.tab_records
 import kinfolk.shared.generated.resources.tab_rota
 import kinfolk.shared.generated.resources.tab_timeline
+import kinfolk.shared.generated.resources.no_meds
 import kinfolk.shared.generated.resources.you
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -111,7 +130,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Home, Appt, ApptForm }
+private enum class Screen { Onb0, Phone, Code, Onb1, Home, Appt, ApptForm, MedForm, Contacts, ContactForm }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -131,6 +150,10 @@ fun App() {
         var next by remember { mutableStateOf<Appointment?>(null) }
         var editing by remember { mutableStateOf<Appointment?>(null) }
         var providers by remember { mutableStateOf(emptyList<Provider>()) }
+        var meds by remember { mutableStateOf(emptyList<Medication>()) }
+        var editingMed by remember { mutableStateOf<Medication?>(null) }
+        var contacts by remember { mutableStateOf(emptyList<CareContact>()) }
+        var editingContact by remember { mutableStateOf<CareContact?>(null) }
         val tz = remember { TimeZone.currentSystemDefault() }
         val now by produceState(Clock.System.now()) { while (true) { delay(30_000); value = Clock.System.now() } }
         // ponytail: Budi's avatar color from the prototype, since Sri's green vanishes on the green Home card; #5 gives each Member a color.
@@ -143,6 +166,7 @@ fun App() {
             val today = Clock.System.now().toLocalDateTime(tz).date.atStartOfDayIn(tz)
             recipient = retrying { supabase.careRecipients(c.id).firstOrNull() }
             next = retrying { supabase.nextAppointment(c.id, since = today) }
+            meds = retrying { supabase.medications(c.id) }
         }
         suspend fun land(how: Nav) {
             circle = retrying { supabase.myCareCircle() }
@@ -153,6 +177,9 @@ fun App() {
             editing = a
             providers = circle?.let { c -> retrying { supabase.providers(c.id) } }.orEmpty()
             go(Screen.ApptForm)
+        }
+        suspend fun loadContacts() {
+            contacts = circle?.let { c -> retrying { supabase.careContacts(c.id) } }.orEmpty()
         }
         suspend fun sendCode(sms: Boolean): Boolean = attempt {
             supabase.sendSignInCode(e164(phone), sms)
@@ -216,7 +243,7 @@ fun App() {
                             (attempt { supabase.createCareCircle(name, relation, needs) } != null).also { if (it) land(Nav.Tab) }
                         }
                         Screen.Home -> when (t) {
-                            // ponytail: only the header is real so far; the rest is prototype sample data until its tickets land.
+                            // ponytail: header, Appointment and Medications are real; the rest is prototype sample data until its tickets land.
                             Tab.Home -> HomeScreen(
                                 s = SampleData.home.copy(
                                     todayLabel = longDate(now.toLocalDateTime(tz).date),
@@ -229,11 +256,17 @@ fun App() {
                                             questionCount = 0, noteReady = false, // ponytail: both come with #7
                                         )
                                     },
+                                    medsToday = meds.current().size,
+                                    nextMed = meds.current().next(now.toLocalDateTime(tz).time)
+                                        ?.let { m -> listOf(m.name, m.schedule).filter { it.isNotBlank() }.joinToString(" · ") }
+                                        ?: stringResource(Res.string.no_meds),
                                 ),
                                 onSos = {}, onOpenAppointment = { go(Screen.Appt) }, onAddAppointment = { openForm(null) }, onWriteNote = {},
                                 onRota = { nav = Nav.Tab; tab = Tab.Rota }, onRecords = { nav = Nav.Tab; tab = Tab.Records },
                                 onTimeline = { nav = Nav.Tab; tab = Tab.Timeline },
                             )
+                            Tab.Records -> RecordsScreen(meds) { editingMed = it; go(Screen.MedForm) }
+                            Tab.Circle -> CircleScreen(circle?.name.orEmpty(), circle?.memberCount ?: 0, onSos = {}) { scope.launch { loadContacts(); go(Screen.Contacts) } }
                             else -> {}
                         }
                         Screen.Appt -> next?.let { a ->
@@ -257,6 +290,29 @@ fun App() {
                             cancel = {
                                 attempt { editing?.let { supabase.cancelAppointment(it.id) }; loadHome() }
                                     .also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                            },
+                        )
+                        Screen.MedForm -> MedFormScreen(editingMed, onBack = { go(Screen.Home, Nav.Back) }) { f ->
+                            // Not retried: adding is not idempotent.
+                            attempt {
+                                val c = circle!!
+                                val draft = MedicationDraft(c.id, editingMed?.recipientId ?: recipient!!.id, f.name, f.dose, f.schedule, f.timeOfDay, f.active)
+                                editingMed?.let { supabase.editMedication(it.id, draft) } ?: supabase.addMedication(draft)
+                                loadHome()
+                            }.also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                        }
+                        Screen.Contacts -> ContactsScreen(contacts, onBack = { go(Screen.Home, Nav.Back) }) { editingContact = it; go(Screen.ContactForm) }
+                        Screen.ContactForm -> ContactFormScreen(
+                            editingContact, onBack = { go(Screen.Contacts, Nav.Back) },
+                            save = { f ->
+                                attempt {
+                                    val draft = CareContactDraft(circle!!.id, f.name, f.relationship, f.phone, f.group, f.emergency)
+                                    editingContact?.let { supabase.editCareContact(it.id, draft) } ?: supabase.addCareContact(draft)
+                                    loadContacts() // before leaving, so the form stays busy and can't add twice
+                                }.also { if (it != null) go(Screen.Contacts, Nav.Back) } != null
+                            },
+                            remove = {
+                                attempt { editingContact?.let { supabase.removeCareContact(it.id) }; loadContacts() }.also { if (it != null) go(Screen.Contacts, Nav.Back) } != null
                             },
                         )
                     }
