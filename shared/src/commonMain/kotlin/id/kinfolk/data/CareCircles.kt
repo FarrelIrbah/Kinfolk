@@ -12,6 +12,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.add
+import io.github.jan.supabase.exceptions.RestException
+import kotlin.time.Instant
 
 // Care Circle API used by the app and by the seam tests (see CONTEXT.md for the terms).
 
@@ -55,6 +57,7 @@ suspend fun SupabaseClient.createCareCircle(recipientName: String, relation: Rel
 // ponytail: first Care Circle only; a picker comes when a Member can belong to several.
 suspend fun SupabaseClient.myCareCircle(): CareCircle? =
     from("care_circles").select(Columns.raw("id,name,members(count)")) {
+        filter { exact("members.left_at", null) }
         order("created_at", Order.ASCENDING)
         limit(1)
     }.decodeList<CircleRow>().firstOrNull()?.let { CareCircle(it.id, it.name, it.members.firstOrNull()?.count ?: 0) }
@@ -83,3 +86,32 @@ suspend fun SupabaseClient.renameCareRecipient(recipientId: String, name: String
         select()
         filter { eq("id", recipientId) }
     }.decodeList<CareRecipient>().size
+
+/** A Member, or a Former Member once [leftAt] is set: their name stays on what they wrote. */
+@Serializable
+data class Member(
+    @SerialName("user_id") val userId: String,
+    val role: Role,
+    val name: String? = null,
+    @SerialName("created_at") val joinedAt: Instant,
+    @SerialName("left_at") val leftAt: Instant? = null,
+)
+
+/** Everyone who has been a Member of [circleId], in join order; empty for anyone who isn't a Member now. */
+suspend fun SupabaseClient.members(circleId: String): List<Member> =
+    from("members").select { filter { eq("circle_id", circleId) }; order("created_at", Order.ASCENDING) }.decodeList()
+
+/** Admins only. */
+suspend fun SupabaseClient.promoteToAdmin(circleId: String, userId: String) {
+    postgrest.rpc("promote_member", buildJsonObject { put("circle", circleId); put("member", userId) })
+}
+
+/** Admins only; they lose all access at once. Fails with [isLastAdmin] when that would leave no admin. */
+suspend fun SupabaseClient.removeMember(circleId: String, userId: String) {
+    postgrest.rpc("remove_member", buildJsonObject { put("circle", circleId); put("member", userId) })
+}
+
+/** Fails with [isLastAdmin] for the only admin. */
+suspend fun SupabaseClient.leaveCareCircle(circleId: String) = removeMember(circleId, auth.currentUserOrNull()!!.id)
+
+fun Throwable.isLastAdmin() = this is RestException && "last admin" in message.orEmpty()

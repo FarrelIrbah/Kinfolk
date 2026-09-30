@@ -58,24 +58,19 @@ import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
 import kinfolk.shared.generated.resources.add_contact
 import kinfolk.shared.generated.resources.back
-import kinfolk.shared.generated.resources.circle_name
 import kinfolk.shared.generated.resources.contact_form_head
 import kinfolk.shared.generated.resources.contact_name
 import kinfolk.shared.generated.resources.contact_phone
 import kinfolk.shared.generated.resources.contacts
-import kinfolk.shared.generated.resources.contacts_sub
 import kinfolk.shared.generated.resources.emergency_contact
 import kinfolk.shared.generated.resources.emergency_pill
 import kinfolk.shared.generated.resources.group_emergency
 import kinfolk.shared.generated.resources.group_home
 import kinfolk.shared.generated.resources.group_medical
-import kinfolk.shared.generated.resources.more_ways
 import kinfolk.shared.generated.resources.no_connection
 import kinfolk.shared.generated.resources.relationship
 import kinfolk.shared.generated.resources.remove_contact
 import kinfolk.shared.generated.resources.save
-import kinfolk.shared.generated.resources.sos
-import kinfolk.shared.generated.resources.tab_circle
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -92,36 +87,6 @@ fun typedPhone(input: String) = (if (input.startsWith("+")) localDigits(input) e
 
 /** "0812 3456 7890" */
 fun localPhone(e164: String) = "0" + groupDigits(localDigits(e164))
-
-/** `circle`, only its header and the "Cara lain" row to `contacts` until #5 builds the rest (docs/screen-map.md). */
-@Composable
-fun CircleScreen(circleName: String, memberCount: Int, onSos: () -> Unit, onContacts: () -> Unit) {
-    // design: padding:4px 20px; gap:20px
-    Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(Res.string.circle_name, circleName, memberCount), fontSize = 13.sp, color = Kf.Muted)
-                Text(stringResource(Res.string.tab_circle), style = serifStyle(30f, 1.1f))
-            }
-            Box(Modifier.height(44.dp).background(Kf.Sos, CircleShape).tap(onSos).padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
-                Text(stringResource(Res.string.sos), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.em)
-            }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionLabel(stringResource(Res.string.more_ways))
-            Card {
-                Row(Modifier.fillMaxWidth().tap(onContacts).padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(stringResource(Res.string.contacts), fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                        Text(stringResource(Res.string.contacts_sub), fontSize = 12.sp, color = Kf.Muted)
-                    }
-                    Text("›", color = Kf.Muted, fontSize = 18.sp)
-                }
-                Hairline()
-            }
-        }
-    }
-}
 
 /** `contacts` from design v3; the "Darurat" pill, the form and hiding the note line are approved in #11. */
 @Composable

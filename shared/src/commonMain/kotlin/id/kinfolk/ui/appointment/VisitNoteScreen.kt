@@ -70,6 +70,7 @@ fun VisitNoteScreen(
     recipientName: String,
     now: Instant,
     tz: TimeZone,
+    askerColor: (String) -> Color,
     onHome: () -> Unit,
     save: suspend (answers: Map<String, String>, nextSteps: List<String>, notes: String) -> Boolean,
 ) {
@@ -126,7 +127,7 @@ fun VisitNoteScreen(
             open.forEach { q ->
                 Column(Modifier.fillMaxWidth().dashed().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Avatar(q.askedByName.orEmpty().take(1), AskerColor, 26.dp, 11.sp)
+                        Avatar(q.askedByName.orEmpty().take(1), askerColor(q.askedBy), 26.dp, 11.sp)
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(q.text, fontSize = 15.sp, lineHeight = (15 * 1.4).sp)
                             carriedFrom(q)
@@ -163,9 +164,6 @@ fun VisitNoteScreen(
         }
     }
 }
-
-/** Asker avatars: Budi's color for everyone until #5 gives each Member one (approved in #7). */
-val AskerColor = Color(0xFFB0643A)
 
 @Composable
 private fun Section(label: String, content: @Composable () -> Unit) =

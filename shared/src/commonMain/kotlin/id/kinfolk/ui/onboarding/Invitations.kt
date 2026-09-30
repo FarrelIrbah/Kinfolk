@@ -59,7 +59,8 @@ import org.jetbrains.compose.resources.stringResource
 // onb2 and invitee from design v3, with the deviations approved in #4 (docs/screen-map.md).
 
 /** Budi, Dewi, Agus, Rina: the prototype's sibling colors, in its invite-list order. */
-private val InviteColors = listOf(Color(0xFFB0643A), Color(0xFF6C5A8E), Color(0xFF3E6E8E), Color(0xFF9A7A2F))
+/** Avatar colors of Budi, Dewi, Agus and Rina in the prototype: everyone but yourself. */
+val InviteColors = listOf(Color(0xFFB0643A), Color(0xFF6C5A8E), Color(0xFF3E6E8E), Color(0xFF9A7A2F))
 
 private data class NewInvite(val name: String, val local: String, val send: Boolean = true)
 

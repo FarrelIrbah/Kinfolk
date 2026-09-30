@@ -113,7 +113,18 @@ import id.kinfolk.ui.appointment.hm
 import id.kinfolk.ui.appointment.longDate
 import id.kinfolk.ui.appointment.whenLabel
 import id.kinfolk.ui.appointment.withWhom
-import id.kinfolk.ui.contacts.CircleScreen
+import id.kinfolk.ui.circle.CircleMember
+import id.kinfolk.ui.circle.CircleScreen
+import id.kinfolk.ui.circle.MemberScreen
+import id.kinfolk.ui.Confirm
+import id.kinfolk.ui.ConfirmSheet
+import id.kinfolk.ui.onboarding.InviteColors
+import id.kinfolk.data.Member
+import id.kinfolk.data.isLastAdmin
+import id.kinfolk.data.leaveCareCircle
+import id.kinfolk.data.members
+import id.kinfolk.data.promoteToAdmin
+import id.kinfolk.data.removeMember
 import id.kinfolk.ui.contacts.ContactFormScreen
 import id.kinfolk.ui.contacts.ContactsScreen
 import id.kinfolk.ui.home.HomeScreen
@@ -140,6 +151,17 @@ import kinfolk.shared.generated.resources.no_meds
 import kinfolk.shared.generated.resources.never
 import kinfolk.shared.generated.resources.qr_revoked
 import kinfolk.shared.generated.resources.you
+import kinfolk.shared.generated.resources.cancel
+import kinfolk.shared.generated.resources.former_member
+import kinfolk.shared.generated.resources.last_admin
+import kinfolk.shared.generated.resources.leave_body
+import kinfolk.shared.generated.resources.leave_confirm
+import kinfolk.shared.generated.resources.leave_title
+import kinfolk.shared.generated.resources.no_connection
+import kinfolk.shared.generated.resources.now_admin
+import kinfolk.shared.generated.resources.remove_body
+import kinfolk.shared.generated.resources.remove_confirm
+import kinfolk.shared.generated.resources.remove_title
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CancellationException
@@ -160,7 +182,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -192,15 +214,38 @@ fun App() {
         var formBack by remember { mutableStateOf(Screen.Emergency) } // where the Emergency Info form returns to
         var emergencyLoad by remember { mutableStateOf<Job?>(null) }
         var toast by remember { mutableStateOf<String?>(null) }
+        var members by remember { mutableStateOf(emptyList<Member>()) } // Former Members too, for their names
+        var viewing by rememberSaveable { mutableStateOf<String?>(null) } // on `member`
+        var memberError by remember { mutableStateOf<String?>(null) }
+        var confirm by remember { mutableStateOf<Confirm?>(null) }
         LaunchedEffect(toast) { if (toast != null) { delay(2600); toast = null } }
         val share = rememberShare()
         val revoked = stringResource(Res.string.qr_revoked)
         val tz = remember { TimeZone.currentSystemDefault() }
         val now by produceState(Clock.System.now()) { while (true) { delay(30_000); value = Clock.System.now() } }
-        // ponytail: Budi's avatar color from the prototype, since Sri's green vanishes on the green Home card; #5 gives each Member a color.
+        // "Anda" in Budi's avatar color from the prototype, since Sri's green vanishes on the green Home card.
         val you = Person(stringResource(Res.string.you), Color(0xFFB0643A))
+        val former = stringResource(Res.string.former_member) // "%1$s · Mantan anggota"
         fun me() = supabase.auth.currentUserOrNull()?.id
-        fun person(id: String?) = you.takeIf { id != null && id == me() }
+        // Approved in #5: yourself in Sri's green, the others in join order in Budi's, Dewi's, Agus's and Rina's, Former Members muted.
+        fun colorOf(id: String): Color {
+            val m = members.firstOrNull { it.userId == id }
+            return when {
+                id == me() -> Kf.Green
+                m?.leftAt != null -> Kf.Muted
+                else -> InviteColors[members.filter { it.userId != me() && it.leftAt == null }.indexOf(m).coerceAtLeast(0) % 4]
+            }
+        }
+        fun person(id: String?): Person? {
+            if (id == null) return null
+            if (id == me()) return you
+            val m = members.firstOrNull { it.userId == id } ?: return null
+            val name = m.name.orEmpty()
+            return Person(if (m.leftAt != null) former.replace("%1\$s", name) else name, colorOf(id))
+        }
+        fun circleMembers() = members.filter { it.leftAt == null }.sortedBy { it.userId != me() }.map {
+            CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me())
+        }
         fun go(to: Screen, how: Nav = Nav.Push) { nav = how; screen = to }
         suspend fun loadVisit() {
             questions = next?.let { a -> retrying { supabase.questions(a.id) } }.orEmpty()
@@ -215,6 +260,7 @@ fun App() {
             loadVisit()
             meds = retrying { supabase.medications(c.id) }
             sent = retrying { if (supabase.roleIn(c.id) == Role.admin) supabase.invitations(c.id) else null }
+            members = retrying { supabase.members(c.id) }
         }
         suspend fun land(how: Nav) {
             circle = retrying { supabase.myCareCircle() }
@@ -346,12 +392,15 @@ fun App() {
                                 onFillEmergency = { openEmergencyForm(Screen.Home) },
                             )
                             Tab.Records -> RecordsScreen(meds) { editingMed = it; go(Screen.MedForm) }
-                            Tab.Circle -> CircleScreen(circle?.name.orEmpty(), circle?.memberCount ?: 0, onSos = { openEmergency() }) { scope.launch { loadContacts(); go(Screen.Contacts) } }
+                            Tab.Circle -> CircleScreen(
+                                circle?.name.orEmpty(), circleMembers(), onSos = { openEmergency() },
+                                onMember = { viewing = it.id; memberError = null; go(Screen.Member) },
+                            ) { scope.launch { loadContacts(); go(Screen.Contacts) } }
                             else -> {}
                         }
                         Screen.Appt -> next?.let { a ->
                             ApptScreen(
-                                a, questions, note != null, now, tz, ::person, a.attendeeId == me(), recipient?.name.orEmpty(),
+                                a, questions, note != null, now, tz, ::person, ::colorOf, a.attendeeId == me(), recipient?.name.orEmpty(),
                                 onBack = { go(Screen.Home, Nav.Back) }, onEdit = { openForm(a) },
                                 // Not retried: adding is not idempotent.
                                 ask = { text -> attempt { supabase.askQuestion(a.circleId, a.id, text); loadVisit() } != null },
@@ -360,7 +409,7 @@ fun App() {
                         }
                         Screen.VisitNote -> next?.let { a ->
                             VisitNoteScreen(
-                                a, questions, note, editable = a.attendeeId == me(), recipient?.name.orEmpty(), now, tz,
+                                a, questions, note, editable = a.attendeeId == me(), recipient?.name.orEmpty(), now, tz, ::colorOf,
                                 onHome = { go(Screen.Home, Nav.Back) },
                                 save = { answers, steps, notes ->
                                     attempt { supabase.saveVisitNote(a.id, answers, steps, notes); loadVisit() }
@@ -411,6 +460,50 @@ fun App() {
                                 attempt { editingContact?.let { supabase.removeCareContact(it.id) }; loadContacts() }.also { if (it != null) go(Screen.Contacts, Nav.Back) } != null
                             },
                         )
+                        Screen.Member -> circleMembers().firstOrNull { it.id == viewing }?.let { m ->
+                            val c = circle ?: return@let // gone while leaving, before land() moves on
+                            val offline = stringResource(Res.string.no_connection)
+                            val lastAdmin = stringResource(Res.string.last_admin)
+                            val nowAdmin = stringResource(Res.string.now_admin, m.name)
+                            val remove = Triple(stringResource(Res.string.remove_title, m.name), stringResource(Res.string.remove_body, m.name), stringResource(Res.string.remove_confirm))
+                            val leave = Triple(stringResource(Res.string.leave_title), stringResource(Res.string.leave_body), stringResource(Res.string.leave_confirm))
+                            MemberScreen(
+                                m, iAmAdmin = sent != null, memberError, onBack = { go(Screen.Home, Nav.Back) },
+                                onPromote = {
+                                    memberError = null
+                                    scope.launch {
+                                        if (attempt { supabase.promoteToAdmin(c.id, m.id); loadHome() } != null) toast = nowAdmin else memberError = offline
+                                    }
+                                },
+                                onRemove = {
+                                    memberError = null
+                                    confirm = Confirm(remove.first, remove.second, remove.third) {
+                                        scope.launch {
+                                            if (attempt { supabase.removeMember(c.id, m.id); circle = supabase.myCareCircle(); loadHome() } != null) go(Screen.Home, Nav.Back)
+                                            else memberError = offline
+                                        }
+                                    }
+                                },
+                                onLeave = {
+                                    memberError = null
+                                    // The server refuses too; checking first spares the sheet.
+                                    if (m.role == Role.admin && members.none { it.leftAt == null && it.role == Role.admin && it.userId != m.id }) memberError = lastAdmin
+                                    else confirm = Confirm(leave.first, leave.second, leave.third) {
+                                        scope.launch {
+                                            try {
+                                                supabase.leaveCareCircle(c.id)
+                                                tab = Tab.Home
+                                                land(Nav.Tab)
+                                            } catch (e: CancellationException) {
+                                                throw e
+                                            } catch (e: Exception) {
+                                                memberError = if (e.isLastAdmin()) lastAdmin else offline
+                                            }
+                                        }
+                                    }
+                                },
+                            )
+                        }
                         Screen.Emergency -> recipient?.let { r ->
                             EmergencyScreen(
                                 r.name, r.allergies, r.conditions, meds, contacts, card,
@@ -440,6 +533,7 @@ fun App() {
                 }
             }
             Toast(toast, Modifier.align(Alignment.BottomCenter))
+            ConfirmSheet(confirm, stringResource(Res.string.cancel)) { confirm = null }
             if (screen == Screen.Home) TabBar(tab, { nav = Nav.Tab; tab = it }, Modifier.align(Alignment.BottomCenter))
         }
     }

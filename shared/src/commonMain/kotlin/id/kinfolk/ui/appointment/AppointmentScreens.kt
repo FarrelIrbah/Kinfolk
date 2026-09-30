@@ -34,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -110,6 +111,7 @@ fun ApptScreen(
     now: Instant,
     tz: TimeZone,
     person: (String?) -> Person?,
+    askerColor: (String) -> Color,
     isAttendee: Boolean,
     recipientName: String,
     onBack: () -> Unit,
@@ -155,7 +157,7 @@ fun ApptScreen(
             Card {
                 questions.forEach { q ->
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Avatar(q.askedByName.orEmpty().take(1), AskerColor, 26.dp, 11.sp)
+                        Avatar(q.askedByName.orEmpty().take(1), askerColor(q.askedBy), 26.dp, 11.sp)
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(q.text, fontSize = 15.sp, lineHeight = (15 * 1.4).sp)
                             if (q.carried) Text(
