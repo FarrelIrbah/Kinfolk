@@ -31,7 +31,7 @@ Posisi Member di Care Circle (admin, sibling, parent, viewer) yang menentukan ak
 _Avoid_: permission level, type
 
 **Data Category**:
-Kelompok data kesehatan (mis. medis, psikiatri, keuangan, dokumen) yang aksesnya bisa dibatasi per Role di luar akses dasar.
+Kelompok data kesehatan yang aksesnya bisa dibatasi per Member di luar akses dasar Role-nya. Di v1: janji dokter (beserta Question), Visit Note, Medication. UI: "Janji dokter", "Catatan kunjungan", "Obat".
 _Avoid_: tag, section
 
 ### Perawatan

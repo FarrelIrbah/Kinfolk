@@ -92,6 +92,12 @@ import id.kinfolk.data.current
 import id.kinfolk.data.editCareContact
 import id.kinfolk.data.editMedication
 import id.kinfolk.data.medications
+import id.kinfolk.data.DataCategory
+import id.kinfolk.data.Hidden
+import id.kinfolk.data.emergencyMedications
+import id.kinfolk.data.hidden
+import id.kinfolk.data.hideByDefault
+import id.kinfolk.data.setHidden
 import id.kinfolk.data.next
 import id.kinfolk.data.removeCareContact
 import id.kinfolk.data.Provider
@@ -137,6 +143,7 @@ import id.kinfolk.ui.appointment.withWhom
 import id.kinfolk.ui.circle.CircleMember
 import id.kinfolk.ui.circle.CircleScreen
 import id.kinfolk.ui.circle.MemberScreen
+import id.kinfolk.ui.circle.label
 import id.kinfolk.ui.Confirm
 import id.kinfolk.ui.ConfirmSheet
 import id.kinfolk.ui.onboarding.InviteColors
@@ -157,6 +164,7 @@ import id.kinfolk.ui.onboarding.Onb0
 import id.kinfolk.ui.onboarding.Invitee
 import id.kinfolk.ui.onboarding.Onb1
 import id.kinfolk.ui.onboarding.Onb2
+import id.kinfolk.ui.onboarding.Onb3
 import id.kinfolk.ui.onboarding.PhoneScreen
 import id.kinfolk.ui.onboarding.e164
 import id.kinfolk.ui.records.MedFormScreen
@@ -191,6 +199,14 @@ import kinfolk.shared.generated.resources.legend_other
 import kinfolk.shared.generated.resources.legend_you
 import kinfolk.shared.generated.resources.swap_declined
 import kinfolk.shared.generated.resources.swap_taken
+import kinfolk.shared.generated.resources.admins_full
+import kinfolk.shared.generated.resources.hide_body
+import kinfolk.shared.generated.resources.hide_confirm
+import kinfolk.shared.generated.resources.hide_title
+import kinfolk.shared.generated.resources.now_hidden
+import kinfolk.shared.generated.resources.now_shown
+import kinfolk.shared.generated.resources.only_recipient
+import kinfolk.shared.generated.resources.undo
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CancellationException
@@ -213,7 +229,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -251,7 +267,11 @@ fun App() {
         var formBack by remember { mutableStateOf(Screen.Emergency) } // where the Emergency Info form returns to
         var emergencyLoad by remember { mutableStateOf<Job?>(null) }
         var toast by remember { mutableStateOf<String?>(null) }
+        var undo by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) } // "Urungkan" while its toast shows
         var members by remember { mutableStateOf(emptyList<Member>()) } // Former Members too, for their names
+        var hidden by remember { mutableStateOf(emptyList<Hidden>()) }
+        var sosMeds by remember { mutableStateOf(emptyList<Medication>()) } // whatever is hidden (ADR 0003)
+        var onboarding by rememberSaveable { mutableStateOf(false) } // onb2 goes on to onb3 right after onb1
         var viewing by rememberSaveable { mutableStateOf<String?>(null) } // on `member`
         var memberError by remember { mutableStateOf<String?>(null) }
         var confirm by remember { mutableStateOf<Confirm?>(null) }
@@ -259,7 +279,7 @@ fun App() {
         var drives by remember { mutableStateOf(emptyList<Appointment>()) } // this week, with a Driver
         var swapping by remember { mutableStateOf<DutyTurn?>(null) }
         var editingDuty by remember { mutableStateOf<DutyTurn?>(null) }
-        LaunchedEffect(toast) { if (toast != null) { delay(2600); toast = null } }
+        LaunchedEffect(toast) { if (toast != null) { delay(if (undo?.first == toast) 5000 else 2600); toast = null } }
         val share = rememberShare()
         val revoked = stringResource(Res.string.qr_revoked)
         val tz = remember { TimeZone.currentSystemDefault() }
@@ -291,8 +311,13 @@ fun App() {
             return Person(if (m?.leftAt != null) former.replace("%1\$s", name) else name, colorOf(e.by))
         }
         fun visit() = opened ?: next?.let { Visit(it, questions, note) }
-        fun circleMembers() = members.filter { it.leftAt == null }.sortedBy { it.userId != me() }.map {
-            CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me())
+        // The Care Recipient while they are a Member: they set restrictions, else the admins (ADR 0004).
+        fun owner() = recipient?.memberId?.takeIf { id -> members.any { it.userId == id && it.leftAt == null } }
+        fun sees(m: Member): Set<DataCategory> =
+            if (m.userId == owner() || (owner() == null && m.role == Role.admin)) DataCategory.entries.toSet()
+            else DataCategory.entries.toSet() - hidden.filter { it.recipientId == recipient?.id && it.memberId == m.userId }.map { it.category }.toSet()
+        fun circleMembers() = members.filter { it.leftAt == null }.sortedWith(compareBy({ it.userId != owner() }, { it.userId != me() })).map {
+            CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me(), sees(it), it.userId == owner())
         }
         fun go(to: Screen, how: Nav = Nav.Push) { nav = how; screen = to }
         val today = now.toLocalDateTime(tz).date
@@ -330,6 +355,8 @@ fun App() {
             meds = retrying { supabase.medications(c.id) }
             sent = retrying { if (supabase.roleIn(c.id) == Role.admin) supabase.invitations(c.id) else null }
             members = retrying { supabase.members(c.id) }
+            hidden = retrying { supabase.hidden(c.id) }
+            sosMeds = recipient?.let { r -> retrying { supabase.emergencyMedications(r.id) } }.orEmpty()
             timeline = retrying { supabase.timeline(c.id) }
             loadRota()
         }
@@ -422,15 +449,22 @@ fun App() {
                         Screen.Onb1 -> Onb1 { myName, name, relation, needs ->
                             // Not retried: creating is not idempotent.
                             (attempt { supabase.createCareCircle(name, relation, needs, myName) } != null).also {
-                                if (it) { circle = retrying { supabase.myCareCircle() }; loadHome(); go(Screen.Onb2) }
+                                if (it) { circle = retrying { supabase.myCareCircle() }; loadHome(); onboarding = true; go(Screen.Onb2) }
                             }
                         }
                         Screen.Onb2 -> Onb2(
                             sent.orEmpty().filter { it.pending },
                             cancel = { inv -> attempt { supabase.cancelInvitation(inv.id) } != null },
                             send = { name, phone -> attempt { supabase.invite(circle!!.id, name, phone) } != null },
-                            onDone = { scope.launch { loadHome(); go(Screen.Home, Nav.Tab) } },
+                            onDone = { scope.launch { loadHome(); if (onboarding) go(Screen.Onb3) else go(Screen.Home, Nav.Tab) } },
                         )
+                        Screen.Onb3 -> Onb3(recipient?.name.orEmpty()) { perPerson ->
+                            attempt {
+                                supabase.hideByDefault(circle!!.id, if (perPerson) setOf(DataCategory.visit_notes) else emptySet())
+                                onboarding = false
+                                go(Screen.Home, Nav.Tab)
+                            } != null
+                        }
                         Screen.Invitee -> invitation?.let { inv ->
                             Invitee(inv) { take ->
                                 attempt { supabase.acceptInvitation(inv.id) }?.let {
@@ -498,7 +532,7 @@ fun App() {
                             Tab.Timeline -> TimelineScreen(timeline.map { e -> TimelineRow(author(e), ago(e.at, now, tz), text(e, tz)) { openFromTimeline(e) } })
                             Tab.Records -> RecordsScreen(meds) { editingMed = it; go(Screen.MedForm) }
                             Tab.Circle -> CircleScreen(
-                                circle?.name.orEmpty(), circleMembers(), onSos = { openEmergency() },
+                                circle?.name.orEmpty(), recipient?.name.orEmpty(), circleMembers(), onSos = { openEmergency() },
                                 onMember = { viewing = it.id; memberError = null; go(Screen.Member) },
                             ) { scope.launch { loadContacts(); go(Screen.Contacts) } }
                         }
@@ -584,8 +618,41 @@ fun App() {
                             val nowAdmin = stringResource(Res.string.now_admin, m.name)
                             val remove = Triple(stringResource(Res.string.remove_title, m.name), stringResource(Res.string.remove_body, m.name), stringResource(Res.string.remove_confirm))
                             val leave = Triple(stringResource(Res.string.leave_title), stringResource(Res.string.leave_body), stringResource(Res.string.leave_confirm))
+                            val category = DataCategory.entries.associateWith { stringResource(it.label).lowercase() }
+                            val hideTitle = category.mapValues { (_, name) -> stringResource(Res.string.hide_title, name, m.name) }
+                            val nowHidden = category.mapValues { (_, name) -> stringResource(Res.string.now_hidden, m.name, name) }
+                            val nowShown = category.mapValues { (_, name) -> stringResource(Res.string.now_shown, m.name, name) }
+                            val hideBody = stringResource(Res.string.hide_body)
+                            val hideConfirm = stringResource(Res.string.hide_confirm)
+                            val adminsFull = stringResource(Res.string.admins_full)
+                            val onlyRecipient = stringResource(Res.string.only_recipient, recipient?.name.orEmpty())
+                            // Not retried: offline, the switch stays put and says so.
+                            fun setHidden(cat: DataCategory, hide: Boolean, then: () -> Unit) = scope.launch {
+                                val r = recipient ?: return@launch
+                                if (attempt { supabase.setHidden(r.id, m.id, cat, hide) } == null) { toast = offline; return@launch }
+                                then()
+                                hidden = retrying { supabase.hidden(c.id) }
+                            }
+                            fun change(cat: DataCategory, hide: Boolean) = setHidden(cat, hide) {
+                                val msg = (if (hide) nowHidden else nowShown).getValue(cat)
+                                undo = msg to { setHidden(cat, !hide) {} }
+                                toast = msg
+                            }
+                            // Hiding asks first (prototype confirm sheet); sharing happens at once.
+                            val toggle: (DataCategory, Boolean) -> Unit = { cat, on ->
+                                if (on) confirm = Confirm(hideTitle.getValue(cat), hideBody, hideConfirm) { change(cat, true) } else change(cat, false)
+                            }
+                            val onToggle: ((DataCategory, Boolean) -> Unit)? = when {
+                                m.isRecipient || recipient == null -> null
+                                owner() == me() -> toggle
+                                sent == null -> null // neither admin nor the Care Recipient
+                                owner() != null -> { _, _ -> toast = onlyRecipient }
+                                m.role == Role.admin -> { _, _ -> toast = adminsFull }
+                                else -> toggle
+                            }
                             MemberScreen(
                                 m, iAmAdmin = sent != null, memberError, onBack = { go(Screen.Home, Nav.Back) },
+                                onToggle = onToggle,
                                 onPromote = {
                                     memberError = null
                                     scope.launch {
@@ -623,7 +690,7 @@ fun App() {
                         }
                         Screen.Emergency -> recipient?.let { r ->
                             EmergencyScreen(
-                                r.name, r.allergies, r.conditions, meds, contacts, card,
+                                r.name, r.allergies, r.conditions, sosMeds, contacts, card,
                                 onClose = { go(Screen.Home, Nav.Back) }, onEdit = { openEmergencyForm(Screen.Emergency) },
                                 // Refreshes "terakhir dipindai" when reachable; the card on screen already works.
                                 onQr = { go(Screen.Qr); scope.launch { attempt { supabase.emergencyCard(r.id) }?.let { card = it } } },
@@ -651,7 +718,11 @@ fun App() {
             }
             ConfirmSheet(confirm, stringResource(Res.string.cancel)) { confirm = null }
             if (screen == Screen.Home) TabBar(tab, { nav = Nav.Tab; tab = it }, Modifier.align(Alignment.BottomCenter))
-            Toast(toast, Modifier.align(Alignment.BottomCenter), overTabs = screen == Screen.Home)
+            Toast(
+                toast, Modifier.align(Alignment.BottomCenter), overTabs = screen == Screen.Home,
+                action = stringResource(Res.string.undo).takeIf { toast != null && undo?.first == toast },
+                onAction = { undo?.second?.invoke(); undo = null; toast = null },
+            )
             swapping?.let { t ->
                 val offline = stringResource(Res.string.no_connection)
                 Sheet(t, { swapping = null }) {

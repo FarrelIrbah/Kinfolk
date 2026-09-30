@@ -220,4 +220,32 @@
     <string name="inv_ask_body">%1$s minggu depan dipegang %2$s.</string>
     <string name="inv_took">Anda pegang %1$s minggu depan.</string>
     <string name="inv_skipped">Tidak apa-apa. %1$s akan bertanya ke yang lain.</string>
+    <!-- Data Category restrictions (#9): onb3, circle, member, invitee -->
+    <string name="onb3_head">%1$s yang menentukan siapa melihat apa</string>
+    <string name="onb3_sub">Beberapa hal mungkin ingin beliau batasi. Bisa diubah per orang kapan saja.</string>
+    <string name="privacy_all">Semua melihat semuanya</string>
+    <string name="privacy_all_body">Paling sederhana. Cocok jika keluarga dekat dan %1$s nyaman.</string>
+    <string name="privacy_per">%1$s atur per orang</string>
+    <string name="privacy_per_body">Mulai dengan janji dokter dan obat dibagikan; atur catatan kunjungan satu per satu.</string>
+    <string name="perm_intro">%1$s memilih apa yang bisa dilihat tiap orang.</string>
+    <string name="recipient_sub">Penerima perawatan · menentukan akses</string>
+    <string name="access_full">Penuh</string>
+    <string name="access_part">%1$d/%2$d</string>
+    <string name="can_see">Bisa melihat</string>
+    <string name="cat_appointments">Janji dokter</string>
+    <string name="cat_appointments_desc">Tanggal, dokter, siapa mengantar</string>
+    <string name="cat_visit_notes">Catatan kunjungan</string>
+    <string name="cat_visit_notes_desc">Pertanyaan, jawaban, langkah berikutnya</string>
+    <string name="cat_medications">Obat</string>
+    <string name="cat_medications_desc">Jadwal, dosis, isi ulang</string>
+    <string name="admins_full">Pengatur tetap punya akses penuh.</string>
+    <string name="only_recipient">Hanya %1$s yang bisa mengubah ini.</string>
+    <string name="hide_title">Sembunyikan %1$s dari %2$s?</string>
+    <string name="hide_body">Mereka tidak akan melihatnya di mana pun, termasuk linimasa dan WhatsApp.</string>
+    <string name="hide_confirm">Sembunyikan</string>
+    <string name="now_hidden">%1$s tidak lagi bisa melihat %2$s</string>
+    <string name="now_shown">%1$s kini bisa melihat %2$s</string>
+    <string name="undo">Urungkan</string>
+    <string name="inv_see_label">%1$s membagikan kepada Anda</string>
+    <string name="inv_see_hidden">%1$s untuk sementara hanya untuk beberapa orang.</string>
 </resources>

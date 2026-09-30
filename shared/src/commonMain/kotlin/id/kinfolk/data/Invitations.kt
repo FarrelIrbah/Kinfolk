@@ -38,15 +38,21 @@ data class InvitationToMe(
     @SerialName("duty_id") val dutyId: String? = null,
     val duty: String? = null,
     @SerialName("duty_holder") val dutyHolder: String? = null,
+    /** What they will start without, for "Bapak membagikan kepada Anda" (#9). */
+    val hidden: List<DataCategory> = emptyList(),
 )
 
-/** Admins only: saves the Invitation and sends its link to [phone] (E.164) on WhatsApp, or SMS when that fails. */
-suspend fun SupabaseClient.invite(circleId: String, name: String, phone: String, role: Role = Role.sibling) {
+/**
+ * Admins only: saves the Invitation and sends its link to [phone] (E.164) on WhatsApp, or SMS when that fails.
+ * Role parent needs [recipientId], the Care Recipient they are.
+ */
+suspend fun SupabaseClient.invite(circleId: String, name: String, phone: String, role: Role = Role.sibling, recipientId: String? = null) {
     functions.invoke("invite", buildJsonObject {
         put("circle_id", circleId)
         put("name", name)
         put("phone", phone)
         put("role", role.name)
+        put("recipient_id", recipientId)
     })
 }
 

@@ -202,26 +202,33 @@ fun AddRow(value: String, onValue: (String) -> Unit, hint: String, button: Strin
     }
 }
 
-/** Switch from `notes`/`member`: 50x30 track (#2F5D4A on, #D6CEBF off), 24px white knob; label 14px, gap 10. */
+/** Switch from `notes`/`member`: 50x30 track (#2F5D4A on, #D6CEBF off), 24px white knob. */
+@Composable
+fun Switch(on: Boolean) {
+    Box(
+        Modifier.size(50.dp, 30.dp).background(if (on) Kf.Green else Kf.Line, CircleShape).padding(3.dp),
+        contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Box(Modifier.size(24.dp).shadow(1.dp, CircleShape).background(Color.White, CircleShape))
+    }
+}
+
+/** [Switch] with its label on the right: 14px, gap 10. */
 @Composable
 fun Toggle(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.tap { onChange(!on) }, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(50.dp, 30.dp).background(if (on) Kf.Green else Kf.Line, CircleShape).padding(3.dp),
-            contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
-        ) {
-            Box(Modifier.size(24.dp).shadow(1.dp, CircleShape).background(Color.White, CircleShape))
-        }
+        Switch(on)
         Text(label, fontSize = 14.sp)
     }
 }
 
 /**
- * Prototype toast: #22261F, radius 14, 14px/1.4, 20 from the sides; rises in over 280ms and leaves after 2.6s.
+ * Prototype toast: #22261F, radius 14, 14px/1.4, 20 from the sides; rises in over 280ms and leaves after 2.6s (5s
+ * with an [action], the prototype's "Urungkan" pill: rgba(243,238,228,.14), height 32, padding 0 12, 13/600, gap 12).
  * [overTabs]: bottom 104 instead of 40, i.e. above the tab bar (its 30px home-indicator padding is the nav bar here).
  */
 @Composable
-fun Toast(text: String?, modifier: Modifier = Modifier, overTabs: Boolean = false) {
+fun Toast(text: String?, modifier: Modifier = Modifier, overTabs: Boolean = false, action: String? = null, onAction: () -> Unit = {}) {
     val shown = remember { MutableTransitionState(false) }.apply { targetState = text != null }
     var last by remember { mutableStateOf("") }
     if (text != null) last = text
@@ -231,12 +238,17 @@ fun Toast(text: String?, modifier: Modifier = Modifier, overTabs: Boolean = fals
         enter = fadeIn(tween(280, easing = KfEase)) + scaleIn(tween(280, easing = KfEase), initialScale = .97f) + slideInVertically(tween(280, easing = KfEase)) { rise },
         exit = ExitTransition.None,
     ) {
-        Text(
-            last, color = Kf.Paper, fontSize = 14.sp, lineHeight = (14 * 1.4).sp,
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            Modifier.fillMaxWidth()
                 .dropShadow(RoundedCornerShape(14.dp), Shadow(24.dp, Color(0x33000000), offset = DpOffset(0.dp, 8.dp)))
                 .background(Kf.Ink, RoundedCornerShape(14.dp)).padding(horizontal = 16.dp, vertical = 14.dp),
-        )
+            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(last, Modifier.weight(1f), color = Kf.Paper, fontSize = 14.sp, lineHeight = (14 * 1.4).sp)
+            if (action != null) Box(Modifier.height(32.dp).background(Color(0x24F3EEE4), CircleShape).tap(onAction).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+                Text(action, color = Kf.Paper, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
 }
 

@@ -60,10 +60,23 @@ import kinfolk.shared.generated.resources.open_circle
 import kinfolk.shared.generated.resources.send_invites
 import kinfolk.shared.generated.resources.skip_for_now
 import kinfolk.shared.generated.resources.will_send
+import kinfolk.shared.generated.resources.inv_see_hidden
+import kinfolk.shared.generated.resources.inv_see_label
+import kinfolk.shared.generated.resources.onb3_head
+import kinfolk.shared.generated.resources.onb3_sub
+import kinfolk.shared.generated.resources.privacy_all
+import kinfolk.shared.generated.resources.privacy_all_body
+import kinfolk.shared.generated.resources.privacy_per
+import kinfolk.shared.generated.resources.privacy_per_body
+import id.kinfolk.data.DataCategory
+import id.kinfolk.ui.circle.label
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
-// onb2 and invitee from design v3, with the deviations approved in #4 (docs/screen-map.md).
+// onb2, onb3 and invitee from design v3, with the deviations approved in #4 and #9 (docs/screen-map.md).
+
+/** "a", "a dan b", "a, b, dan c". */
+fun listing(items: List<String>) = if (items.size < 3) items.joinToString(" dan ") else items.dropLast(1).joinToString(", ") + ", dan " + items.last()
 
 /** Budi, Dewi, Agus, Rina: the prototype's sibling colors, in its invite-list order. */
 /** Avatar colors of Budi, Dewi, Agus and Rina in the prototype: everyone but yourself. */
@@ -162,6 +175,50 @@ fun Onb2(
     }
 }
 
+/**
+ * onb3 (#9): "Semua melihat semuanya" or, preselected like the prototype, "Bapak atur per orang", where Members
+ * who join later start without Visit Notes. [choose] saves it and returns false when offline.
+ */
+@Composable
+fun Onb3(recipientName: String, choose: suspend (perPerson: Boolean) -> Boolean) {
+    val scope = rememberCoroutineScope()
+    var perPerson by remember { mutableStateOf(true) }
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    // design: padding 12px 24px, gap 22
+    Column(Modifier.padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            repeat(3) { Box(Modifier.weight(1f).height(4.dp).background(Kf.Green, RoundedCornerShape(2.dp))) }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(Res.string.onb3_head, recipientName), style = serifStyle(30f, 1.1f))
+            Text(stringResource(Res.string.onb3_sub), fontSize = 15.sp, lineHeight = (15 * 1.5).sp, color = Kf.Ink2)
+        }
+        // design: option 1.5px border (#2F5D4A picked), #FBF8F2, radius 18, padding 16, gap 4; title 16/600, body 14/1.45 muted
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf(
+                false to (stringResource(Res.string.privacy_all) to stringResource(Res.string.privacy_all_body, recipientName)),
+                true to (stringResource(Res.string.privacy_per, recipientName) to stringResource(Res.string.privacy_per_body)),
+            ).forEach { (option, text) ->
+                Column(
+                    Modifier.fillMaxWidth().border(1.5.dp, if (perPerson == option) Kf.Green else Color.Transparent, RoundedCornerShape(18.dp))
+                        .background(Kf.Card, RoundedCornerShape(18.dp)).tap { perPerson = option }.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(text.first, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text(text.second, fontSize = 14.sp, lineHeight = (14 * 1.45).sp, color = Kf.Muted)
+                }
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PrimaryButton(stringResource(Res.string.open_circle)) {
+                if (!busy) scope.launch { busy = true; failed = !choose(perPerson); busy = false }
+            }
+            if (failed) ErrorText(stringResource(Res.string.no_connection))
+        }
+    }
+}
+
 // design: padding 14px 16px, gap 12, avatar 36, name 16/500, phone 13 muted, pill 8px 14px 13/600
 @Composable
 private fun InviteRow(name: String, phone: String, color: Color, label: String, on: Boolean, onToggle: () -> Unit) {
@@ -180,7 +237,7 @@ private fun InviteRow(name: String, phone: String, color: Color, label: String, 
 }
 
 /**
- * `invitee`: head, the Duty ask (#10) and the button; last visit (#7) stays hidden and sharing waits for #9.
+ * `invitee`: head, the Duty ask (#10), what they will see (#9) and the button; last visit (#7) stays hidden.
  * "Saya ambil" is kept until [accept] joins, since only Members hold turns. [accept] returns false when offline.
  */
 @Composable
@@ -224,6 +281,20 @@ fun Invitee(invitation: InvitationToMe, accept: suspend (takeTurn: Boolean) -> B
                     fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Kf.Green,
                 )
             }
+        }
+        // "Janji dokter dan obat. Catatan kunjungan untuk sementara hanya untuk beberapa orang." (approved in #9)
+        val names = DataCategory.entries.associateWith { stringResource(it.label).lowercase() }
+        val (hidden, shown) = DataCategory.entries.partition { it in invitation.hidden }
+        // design: padding 0 4px, gap 4; label 13 muted, text 14/1.5
+        Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(Res.string.inv_see_label, invitation.circle), fontSize = 13.sp, color = Kf.Muted)
+            Text(
+                listOfNotNull(
+                    shown.takeIf { it.isNotEmpty() }?.let { listing(it.map(names::getValue)).replaceFirstChar(Char::uppercase) + "." },
+                    hidden.takeIf { it.isNotEmpty() }?.let { stringResource(Res.string.inv_see_hidden, listing(it.map(names::getValue)).replaceFirstChar(Char::uppercase)) },
+                ).joinToString(" "),
+                fontSize = 14.sp, lineHeight = (14 * 1.5).sp,
+            )
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PrimaryButton(stringResource(Res.string.open_circle)) {

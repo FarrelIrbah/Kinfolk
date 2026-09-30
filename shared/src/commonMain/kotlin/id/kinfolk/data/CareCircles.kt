@@ -35,6 +35,8 @@ data class CareRecipient(
     val relation: String? = null,
     val allergies: String = "", // Emergency Info: "Penisilin"
     val conditions: String = "", // Emergency Info: "Stroke iskemik, April 2026. …"
+    /** The Member who is this Care Recipient (Role parent); they own its Data Category restrictions (ADR 0004). */
+    @SerialName("member_id") val memberId: String? = null,
 )
 
 @Serializable

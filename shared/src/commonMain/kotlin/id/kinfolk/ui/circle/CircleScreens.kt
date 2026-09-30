@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import id.kinfolk.data.DataCategory
 import id.kinfolk.data.Role
 import id.kinfolk.ui.Avatar
 import id.kinfolk.ui.Card
@@ -27,11 +29,23 @@ import id.kinfolk.ui.Kf
 import id.kinfolk.ui.Link
 import id.kinfolk.ui.Pill
 import id.kinfolk.ui.SectionLabel
+import id.kinfolk.ui.Switch
 import id.kinfolk.ui.appointment.dayMonth
 import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
+import kinfolk.shared.generated.resources.access_full
+import kinfolk.shared.generated.resources.access_part
 import kinfolk.shared.generated.resources.back_circle
+import kinfolk.shared.generated.resources.can_see
+import kinfolk.shared.generated.resources.cat_appointments
+import kinfolk.shared.generated.resources.cat_appointments_desc
+import kinfolk.shared.generated.resources.cat_medications
+import kinfolk.shared.generated.resources.cat_medications_desc
+import kinfolk.shared.generated.resources.cat_visit_notes
+import kinfolk.shared.generated.resources.cat_visit_notes_desc
+import kinfolk.shared.generated.resources.perm_intro
+import kinfolk.shared.generated.resources.recipient_sub
 import kinfolk.shared.generated.resources.circle_name
 import kinfolk.shared.generated.resources.contacts
 import kinfolk.shared.generated.resources.contacts_sub
@@ -48,10 +62,29 @@ import kinfolk.shared.generated.resources.role_viewer
 import kinfolk.shared.generated.resources.sos
 import kinfolk.shared.generated.resources.tab_circle
 import kotlinx.datetime.LocalDate
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-/** A current Member as `circle` and `member` show them. */
-class CircleMember(val id: String, val name: String, val color: Color, val role: Role, val joined: LocalDate, val isMe: Boolean)
+/**
+ * A current Member as `circle` and `member` show them. [sees] are the Data Categories they can see; [isRecipient]
+ * when they are the Care Recipient, who sees everything and sets restrictions (ADR 0004).
+ */
+class CircleMember(
+    val id: String, val name: String, val color: Color, val role: Role, val joined: LocalDate, val isMe: Boolean,
+    val sees: Set<DataCategory> = DataCategory.entries.toSet(), val isRecipient: Boolean = false,
+)
+
+/** `member` rows, approved in #9: the prototype's "Janji dokter" and "Obat", and "Catatan kunjungan" for "Rekaman kunjungan". */
+val DataCategory.label: StringResource get() = when (this) {
+    DataCategory.appointments -> Res.string.cat_appointments
+    DataCategory.visit_notes -> Res.string.cat_visit_notes
+    DataCategory.medications -> Res.string.cat_medications
+}
+private val DataCategory.desc get() = when (this) {
+    DataCategory.appointments -> Res.string.cat_appointments_desc
+    DataCategory.visit_notes -> Res.string.cat_visit_notes_desc
+    DataCategory.medications -> Res.string.cat_medications_desc
+}
 
 @Composable
 private fun CircleMember.roleText() = stringResource(
@@ -63,16 +96,21 @@ private fun CircleMember.roleText() = stringResource(
     },
 )
 
-/** "Anda · pengatur", "Anak" (approved in #5). */
+/** "Anda · pengatur", "Anak" (approved in #5); the Care Recipient "Penerima perawatan · menentukan akses" (#9). */
 @Composable
-private fun CircleMember.sub() = if (isMe) stringResource(Res.string.member_you, roleText()) else roleText().replaceFirstChar { it.uppercase() }
+private fun CircleMember.sub() = when {
+    isRecipient -> stringResource(Res.string.recipient_sub)
+    isMe -> stringResource(Res.string.member_you, roleText())
+    else -> roleText().replaceFirstChar { it.uppercase() }
+}
 
 /**
- * `circle` from design v3: header, Members, "Cara lain". Approved in #5: the permission intro, access column and
- * Care Recipient row wait for #9; "Paket" and "Ulangi onboarding" are hidden.
+ * `circle` from design v3: header, Members, "Cara lain". Approved in #5: "Paket" and "Ulangi onboarding" are hidden.
+ * Approved in #9: the intro box, without "Perubahan tercatat di linimasa.", only while the Care Recipient
+ * [recipientName] is a Member (their row first, no access column); access "Penuh" or "2/3".
  */
 @Composable
-fun CircleScreen(circleName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit) {
+fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit) {
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -84,6 +122,11 @@ fun CircleScreen(circleName: String, members: List<CircleMember>, onSos: () -> U
                 Text(stringResource(Res.string.sos), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.em)
             }
         }
+        // design: 14px/1.5 #44463E on #E9E2D4, radius 14, padding 12px 14px
+        if (members.any { it.isRecipient }) Text(
+            stringResource(Res.string.perm_intro, recipientName), fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Kf.Ink2,
+            modifier = Modifier.fillMaxWidth().background(Kf.CardAlt, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+        )
         if (members.isNotEmpty()) Card {
             members.forEach { m ->
                 Row(
@@ -95,6 +138,11 @@ fun CircleScreen(circleName: String, members: List<CircleMember>, onSos: () -> U
                         Text(m.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                         Text(m.sub(), fontSize = 13.sp, color = Kf.Muted)
                     }
+                    if (!m.isRecipient) Text(
+                        if (m.sees.size == DataCategory.entries.size) stringResource(Res.string.access_full)
+                        else stringResource(Res.string.access_part, m.sees.size, DataCategory.entries.size),
+                        fontSize = 12.sp, color = Kf.Muted,
+                    )
                     Text("›", color = Kf.Muted, fontSize = 18.sp)
                 }
                 Hairline()
@@ -117,12 +165,16 @@ fun CircleScreen(circleName: String, members: List<CircleMember>, onSos: () -> U
 }
 
 /**
- * `member` from design v3, header only. Approved in #5: "Bisa melihat" (#9), "Notifikasi" (#13), the change history
- * and footnote are hidden; admins get "Jadikan pengatur" and "Keluarkan dari lingkaran" on others, everyone
- * "Keluar dari lingkaran" on themselves, each a confirm sheet except promoting.
+ * `member` from design v3. Approved in #5: "Notifikasi" (#13), the change history and footnote are hidden; admins
+ * get "Jadikan pengatur" and "Keluarkan dari lingkaran" on others, everyone "Keluar dari lingkaran" on themselves,
+ * each a confirm sheet except promoting. Approved in #9: "Bisa melihat" for admins and the Care Recipient, hidden
+ * while [onToggle] is null; a tap passes the category and whether it was on.
  */
 @Composable
-fun MemberScreen(m: CircleMember, iAmAdmin: Boolean, error: String?, onBack: () -> Unit, onPromote: () -> Unit, onRemove: () -> Unit, onLeave: () -> Unit) {
+fun MemberScreen(
+    m: CircleMember, iAmAdmin: Boolean, error: String?, onBack: () -> Unit, onPromote: () -> Unit, onRemove: () -> Unit, onLeave: () -> Unit,
+    onToggle: ((DataCategory, Boolean) -> Unit)?,
+) {
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Pill(stringResource(Res.string.back_circle), onBack)
@@ -134,6 +186,26 @@ fun MemberScreen(m: CircleMember, iAmAdmin: Boolean, error: String?, onBack: () 
                     if (m.isMe) m.sub() else stringResource(Res.string.member_joined, m.roleText().replaceFirstChar { it.uppercase() }, dayMonth(m.joined)),
                     fontSize = 13.sp, color = Kf.Muted,
                 )
+            }
+        }
+        // design: rows padding 14px 16px, gap 12; label 15/500, desc 12 muted
+        if (onToggle != null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionLabel(stringResource(Res.string.can_see))
+            Card {
+                DataCategory.entries.forEach { c ->
+                    val on = c in m.sees
+                    Row(
+                        Modifier.fillMaxWidth().tap { onToggle(c, on) }.padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(stringResource(c.label), fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                            Text(stringResource(c.desc), fontSize = 12.sp, color = Kf.Muted)
+                        }
+                        Switch(on)
+                    }
+                    Hairline()
+                }
             }
         }
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
