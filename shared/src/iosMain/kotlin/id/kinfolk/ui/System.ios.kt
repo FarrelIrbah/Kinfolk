@@ -2,6 +2,7 @@ package id.kinfolk.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import platform.Foundation.NSUserDefaults
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
 
@@ -16,3 +17,9 @@ actual fun rememberShare(): (text: String) -> Unit = remember {
 // ponytail: iOS keeps its status bar style; the dark `emergency` screen needs a UIViewController override when iOS ships.
 @Composable
 actual fun LightStatusBarIcons() {}
+
+@Composable
+actual fun rememberKept(key: String): Kept = remember {
+    val defaults = NSUserDefaults.standardUserDefaults
+    Kept({ defaults.stringForKey(key) }, { v -> if (v == null) defaults.removeObjectForKey(key) else defaults.setObject(v, key) })
+}

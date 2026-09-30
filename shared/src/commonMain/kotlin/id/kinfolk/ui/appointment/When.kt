@@ -63,3 +63,13 @@ fun ago(at: Instant, now: Instant, tz: TimeZone): String {
         else -> dayMonth(t.date)
     }
 }
+
+/** How old the offline copy is: "2 jam lalu" from the prototype, with minutes and days like [countdown] (#14). */
+fun updatedAgo(savedAt: Instant, now: Instant): String {
+    val mins = (now - savedAt).inWholeMinutes.coerceAtLeast(1)
+    return when {
+        mins < 60 -> "$mins mnt lalu"
+        mins < 24 * 60 -> "${mins / 60} jam lalu"
+        else -> "${mins / (24 * 60)} hari lalu"
+    }
+}

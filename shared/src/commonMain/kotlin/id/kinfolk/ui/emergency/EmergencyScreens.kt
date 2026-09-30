@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -61,6 +62,7 @@ import kinfolk.shared.generated.resources.close
 import kinfolk.shared.generated.resources.conditions
 import kinfolk.shared.generated.resources.current_meds
 import kinfolk.shared.generated.resources.edit
+import kinfolk.shared.generated.resources.em_offline
 import kinfolk.shared.generated.resources.em_title
 import kinfolk.shared.generated.resources.no_connection
 import kinfolk.shared.generated.resources.qr_body
@@ -108,12 +110,12 @@ private fun Tile(label: String, horizontal: Dp, gap: Dp, value: @Composable () -
 }
 
 /**
- * `emergency`. Approved deviation (#12): only ADR 0003's fixed fields, so no age line, blood-thinner banner, "Keinginan"
- * or offline line; Alergi is one full-width tile; empty sections are hidden; "Ubah" opens the form.
+ * `emergency`. Approved deviation (#12): only ADR 0003's fixed fields, so no age line, blood-thinner banner or "Keinginan";
+ * Alergi is one full-width tile; empty sections are hidden; "Ubah" opens the form. [updated]: age of the offline copy (#14).
  */
 @Composable
 fun EmergencyScreen(
-    name: String, allergies: String, conditions: String, meds: List<Medication>, contacts: List<CareContact>, card: EmergencyCard?,
+    name: String, allergies: String, conditions: String, meds: List<Medication>, contacts: List<CareContact>, card: EmergencyCard?, updated: String?,
     onClose: () -> Unit, onEdit: () -> Unit, onQr: () -> Unit,
 ) {
     LightStatusBarIcons()
@@ -170,6 +172,12 @@ fun EmergencyScreen(
                     Text(stringResource(Res.string.qr_sub), fontSize = 13.sp, lineHeight = (13 * 1.4).sp, color = Kf.Night, modifier = Modifier.alpha(.75f))
                 }
             }
+        }
+        updated?.let {
+            Text(
+                stringResource(Res.string.em_offline, it), Modifier.fillMaxWidth().padding(top = 4.dp).alpha(.6f),
+                fontSize = 12.sp, color = ink, textAlign = TextAlign.Center,
+            )
         }
     }
 }

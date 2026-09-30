@@ -15,6 +15,7 @@ import kotlin.time.Instant
 private data class CardRow(val token: String, val version: Int, @SerialName("last_scanned_at") val lastScannedAt: Instant? = null)
 
 /** The QR card of a Care Recipient: [url] opens Emergency Info without login until an admin revokes it. */
+@Serializable
 data class EmergencyCard(val url: String, val version: Int, val lastScannedAt: Instant?)
 
 private fun SupabaseClient.card(row: CardRow) = EmergencyCard("$supabaseHttpUrl/functions/v1/emergency?t=${row.token}", row.version, row.lastScannedAt)

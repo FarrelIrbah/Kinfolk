@@ -99,6 +99,7 @@
     <string name="code_sub">Dikirim ke WhatsApp %1$s.</string>
     <string name="code_sub_sms">Dikirim lewat SMS ke %1$s.</string>
     <string name="no_connection">Tidak tersambung. Coba lagi.</string>
+    <string name="offline">Offline</string>
     <string name="code_label">Kode 6 angka</string>
     <string name="code_wrong">Kode salah. Coba lagi.</string>
     <string name="resend_in">Kirim ulang (%1$s)</string>
@@ -154,6 +155,7 @@
     <string name="current_meds">Obat saat ini</string>
     <string name="call">Telepon</string>
     <string name="qr_title">QR untuk paramedis</string>
+    <string name="em_offline">Tersimpan di ponsel ini · bisa tanpa sinyal · diperbarui %1$s</string>
     <string name="qr_sub">Membuka halaman ini tanpa login. Untuk dompet dan kulkas.</string>
     <string name="qr_head">Kartu dompet &amp; kulkas</string>
     <string name="qr_body">Paramedis memindai kode dan melihat halaman darurat, tanpa ponsel keluarga. Tanpa login, tanpa app.</string>

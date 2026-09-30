@@ -119,7 +119,17 @@ import id.kinfolk.data.providers
 import id.kinfolk.data.scheduleAppointment
 import id.kinfolk.data.createCareCircle
 import id.kinfolk.data.kinfolkClient
-import id.kinfolk.data.myCareCircle
+import id.kinfolk.data.Snapshot
+import id.kinfolk.data.snapshot
+import id.kinfolk.ui.rememberKept
+import id.kinfolk.ui.appointment.updatedAgo
+import kinfolk.shared.generated.resources.offline
+import kotlin.time.Instant
+import kotlinx.serialization.json.Json
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.unit.DpOffset
 import id.kinfolk.data.sendSignInCode
 import id.kinfolk.data.verifySignInCode
 import id.kinfolk.ui.Kf
@@ -279,6 +289,9 @@ fun App() {
         var drives by remember { mutableStateOf(emptyList<Appointment>()) } // this week, with a Driver
         var swapping by remember { mutableStateOf<DutyTurn?>(null) }
         var editingDuty by remember { mutableStateOf<DutyTurn?>(null) }
+        var offline by remember { mutableStateOf(false) } // the last read failed
+        var savedAt by remember { mutableStateOf<Instant?>(null) } // of what's on screen
+        val kept = rememberKept("snapshot")
         LaunchedEffect(toast) { if (toast != null) { delay(if (undo?.first == toast) 5000 else 2600); toast = null } }
         val share = rememberShare()
         val revoked = stringResource(Res.string.qr_revoked)
@@ -288,6 +301,19 @@ fun App() {
         val you = Person(stringResource(Res.string.you), Color(0xFFB0643A))
         val former = stringResource(Res.string.former_member) // "%1$s · Mantan anggota"
         fun me() = supabase.auth.currentUserOrNull()?.id
+        // Reads only: retries until reachable, showing the offline banner meanwhile.
+        suspend fun <T> retrying(block: suspend () -> T): T {
+            while (true) {
+                try {
+                    return block().also { offline = false }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    offline = true
+                    delay(3000)
+                }
+            }
+        }
         // Approved in #5: yourself in Sri's green, the others in join order in Budi's, Dewi's, Agus's and Rina's, Former Members muted.
         fun colorOf(id: String): Color {
             val m = members.firstOrNull { it.userId == id }
@@ -330,11 +356,6 @@ fun App() {
             drives = retrying { supabase.appointmentsBetween(c.id, week.atStartOfDayIn(tz), (week + DatePeriod(days = 7)).atStartOfDayIn(tz)) }
                 .filter { it.driverId != null }
         }
-        suspend fun loadVisit() {
-            questions = next?.let { a -> retrying { supabase.questions(a.id) } }.orEmpty()
-            note = next?.let { a -> retrying { supabase.visitNote(a.id) } }
-            opened?.appointment?.let { a -> opened = Visit(a, retrying { supabase.questions(a.id) }, retrying { supabase.visitNote(a.id) }) }
-        }
         // Not retried: offline, the tap does nothing rather than jumping there later. The latest tap wins.
         fun openFromTimeline(e: TimelineEntry) {
             opening?.cancel()
@@ -345,23 +366,26 @@ fun App() {
                 go(if (e.kind == TimelineEntry.Kind.visit_note) Screen.VisitNote else Screen.Appt)
             }
         }
+        // What stays readable offline (#14); the rest (Invitations, restrictions, rota) waits for a connection.
+        fun restore(k: Snapshot) {
+            circle = k.circle; recipient = k.recipient; next = k.next; questions = k.questions; note = k.note
+            meds = k.medications; members = k.members; timeline = k.timeline; sosMeds = k.emergencyMedications
+            contacts = k.contacts; card = k.card; savedAt = k.savedAt
+        }
         suspend fun loadHome() {
-            val c = circle ?: return
             // The card stays until the day ends: its "Tulis catatan" button is for after the visit.
             val today = Clock.System.now().toLocalDateTime(tz).date.atStartOfDayIn(tz)
-            recipient = retrying { supabase.careRecipients(c.id).firstOrNull() }
-            next = retrying { supabase.nextAppointment(c.id, since = today) }
-            loadVisit()
-            meds = retrying { supabase.medications(c.id) }
-            sent = retrying { if (supabase.roleIn(c.id) == Role.admin) supabase.invitations(c.id) else null }
-            members = retrying { supabase.members(c.id) }
-            hidden = retrying { supabase.hidden(c.id) }
-            sosMeds = recipient?.let { r -> retrying { supabase.emergencyMedications(r.id) } }.orEmpty()
-            timeline = retrying { supabase.timeline(c.id) }
+            val k = retrying { supabase.snapshot(since = today) }
+            // Without a Care Circle (left, removed) nothing stays on the phone.
+            kept.write(k?.let { Json.encodeToString(it) })
+            if (k == null) { circle = null; return }
+            restore(k)
+            opened?.appointment?.let { a -> opened = Visit(a, retrying { supabase.questions(a.id) }, retrying { supabase.visitNote(a.id) }) }
+            sent = retrying { if (supabase.roleIn(k.circle.id) == Role.admin) supabase.invitations(k.circle.id) else null }
+            hidden = retrying { supabase.hidden(k.circle.id) }
             loadRota()
         }
         suspend fun land(how: Nav) {
-            circle = retrying { supabase.myCareCircle() }
             loadHome()
             // Whoever signs in without a Care Circle but with a pending Invitation to their number sees `invitee`.
             invitation = if (circle == null) retrying { supabase.myInvitations() }.firstOrNull() else null
@@ -396,7 +420,15 @@ fun App() {
             supabase.auth.awaitInitialization()
             // After rotation the sign-in screens stay; the rest reload their Care Circle from Home.
             if (screen in listOf(Screen.Onb0, Screen.Phone, Screen.Code, Screen.Onb1)) return@LaunchedEffect
-            if (supabase.auth.currentSessionOrNull() != null) land(Nav.Tab) else go(Screen.Onb0, Nav.Tab)
+            if (supabase.auth.currentSessionOrNull() == null) return@LaunchedEffect go(Screen.Onb0, Nav.Tab)
+            // Offline, Home opens with what the last load kept and refreshes in place once reachable,
+            // so whoever moved on meanwhile stays where they are unless the Care Circle is gone.
+            val k = kept.read()?.let { runCatching { Json { ignoreUnknownKeys = true }.decodeFromString<Snapshot>(it) }.getOrNull() }
+                ?: return@LaunchedEffect land(Nav.Tab)
+            restore(k)
+            go(Screen.Home, Nav.Tab)
+            loadHome()
+            if (circle == null) land(Nav.Tab)
         }
 
         val slide = with(LocalDensity.current) { 36.dp.roundToPx() }
@@ -449,7 +481,7 @@ fun App() {
                         Screen.Onb1 -> Onb1 { myName, name, relation, needs ->
                             // Not retried: creating is not idempotent.
                             (attempt { supabase.createCareCircle(name, relation, needs, myName) } != null).also {
-                                if (it) { circle = retrying { supabase.myCareCircle() }; loadHome(); onboarding = true; go(Screen.Onb2) }
+                                if (it) { loadHome(); onboarding = true; go(Screen.Onb2) }
                             }
                         }
                         Screen.Onb2 -> Onb2(
@@ -542,7 +574,7 @@ fun App() {
                                 a, v.questions, v.note != null, now, tz, ::person, ::colorOf, a.attendeeId == me(), recipient?.name.orEmpty(),
                                 onBack = { go(Screen.Home, Nav.Back) }, onEdit = { openForm(a) },
                                 // Not retried: adding is not idempotent.
-                                ask = { text -> attempt { supabase.askQuestion(a.circleId, a.id, text); loadVisit() } != null },
+                                ask = { text -> attempt { supabase.askQuestion(a.circleId, a.id, text); loadHome() } != null },
                                 onNote = { go(Screen.VisitNote) },
                             )
                         }
@@ -604,11 +636,11 @@ fun App() {
                                 attempt {
                                     val draft = CareContactDraft(circle!!.id, f.name, f.relationship, f.phone, f.group, f.emergency)
                                     editingContact?.let { supabase.editCareContact(it.id, draft) } ?: supabase.addCareContact(draft)
-                                    loadContacts() // before leaving, so the form stays busy and can't add twice
+                                    loadHome() // before leaving, so the form stays busy and can't add twice
                                 }.also { if (it != null) go(Screen.Contacts, Nav.Back) } != null
                             },
                             remove = {
-                                attempt { editingContact?.let { supabase.removeCareContact(it.id) }; loadContacts() }.also { if (it != null) go(Screen.Contacts, Nav.Back) } != null
+                                attempt { editingContact?.let { supabase.removeCareContact(it.id) }; loadHome() }.also { if (it != null) go(Screen.Contacts, Nav.Back) } != null
                             },
                         )
                         Screen.Member -> circleMembers().firstOrNull { it.id == viewing }?.let { m ->
@@ -663,7 +695,7 @@ fun App() {
                                     memberError = null
                                     confirm = Confirm(remove.first, remove.second, remove.third) {
                                         scope.launch {
-                                            if (attempt { supabase.removeMember(c.id, m.id); circle = supabase.myCareCircle(); loadHome() } != null) go(Screen.Home, Nav.Back)
+                                            if (attempt { supabase.removeMember(c.id, m.id); loadHome() } != null) go(Screen.Home, Nav.Back)
                                             else memberError = offline
                                         }
                                     }
@@ -690,7 +722,7 @@ fun App() {
                         }
                         Screen.Emergency -> recipient?.let { r ->
                             EmergencyScreen(
-                                r.name, r.allergies, r.conditions, sosMeds, contacts, card,
+                                r.name, r.allergies, r.conditions, sosMeds, contacts, card, savedAt?.let { updatedAgo(it, now) },
                                 onClose = { go(Screen.Home, Nav.Back) }, onEdit = { openEmergencyForm(Screen.Emergency) },
                                 // Refreshes "terakhir dipindai" when reachable; the card on screen already works.
                                 onQr = { go(Screen.Qr); scope.launch { attempt { supabase.emergencyCard(r.id) }?.let { card = it } } },
@@ -701,7 +733,7 @@ fun App() {
                                 QrScreen(
                                     r.name, r.allergies, c, c.lastScannedAt?.let { whenLabel(it, now, tz) } ?: stringResource(Res.string.never),
                                     admin = sent != null, onBack = { go(Screen.Emergency, Nav.Back) }, onShare = { share(c.url) },
-                                    revoke = { attempt { card = supabase.reissueEmergencyCard(r.id); toast = revoked } != null },
+                                    revoke = { attempt { card = supabase.reissueEmergencyCard(r.id); toast = revoked; scope.launch { loadHome() } } != null },
                                 )
                             }
                         }
@@ -710,6 +742,7 @@ fun App() {
                                 attempt {
                                     supabase.saveEmergencyInfo(r.id, allergies, conditions)
                                     recipient = r.copy(allergies = allergies, conditions = conditions)
+                                    scope.launch { loadHome() } // keeps the offline copy current without holding the form
                                 }.also { if (it != null) go(formBack, Nav.Back) } != null
                             }
                         }
@@ -717,6 +750,7 @@ fun App() {
                 }
             }
             ConfirmSheet(confirm, stringResource(Res.string.cancel)) { confirm = null }
+            if (offline && screen != null) OfflineBanner(stringResource(Res.string.offline), Modifier.align(Alignment.TopCenter))
             if (screen == Screen.Home) TabBar(tab, { nav = Nav.Tab; tab = it }, Modifier.align(Alignment.BottomCenter))
             Toast(
                 toast, Modifier.align(Alignment.BottomCenter), overTabs = screen == Screen.Home,
@@ -740,16 +774,18 @@ fun App() {
 private suspend fun <T : Any> attempt(block: suspend () -> T): T? =
     try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
 
-// ponytail: reads only; retries forever with no message until the offline ticket designs what to show.
-private suspend fun <T> retrying(block: suspend () -> T): T {
-    while (true) {
-        try {
-            return block()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            delay(3000)
-        }
+/** Prototype offline pill: top 54px, #22261F, 12px 500, padding 7 14, gap 6, 7px amber dot; copy approved in #14. */
+@Composable
+private fun OfflineBanner(text: String, modifier: Modifier) {
+    // ponytail: sits right under the status bar; the prototype's 54px is 6px above its 60px content inset.
+    Row(
+        modifier.statusBarsPadding()
+            .dropShadow(CircleShape, Shadow(12.dp, Color(0x26000000), offset = DpOffset(0.dp, 4.dp)))
+            .background(Kf.Ink, CircleShape).padding(horizontal = 14.dp, vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).background(Color(0xFFC9A77C), CircleShape))
+        Text(text, color = Kf.Paper, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
 

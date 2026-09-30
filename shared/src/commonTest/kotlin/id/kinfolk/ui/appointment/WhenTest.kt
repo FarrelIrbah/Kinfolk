@@ -47,4 +47,12 @@ class WhenTest {
         assertNull(parseHm("930"))
         assertNull(parseHm("2460"))
     }
+
+    @Test
+    fun `the offline copy says how old it is the way the design does`() {
+        assertEquals("1 mnt lalu", updatedAgo(now, now))
+        assertEquals("40 mnt lalu", updatedAgo(at(29, 10, 40), now))
+        assertEquals("2 jam lalu", updatedAgo(at(29, 9, 0), now))
+        assertEquals("3 hari lalu", updatedAgo(at(26, 11, 0), now))
+    }
 }

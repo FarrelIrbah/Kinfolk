@@ -1,6 +1,7 @@
 package id.kinfolk.ui
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -26,4 +27,10 @@ actual fun LightStatusBarIcons() {
         bars.isAppearanceLightStatusBars = false
         onDispose { bars.isAppearanceLightStatusBars = was }
     }
+}
+
+@Composable
+actual fun rememberKept(key: String): Kept {
+    val prefs = LocalContext.current.getSharedPreferences("kinfolk", Context.MODE_PRIVATE)
+    return remember(prefs) { Kept({ prefs.getString(key, null) }, { v -> prefs.edit().apply { if (v == null) remove(key) else putString(key, v) }.apply() }) }
 }

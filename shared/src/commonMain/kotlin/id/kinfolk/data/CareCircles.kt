@@ -25,6 +25,7 @@ enum class Need(val key: String) { Visits("visits"), Medicines("medicines"), Che
 
 enum class Role { admin, sibling, parent, viewer }
 
+@Serializable
 data class CareCircle(val id: String, val name: String, val memberCount: Int)
 
 @Serializable
