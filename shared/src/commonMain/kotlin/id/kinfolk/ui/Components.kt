@@ -2,10 +2,18 @@ package id.kinfolk.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -22,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /** Draws a design SVG path (`viewBox="0 0 24 24"`, round caps/joins) at [size]. */
 @Composable
@@ -42,5 +51,65 @@ fun Modifier.tap(onClick: () -> Unit) = clickable(interactionSource = null, indi
 fun Avatar(initial: String, color: Color, size: Dp, fontSize: TextUnit) {
     Box(Modifier.size(size).background(color, CircleShape), contentAlignment = Alignment.Center) {
         Text(initial, color = Color.White, fontSize = fontSize, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** Back pill from `appt`/`handoff`: height 40, #FBF8F2, 14px. */
+@Composable
+fun Pill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.height(40.dp).background(Kf.Card, CircleShape).tap(onClick).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+        Text(text, fontSize = 14.sp)
+    }
+}
+
+@Composable
+fun Labeled(label: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (label.isNotEmpty()) Text(label, fontSize = 13.sp, color = Kf.Muted)
+        content()
+    }
+}
+
+/** onb1 input: height 52, radius 14, 16px side padding. [multiline] grows it downwards with the text. */
+@Composable
+fun Field(label: String, modifier: Modifier = Modifier, multiline: Boolean = false, input: @Composable () -> Unit) = Box(modifier) {
+    Labeled(label) {
+        Box(
+            Modifier.fillMaxWidth().let { if (multiline) it.heightIn(min = 52.dp) else it.height(52.dp) }
+                .background(Kf.Card, RoundedCornerShape(14.dp))
+                .border(1.dp, Kf.InputBorder, RoundedCornerShape(14.dp))
+                .padding(horizontal = 16.dp, vertical = if (multiline) 14.dp else 0.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) { input() }
+    }
+}
+
+@Composable
+fun Chip(label: String, border: Color, bg: Color, fg: Color, onClick: () -> Unit) {
+    Text(
+        label, color = fg, fontSize = 15.sp,
+        modifier = Modifier.background(bg, CircleShape).border(1.dp, border, CircleShape).tap(onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+    )
+}
+
+/** onb1 "Beliau adalah" chip: one of a set, filled green when picked. */
+@Composable
+fun PickChip(label: String, on: Boolean, onClick: () -> Unit) =
+    Chip(label, if (on) Kf.Green else Kf.InputBorder, if (on) Kf.Green else Kf.Card, if (on) Kf.Paper else Kf.Ink, onClick)
+
+/** Approved sign-in error style: 13px, the SOS red. */
+@Composable
+fun ErrorText(text: String) = Text(text, fontSize = 13.sp, color = Kf.Sos)
+
+/** Styled like "Lihat semua": 14px, 500. */
+@Composable
+fun Link(text: String, color: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Text(text, color = color, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = modifier.tap(onClick))
+}
+
+@Composable
+fun PrimaryButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(modifier.fillMaxWidth().height(54.dp).background(Kf.Green, RoundedCornerShape(16.dp)).tap(onClick), contentAlignment = Alignment.Center) {
+        Text(text, color = Kf.Paper, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }

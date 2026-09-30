@@ -17,6 +17,30 @@
     <string name="meds_today">Obat hari ini</string>
     <string name="latest">Terbaru</string>
     <string name="see_all">Lihat semua</string>
+    <string name="add_appt">Tambah janji dokter berikutnya</string>
+    <string name="add_appt_sub">Tanggal, dokter, siapa mengantar</string>
+
+    <!-- appt -->
+    <string name="driver">Mengantar</string>
+    <string name="in_room">Di ruangan</string>
+    <string name="bring">Bawa</string>
+    <string name="save">Simpan</string>
+
+    <!-- Appointment form and date copy: approved deviation (issue #6, docs/screen-map.md) -->
+    <string name="edit">Ubah</string>
+    <string name="drives_no_time">%1$s mengantar</string>
+    <string name="no_driver">Belum ada yang mengantar</string>
+    <string name="you">Anda</string>
+    <string name="nobody">Belum ada</string>
+    <string name="appt_form_head">Janji dokter</string>
+    <string name="purpose">Keperluan</string>
+    <string name="doctor">Dokter</string>
+    <string name="new_doctor">+ Dokter baru</string>
+    <string name="place">Tempat</string>
+    <string name="date">Tanggal</string>
+    <string name="time">Jam</string>
+    <string name="departs">Berangkat</string>
+    <string name="cancel_appt">Batalkan janji</string>
 
     <!-- onb0, onb1 -->
     <string name="onb_head">Satu tempat bagi kalian berlima untuk merawat Bapak.</string>

@@ -60,6 +60,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.supabase.auth)
             implementation(libs.supabase.postgrest)
+            implementation(libs.kotlinx.datetime)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

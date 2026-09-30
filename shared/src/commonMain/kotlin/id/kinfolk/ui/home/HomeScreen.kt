@@ -1,6 +1,7 @@
 package id.kinfolk.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,10 @@ import id.kinfolk.ui.Kf
 import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
+import kinfolk.shared.generated.resources.add_appt
+import kinfolk.shared.generated.resources.add_appt_sub
+import kinfolk.shared.generated.resources.drives_no_time
+import kinfolk.shared.generated.resources.no_driver
 import kinfolk.shared.generated.resources.circle_name
 import kinfolk.shared.generated.resources.drives
 import kinfolk.shared.generated.resources.latest
@@ -47,8 +52,8 @@ data class NextAppointment(
     val countdown: String,
     val title: String,
     val provider: String,
-    val driver: Person,
-    val leavesAt: String,
+    val driver: Person?,
+    val leavesAt: String?,
     val questionCount: Int,
     val noteReady: Boolean,
 )
@@ -78,6 +83,7 @@ fun HomeScreen(
     s: HomeState,
     onSos: () -> Unit,
     onOpenAppointment: () -> Unit,
+    onAddAppointment: () -> Unit,
     onWriteNote: () -> Unit,
     onRota: () -> Unit,
     onRecords: () -> Unit,
@@ -100,7 +106,7 @@ fun HomeScreen(
         }
         // ponytail: search bar, tasks row and weekly digest row hidden until those features ship.
 
-        s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) }
+        s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) } ?: AddAppointmentRow(onAddAppointment)
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionHeader(stringResource(Res.string.this_week), stringResource(Res.string.see_rota), onRota)
@@ -178,13 +184,37 @@ private fun AppointmentCard(a: NextAppointment, onOpen: () -> Unit, onWriteNote:
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(CreamLine))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Avatar(a.driver.initial, a.driver.color, 26.dp, 12.sp)
-            Text(stringResource(Res.string.drives, a.driver.name, a.leavesAt), fontSize = 14.sp, color = Cream, modifier = Modifier.weight(1f))
+            a.driver?.let { Avatar(it.initial, it.color, 26.dp, 12.sp) }
+            val line = when {
+                a.driver == null -> stringResource(Res.string.no_driver)
+                a.leavesAt == null -> stringResource(Res.string.drives_no_time, a.driver.name)
+                else -> stringResource(Res.string.drives, a.driver.name, a.leavesAt)
+            }
+            Text(line, fontSize = 14.sp, color = Cream, modifier = Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CardButton(stringResource(Res.string.questions_count, a.questionCount), CreamBtn, Cream, onOpen, Modifier.weight(1f))
             CardButton(stringResource(Res.string.write_note), Cream, Kf.Green, onWriteNote, Modifier.weight(1f))
         }
+    }
+}
+
+/** First row of the v3 `empty` screen, shown on Home while nothing is upcoming (docs/screen-map.md). */
+@Composable
+private fun AddAppointmentRow(onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).tap(onClick).padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(32.dp).border(1.5.dp, Color(0x4022261F), CircleShape), contentAlignment = Alignment.Center) {
+            Text("1", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(Res.string.add_appt), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(Res.string.add_appt_sub), fontSize = 13.sp, color = Kf.Muted)
+        }
+        Text("›", color = Kf.Muted, fontSize = 18.sp)
     }
 }
 

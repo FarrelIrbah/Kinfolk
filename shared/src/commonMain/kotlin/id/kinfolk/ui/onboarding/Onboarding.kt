@@ -42,7 +42,15 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import id.kinfolk.data.Need
 import id.kinfolk.data.Relation
+import id.kinfolk.ui.ErrorText
+import id.kinfolk.ui.Field
 import id.kinfolk.ui.Kf
+import id.kinfolk.ui.Labeled
+import id.kinfolk.ui.Link
+import id.kinfolk.ui.Chip
+import id.kinfolk.ui.Pill
+import id.kinfolk.ui.PickChip
+import id.kinfolk.ui.PrimaryButton
 import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
@@ -255,8 +263,7 @@ fun Onb1(onCreate: suspend (name: String, relation: Relation, needs: Set<Need>) 
         Labeled(stringResource(Res.string.they_are)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Relation.entries.forEach { r ->
-                    val on = r == relation
-                    Chip(stringResource(relationLabels.getValue(r)), if (on) Kf.Green else Kf.InputBorder, if (on) Kf.Green else Kf.Card, if (on) Kf.Paper else Kf.Ink) { relation = r }
+                    PickChip(stringResource(relationLabels.getValue(r)), r == relation) { relation = r }
                 }
             }
         }
@@ -287,56 +294,11 @@ fun Onb1(onCreate: suspend (name: String, relation: Relation, needs: Set<Need>) 
 @Composable
 private fun SignInLayout(onBack: () -> Unit, title: String, subtitle: String, content: @Composable () -> Unit) {
     Column(Modifier.padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
-        Box(Modifier.height(40.dp).background(Kf.Card, CircleShape).tap(onBack).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-            Text(stringResource(Res.string.back), fontSize = 14.sp)
-        }
+        Pill(stringResource(Res.string.back), onBack)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = serifStyle(30f, 1.1f))
             Text(subtitle, fontSize = 15.sp, lineHeight = (15 * 1.5).sp, color = Kf.Ink2)
         }
         content()
-    }
-}
-
-@Composable
-private fun Labeled(label: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, fontSize = 13.sp, color = Kf.Muted)
-        content()
-    }
-}
-
-/** onb1 input: height 52, radius 14, 16px side padding. */
-@Composable
-private fun Field(label: String, input: @Composable () -> Unit) = Labeled(label) {
-    Box(
-        Modifier.fillMaxWidth().height(52.dp).background(Kf.Card, RoundedCornerShape(14.dp))
-            .border(1.dp, Kf.InputBorder, RoundedCornerShape(14.dp)).padding(horizontal = 16.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) { input() }
-}
-
-@Composable
-private fun Chip(label: String, border: Color, bg: Color, fg: Color, onClick: () -> Unit) {
-    Text(
-        label, color = fg, fontSize = 15.sp,
-        modifier = Modifier.background(bg, CircleShape).border(1.dp, border, CircleShape).tap(onClick).padding(horizontal = 16.dp, vertical = 10.dp),
-    )
-}
-
-/** Approved sign-in error style: 13px, the SOS red. */
-@Composable
-private fun ErrorText(text: String) = Text(text, fontSize = 13.sp, color = Kf.Sos)
-
-/** Styled like "Lihat semua": 14px, 500. */
-@Composable
-private fun Link(text: String, color: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Text(text, color = color, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = modifier.tap(onClick))
-}
-
-@Composable
-private fun PrimaryButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(modifier.fillMaxWidth().height(54.dp).background(Kf.Green, RoundedCornerShape(16.dp)).tap(onClick), contentAlignment = Alignment.Center) {
-        Text(text, color = Kf.Paper, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }

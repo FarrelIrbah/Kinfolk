@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,7 +48,18 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import id.kinfolk.data.Appointment
+import id.kinfolk.data.AppointmentDraft
 import id.kinfolk.data.CareCircle
+import id.kinfolk.data.CareRecipient
+import id.kinfolk.data.Provider
+import id.kinfolk.data.addProvider
+import id.kinfolk.data.cancelAppointment
+import id.kinfolk.data.careRecipients
+import id.kinfolk.data.editAppointment
+import id.kinfolk.data.nextAppointment
+import id.kinfolk.data.providers
+import id.kinfolk.data.scheduleAppointment
 import id.kinfolk.data.createCareCircle
 import id.kinfolk.data.kinfolkClient
 import id.kinfolk.data.myCareCircle
@@ -56,7 +68,16 @@ import id.kinfolk.data.verifySignInCode
 import id.kinfolk.ui.Kf
 import id.kinfolk.ui.KinfolkTheme
 import id.kinfolk.ui.SvgPath
+import id.kinfolk.ui.appointment.ApptFormScreen
+import id.kinfolk.ui.appointment.ApptScreen
+import id.kinfolk.ui.appointment.countdown
+import id.kinfolk.ui.appointment.hm
+import id.kinfolk.ui.appointment.longDate
+import id.kinfolk.ui.appointment.whenLabel
+import id.kinfolk.ui.appointment.withWhom
 import id.kinfolk.ui.home.HomeScreen
+import id.kinfolk.ui.home.NextAppointment
+import id.kinfolk.ui.home.Person
 import id.kinfolk.ui.onboarding.CodeScreen
 import id.kinfolk.ui.onboarding.Onb0
 import id.kinfolk.ui.onboarding.Onb1
@@ -70,11 +91,16 @@ import kinfolk.shared.generated.resources.tab_home
 import kinfolk.shared.generated.resources.tab_records
 import kinfolk.shared.generated.resources.tab_rota
 import kinfolk.shared.generated.resources.tab_timeline
+import kinfolk.shared.generated.resources.you
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 // Tab icons and fill rule copied from design v3 (tabs 1 and 2 never fill).
 enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive: Boolean) {
@@ -85,7 +111,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Home }
+private enum class Screen { Onb0, Phone, Code, Onb1, Home, Appt, ApptForm }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -101,18 +127,40 @@ fun App() {
         var tab by rememberSaveable { mutableStateOf(Tab.Home) }
         var phone by rememberSaveable { mutableStateOf("") }
         var circle by remember { mutableStateOf<CareCircle?>(null) }
+        var recipient by remember { mutableStateOf<CareRecipient?>(null) }
+        var next by remember { mutableStateOf<Appointment?>(null) }
+        var editing by remember { mutableStateOf<Appointment?>(null) }
+        var providers by remember { mutableStateOf(emptyList<Provider>()) }
+        val tz = remember { TimeZone.currentSystemDefault() }
+        val now by produceState(Clock.System.now()) { while (true) { delay(30_000); value = Clock.System.now() } }
+        // ponytail: Budi's avatar color from the prototype, since Sri's green vanishes on the green Home card; #5 gives each Member a color.
+        val you = Person(stringResource(Res.string.you), Color(0xFFB0643A))
+        fun person(id: String?) = you.takeIf { id != null && id == supabase.auth.currentUserOrNull()?.id }
         fun go(to: Screen, how: Nav = Nav.Push) { nav = how; screen = to }
+        suspend fun loadHome() {
+            val c = circle ?: return
+            // The card stays until the day ends: its "Tulis catatan" button is for after the visit.
+            val today = Clock.System.now().toLocalDateTime(tz).date.atStartOfDayIn(tz)
+            recipient = retrying { supabase.careRecipients(c.id).firstOrNull() }
+            next = retrying { supabase.nextAppointment(c.id, since = today) }
+        }
         suspend fun land(how: Nav) {
             circle = retrying { supabase.myCareCircle() }
+            loadHome()
             go(if (circle != null) Screen.Home else Screen.Onb1, if (circle != null) Nav.Tab else how)
+        }
+        fun openForm(a: Appointment?) = scope.launch {
+            editing = a
+            providers = circle?.let { c -> retrying { supabase.providers(c.id) } }.orEmpty()
+            go(Screen.ApptForm)
         }
         suspend fun sendCode(sms: Boolean): Boolean = attempt {
             supabase.sendSignInCode(e164(phone), sms)
         } != null
         LaunchedEffect(Unit) {
             supabase.auth.awaitInitialization()
-            // After rotation the restored screen stays, except Home, which reloads its Care Circle.
-            if (screen != null && screen != Screen.Home) return@LaunchedEffect
+            // After rotation the sign-in screens stay; the rest reload their Care Circle from Home.
+            if (screen in listOf(Screen.Onb0, Screen.Phone, Screen.Code, Screen.Onb1)) return@LaunchedEffect
             if (supabase.auth.currentSessionOrNull() != null) land(Nav.Tab) else go(Screen.Onb0, Nav.Tab)
         }
 
@@ -170,13 +218,47 @@ fun App() {
                         Screen.Home -> when (t) {
                             // ponytail: only the header is real so far; the rest is prototype sample data until its tickets land.
                             Tab.Home -> HomeScreen(
-                                s = SampleData.home.copy(circleName = circle?.name.orEmpty(), memberCount = circle?.memberCount ?: 0),
-                                onSos = {}, onOpenAppointment = {}, onWriteNote = {},
+                                s = SampleData.home.copy(
+                                    todayLabel = longDate(now.toLocalDateTime(tz).date),
+                                    circleName = circle?.name.orEmpty(), memberCount = circle?.memberCount ?: 0,
+                                    next = next?.let { a ->
+                                        NextAppointment(
+                                            whenLabel(a.startsAt, now, tz), countdown(a.startsAt, now, tz), a.title,
+                                            a.withWhom(),
+                                            person(a.driverId), a.departsAt?.let { hm(it.toLocalDateTime(tz).time) },
+                                            questionCount = 0, noteReady = false, // ponytail: both come with #7
+                                        )
+                                    },
+                                ),
+                                onSos = {}, onOpenAppointment = { go(Screen.Appt) }, onAddAppointment = { openForm(null) }, onWriteNote = {},
                                 onRota = { nav = Nav.Tab; tab = Tab.Rota }, onRecords = { nav = Nav.Tab; tab = Tab.Records },
                                 onTimeline = { nav = Nav.Tab; tab = Tab.Timeline },
                             )
                             else -> {}
                         }
+                        Screen.Appt -> next?.let { a ->
+                            ApptScreen(a, now, tz, ::person, recipient?.name.orEmpty(), onBack = { go(Screen.Home, Nav.Back) }, onEdit = { openForm(a) })
+                        }
+                        Screen.ApptForm -> ApptFormScreen(
+                            editing, providers, supabase.auth.currentUserOrNull()?.id.orEmpty(), tz,
+                            onBack = { go(if (editing != null) Screen.Appt else Screen.Home, Nav.Back) },
+                            // ponytail: not retried (not idempotent); a failed save after adding a new Provider leaves that Provider behind.
+                            save = { f ->
+                                attempt {
+                                    val c = circle!!
+                                    val draft = AppointmentDraft(
+                                        c.id, editing?.recipientId ?: recipient!!.id, f.providerId ?: supabase.addProvider(c.id, f.newProvider).id,
+                                        f.title, f.location, f.startsAt, f.departsAt, f.driverId, f.attendeeId, f.bring,
+                                    )
+                                    editing?.let { supabase.editAppointment(it.id, draft) } ?: supabase.scheduleAppointment(draft)
+                                    loadHome()
+                                }.also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                            },
+                            cancel = {
+                                attempt { editing?.let { supabase.cancelAppointment(it.id) }; loadHome() }
+                                    .also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                            },
+                        )
                     }
                 }
             }
