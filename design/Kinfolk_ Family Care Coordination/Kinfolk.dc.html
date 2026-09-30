@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E4DDD0;font-family:'Instrument Sans',system-ui,sans-serif;color:#22261F;-webkit-font-smoothing:antialiased}a{color:#2F5D4A}a:hover{color:#1F4033}button{font-family:inherit;cursor:pointer}input{font-family:inherit}@keyframes kfpulse{0%,100%{opacity:1}50%{opacity:.35}}@keyframes kfspin{to{transform:rotate(360deg)}}[data-om-starter] *{scrollbar-width:none}[data-om-starter] *::-webkit-scrollbar{display:none}</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-wrap:wrap;gap:56px;justify-content:center;align-items:flex-start;padding:48px 32px;box-sizing:border-box">
+
+  <div style="width:300px;display:flex;flex-direction:column;gap:24px;padding-top:24px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:500 12px/1 'Instrument Sans';letter-spacing:.08em;text-transform:uppercase;color:#6B6A60">Kinfolk · iOS prototype</div>
+      <div style="font:500 32px/1.1 'Newsreader',Georgia,serif;text-wrap:pretty">{{ t.panelTitle }}</div>
+      <div style="font-size:14px;line-height:1.5;color:#44463E;text-wrap:pretty">{{ t.panelBody }}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:500 12px/1 'Instrument Sans';letter-spacing:.08em;text-transform:uppercase;color:#6B6A60">{{ t.language }}</div>
+      <div style="display:flex;gap:4px;background:#D6CEBF;border-radius:999px;padding:4px;width:max-content">
+        <button onClick="{{ setEn }}" style="border:none;border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;background:{{ enBg }};color:#22261F">English</button>
+        <button onClick="{{ setId }}" style="border:none;border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;background:{{ idBg }};color:#22261F">Bahasa Indonesia</button>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:500 12px/1 'Instrument Sans';letter-spacing:.08em;text-transform:uppercase;color:#6B6A60">{{ t.jumpTo }}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <sc-for list="{{ jumps }}" as="j" hint-placeholder-count="12">
+          <button onClick="{{ j.go }}" style="border:1px solid rgba(34,38,31,.16);background:{{ j.bg }};border-radius:999px;padding:7px 12px;font-size:13px;color:#22261F">{{ j.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isEmergency }}" hint-size="402px,874px">
+    <div style="height:100%;position:relative;background:#F3EEE4;font-family:'Instrument Sans',system-ui,sans-serif;color:#22261F;overflow:hidden">
+      <div ref="{{ scrollRef }}" style="position:absolute;inset:0;overflow-y:auto;padding:60px 0 {{ bottomPad }}px;box-sizing:border-box">
+
+        <!-- ONBOARDING -->
+        <sc-if value="{{ isOnb0 }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height:740px;display:flex;flex-direction:column;justify-content:space-between;padding:24px 24px 20px;box-sizing:border-box">
+            <div style="font:600 22px 'Newsreader',Georgia,serif;letter-spacing:-.01em">Kinfolk</div>
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="font:500 40px/1.05 'Newsreader',Georgia,serif;text-wrap:pretty">{{ t.onbHead }}</div>
+              <div style="font-size:16px;line-height:1.5;color:#44463E;text-wrap:pretty">{{ t.onbSub }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button onClick="{{ onbNext }}" style="height:54px;border:none;border-radius:16px;background:#2F5D4A;color:#F3EEE4;font-size:16px;font-weight:600">{{ t.onbCreate }}</button>
+              <button onClick="{{ goHome }}" style="height:54px;border:1px solid rgba(34,38,31,.18);border-radius:16px;background:transparent;color:#22261F;font-size:16px;font-weight:500">{{ t.onbInvited }}</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isOnb1 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:26px;padding:12px 24px">
+            <div style="display:flex;gap:6px"><div style="flex:1;height:4px;border-radius:2px;background:#2F5D4A"></div><div style="flex:1;height:4px;border-radius:2px;background:#D6CEBF"></div><div style="flex:1;height:4px;border-radius:2px;background:#D6CEBF"></div></div>
+            <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.onb1Head }}</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:13px;color:#6B6A60">{{ t.theirName }}</div>
+              <input value="{{ recipName }}" onChange="{{ onRecipName }}" style="height:52px;border:1px solid rgba(34,38,31,.18);border-radius:14px;background:#FBF8F2;padding:0 16px;font-size:17px;color:#22261F;outline:none"></input>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:13px;color:#6B6A60">{{ t.theyAre }}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ relations }}" as="r" hint-placeholder-count="4">
+                  <button onClick="{{ r.pick }}" style="border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.fg }};border-radius:999px;padding:10px 16px;font-size:15px">{{ r.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:13px;color:#6B6A60">{{ t.mainNeed }}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ needs }}" as="r" hint-placeholder-count="4">
+                  <button onClick="{{ r.pick }}" style="border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.fg }};border-radius:999px;padding:10px 16px;font-size:15px">{{ r.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <button onClick="{{ onbNext }}" style="height:54px;border:none;border-radius:16px;background:#2F5D4A;color:#F3EEE4;font-size:16px;font-weight:600;margin-top:12px">{{ t.continue }}</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isOnb2 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:22px;padding:12px 24px">
+            <div style="display:flex;gap:6px"><div style="flex:1;height:4px;border-radius:2px;background:#2F5D4A"></div><div style="flex:1;height:4px;border-radius:2px;background:#2F5D4A"></div><div style="flex:1;height:4px;border-radius:2px;background:#D6CEBF"></div></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.onb2Head }}</div>
+              <div style="font-size:15px;line-height:1.5;color:#44463E">{{ t.onb2Sub }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;background:#FBF8F2;border-radius:18px;overflow:hidden">
+              <sc-for list="{{ invites }}" as="v" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(34,38,31,.07)">
+                  <div style="width:36px;height:36px;border-radius:50%;background:{{ v.color }};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;flex:none">{{ v.initial }}</div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                    <div style="font-size:16px;font-weight:500">{{ v.name }}</div>
+                    <div style="font-size:13px;color:#6B6A60">{{ v.phone }}</div>
+                  </div>
+                  <button onClick="{{ v.toggle }}" style="border:none;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;background:{{ v.bg }};color:{{ v.fg }}">{{ v.label }}</button>
+                </div>
+              </sc-for>
+              <div style="padding:14px 16px;font-size:15px;color:#2F5D4A;font-weight:500">{{ t.addPerson }}</div>
+            </div>
+            <div style="font-size:13px;line-height:1.5;color:#6B6A60">{{ t.onb2Note }}</div>
+            <button onClick="{{ onbNext }}" style="height:54px;border:none;border-radius:16px;background:#2F5D4A;color:#F3EEE4;font-size:16px;font-weight:600">{{ inviteCta }}</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isOnb3 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:22px;padding:12px 24px">
+            <div style="display:flex;gap:6px"><div style="flex:1;height:4px;border-radius:2px;background:#2F5D4A"></div><div style="flex:1;height:4px;border-radius:2px;background:#2F5D4A"></div><div style="flex:1;height:4px;border-radius:2px;background:#2F5D4A"></div></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.onb3Head }}</div>
+              <div style="font-size:15px;line-height:1.5;color:#44463E">{{ t.onb3Sub }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ privacyOpts }}" as="o" hint-placeholder-count="2">
+                <button onClick="{{ o.pick }}" style="text-align:left;border:1.5px solid {{ o.border }};background:#FBF8F2;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:4px;color:#22261F">
+                  <div style="font-size:16px;font-weight:600">{{ o.title }}</div>
+                  <div style="font-size:14px;line-height:1.45;color:#6B6A60">{{ o.body }}</div>
+                </button>
+              </sc-for>
+            </div>
+            <button onClick="{{ goHome }}" style="height:54px;border:none;border-radius:16px;background:#2F5D4A;color:#F3EEE4;font-size:16px;font-weight:600">{{ t.openCircle }}</button>
+          </div>
+        </sc-if>
+
+        <!-- HOME -->
+        <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:22px;padding:4px 20px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:13px;color:#6B6A60">{{ circleName }}</div>
+                <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.today }}</div>
+              </div>
+              <button onClick="{{ openEmergency }}" style="border:none;background:#9E3B1E;color:#fff;border-radius:999px;height:44px;padding:0 18px;font-size:14px;font-weight:600;letter-spacing:.05em">SOS</button>
+            </div>
+
+            <div style="background:#2F5D4A;color:#F3EEE4;border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <div style="font-size:13px;opacity:.85">{{ t.todayAt }}</div>
+                <div style="font-size:12px;background:rgba(243,238,228,.16);border-radius:999px;padding:4px 10px">{{ visitBadge }}</div>
+              </div>
+              <button onClick="{{ openAppt }}" style="text-align:left;border:none;background:transparent;color:inherit;padding:0;display:flex;flex-direction:column;gap:4px">
+                <div style="font:500 26px/1.15 'Newsreader',Georgia,serif">{{ t.neuroTitle }}</div>
+                <div style="font-size:14px;opacity:.85">Dr. Anand Rao · Peninsula Neurology</div>
+              </button>
+              <div style="height:1px;background:rgba(243,238,228,.2)"></div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:14px">
+                <div style="width:26px;height:26px;border-radius:50%;background:#B0643A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">B</div>
+                <div style="flex:1">{{ t.budiDrives }}</div>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button onClick="{{ openAppt }}" style="flex:1;height:44px;border:none;border-radius:12px;background:rgba(243,238,228,.14);color:#F3EEE4;font-size:14px;font-weight:600">{{ questionsBtn }}</button>
+                <button onClick="{{ homeVisitAction }}" style="flex:1;height:44px;border:none;border-radius:12px;background:#F3EEE4;color:#2F5D4A;font-size:14px;font-weight:600">{{ homeVisitLabel }}</button>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <div style="font:500 20px 'Newsreader',Georgia,serif">{{ t.thisWeek }}</div>
+                <button onClick="{{ goRotation }}" style="border:none;background:none;color:#2F5D4A;font-size:14px;font-weight:500;padding:0">{{ t.seeRota }}</button>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px">
+                <sc-for list="{{ weekStrip }}" as="d" hint-placeholder-count="7">
+                  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;border-radius:14px;background:{{ d.bg }}">
+                    <div style="font-size:11px;color:#6B6A60">{{ d.dow }}</div>
+                    <div style="font-size:15px;font-weight:600">{{ d.num }}</div>
+                    <div style="width:22px;height:22px;border-radius:50%;background:{{ d.color }};color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ d.initial }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="font-size:13px;color:#6B6A60">{{ t.eveningLegend }}</div>
+            </div>
+
+            <button onClick="{{ goRecords }}" style="text-align:left;border:none;background:#FBF8F2;border-radius:18px;padding:16px;display:flex;align-items:center;gap:14px;color:#22261F">
+              <div style="width:44px;height:44px;border-radius:50%;background:conic-gradient(#2F5D4A {{ medDeg }}deg,#E4DDD0 0);display:flex;align-items:center;justify-content:center;flex:none"><div style="width:34px;height:34px;border-radius:50%;background:#FBF8F2;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">{{ medCount }}</div></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:16px;font-weight:600">{{ t.medsToday }}</div>
+                <div style="font-size:13px;color:#6B6A60">{{ medNext }}</div>
+              </div>
+              <div style="color:#6B6A60;font-size:18px">›</div>
+            </button>
+
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <div style="font:500 20px 'Newsreader',Georgia,serif">{{ t.latest }}</div>
+                <button onClick="{{ goTimeline }}" style="border:none;background:none;color:#2F5D4A;font-size:14px;font-weight:500;padding:0">{{ t.seeAll }}</button>
+              </div>
+              <div style="display:flex;flex-direction:column;background:#FBF8F2;border-radius:18px;overflow:hidden">
+                <sc-for list="{{ homeFeed }}" as="e" hint-placeholder-count="3">
+                  <div style="display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(34,38,31,.07)">
+                    <div style="width:30px;height:30px;border-radius:50%;background:{{ e.color }};color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">{{ e.initial }}</div>
+                    <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                      <div style="font-size:14px;line-height:1.4;text-wrap:pretty">{{ e.text }}</div>
+                      <div style="font-size:12px;color:#6B6A60">{{ e.meta }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- APPOINTMENT DETAIL -->
+        <sc-if value="{{ isAppt }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:20px;padding:4px 20px">
+            <button onClick="{{ back }}" style="align-self:flex-start;border:none;background:#FBF8F2;border-radius:999px;height:40px;padding:0 14px;font-size:14px;color:#22261F">‹ {{ t.back }}</button>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:13px;color:#6B6A60">{{ t.todayAt }}</div>
+              <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.neuroTitle }}</div>
+              <div style="font-size:15px;color:#44463E">Dr. Anand Rao · Peninsula Neurology, Suite 204</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:#FBF8F2;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px">
+                <div style="font-size:12px;color:#6B6A60">{{ t.driver }}</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600"><div style="width:24px;height:24px;border-radius:50%;background:#B0643A;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center">B</div>Budi</div>
+              </div>
+              <div style="background:#FBF8F2;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px">
+                <div style="font-size:12px;color:#6B6A60">{{ t.inRoom }}</div>
+                <div style="font-size:15px;font-weight:600">Sri, Bapak</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <div style="font:500 20px 'Newsreader',Georgia,serif">{{ t.questionsToAsk }}</div>
+                <div style="font-size:13px;color:#6B6A60">{{ t.fromSiblings }}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;background:#FBF8F2;border-radius:18px;overflow:hidden">
+                <sc-for list="{{ questions }}" as="q" hint-placeholder-count="3">
+                  <div style="display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(34,38,31,.07);align-items:flex-start">
+                    <div style="width:26px;height:26px;border-radius:50%;background:{{ q.color }};color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">{{ q.initial }}</div>
+                    <div style="font-size:15px;line-height:1.4;text-wrap:pretty">{{ q.text }}</div>
+                  </div>
+                </sc-for>
+                <div style="display:flex;gap:8px;padding:10px 12px">
+                  <input value="{{ draftQ }}" onChange="{{ onDraftQ }}" placeholder="{{ t.addQuestion }}" style="flex:1;min-width:0;height:44px;border:1px solid rgba(34,38,31,.14);border-radius:12px;background:#fff;padding:0 12px;font-size:15px;outline:none;color:#22261F"></input>
+                  <button onClick="{{ addQ }}" style="height:44px;border:none;border-radius:12px;background:#22261F;color:#F3EEE4;padding:0 16px;font-size:14px;font-weight:600">{{ t.add }}</button>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="font:500 20px 'Newsreader',Georgia,serif">{{ t.bring }}</div>
+              <div style="font-size:15px;line-height:1.5;color:#44463E">{{ t.bringList }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;background:#E9E2D4;border-radius:18px;padding:16px">
+              <div style="font-size:16px;font-weight:600">{{ t.recordThis }}</div>
+              <div style="font-size:14px;line-height:1.45;color:#44463E">{{ t.recordThisSub }}</div>
+              <button onClick="{{ startRecordFlow }}" style="height:50px;border:none;border-radius:14px;background:#2F5D4A;color:#F3EEE4;font-size:15px;font-weight:600;margin-top:6px">{{ recordCta }}</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- CONSENT -->
+        <sc-if value="{{ isConsent }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:22px;padding:4px 20px">
+            <button onClick="{{ back }}" style="align-self:flex-start;border:none;background:#FBF8F2;border-radius:999px;height:40px;padding:0 14px;font-size:14px;color:#22261F">‹ {{ t.back }}</button>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.consentHead }}</div>
+              <div style="font-size:15px;line-height:1.5;color:#44463E">{{ t.consentSub }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;background:#FBF8F2;border-radius:18px;overflow:hidden">
+              <sc-for list="{{ consentRows }}" as="c" hint-placeholder-count="3">
+                <button onClick="{{ c.toggle }}" style="text-align:left;border:none;border-bottom:1px solid rgba(34,38,31,.07);background:transparent;display:flex;align-items:center;gap:14px;padding:16px;color:#22261F">
+                  <div style="width:26px;height:26px;border-radius:8px;border:1.5px solid {{ c.border }};background:{{ c.bg }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex:none">{{ c.mark }}</div>
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:16px;font-weight:500">{{ c.name }}</div>
+                    <div style="font-size:13px;color:#6B6A60">{{ c.role }}</div>
+                  </div>
+                </button>
+              </sc-for>
+            </div>
+            <div style="font-size:13px;line-height:1.5;color:#6B6A60">{{ t.consentNote }}</div>
+            <button onClick="{{ beginRecording }}" style="height:54px;border:none;border-radius:16px;background:{{ consentBg }};color:#F3EEE4;font-size:16px;font-weight:600">{{ t.startRecording }}</button>
+          </div>
+        </sc-if>
+
+        <!-- RECORDING -->
+        <sc-if value="{{ isRecording }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:22px;padding:8px 20px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#9E3B1E;font-weight:600"><div style="width:10px;height:10px;border-radius:50%;background:#9E3B1E;animation:kfpulse 1.2s infinite"></div>{{ recState }}</div>
+            <div style="font:400 64px/1 'Newsreader',Georgia,serif;letter-spacing:-.02em">{{ recTime }}</div>
+            <div style="display:flex;align-items:center;gap:3px;height:64px">
+              <sc-for list="{{ bars }}" as="b" hint-placeholder-count="36">
+                <div style="flex:1;height:{{ b.h }}px;background:#2F5D4A;border-radius:2px;opacity:{{ b.o }}"></div>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:13px;color:#6B6A60">{{ t.liveNotes }}</div>
+              <div style="display:flex;flex-direction:column;gap:12px;background:#FBF8F2;border-radius:18px;padding:16px;min-height:220px">
+                <sc-for list="{{ liveLines }}" as="l" hint-placeholder-count="2">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:12px;color:#6B6A60">{{ l.time }} · {{ l.speaker }}</div>
+                    <div style="font-size:15px;line-height:1.45">{{ l.text }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <button onClick="{{ togglePause }}" style="flex:1;height:54px;border:1px solid rgba(34,38,31,.18);border-radius:16px;background:transparent;font-size:15px;font-weight:600;color:#22261F">{{ pauseLabel }}</button>
+              <button onClick="{{ stopRecording }}" style="flex:1;height:54px;border:none;border-radius:16px;background:#9E3B1E;color:#fff;font-size:15px;font-weight:600">{{ t.stopSave }}</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- PROCESSING -->
+        <sc-if value="{{ isProcessing }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height:700px;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:0 32px">
+            <div style="width:48px;height:48px;border-radius:50%;border:3px solid #D6CEBF;border-top-color:#2F5D4A;animation:kfspin 1s linear infinite"></div>
+            <div style="font:500 28px/1.15 'Newsreader',Georgia,serif">{{ t.processingHead }}</div>
+            <div style="font-size:15px;line-height:1.5;color:#44463E">{{ t.processingSub }}</div>
+          </div>
+        </sc-if>
+
+        <!-- SUMMARY + TRANSCRIPT -->
+        <sc-if value="{{ isSummary }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:18px;padding:4px 20px 0">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <button onClick="{{ goHome }}" style="border:none;background:#FBF8F2;border-radius:999px;height:40px;padding:0 14px;font-size:14px;color:#22261F">‹ {{ t.home }}</button>
+              <div style="font-size:12px;color:#6B6A60">{{ t.selfHosted }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:13px;color:#6B6A60">{{ t.visitMeta }}</div>
+              <div style="font:500 28px/1.1 'Newsreader',Georgia,serif">{{ t.neuroTitle }}</div>
+            </div>
+            <div style="font-size:13px;line-height:1.45;color:#44463E;background:#E9E2D4;border-radius:12px;padding:10px 12px">{{ t.verifyHint }}</div>
+
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6B6A60">{{ t.askedAnswered }}</div>
+              <sc-for list="{{ qa }}" as="s" hint-placeholder-count="3">
+                <button onClick="{{ s.select }}" style="text-align:left;border:1.5px solid {{ s.border }};background:#FBF8F2;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;color:#22261F">
+                  <div style="font-size:14px;color:#6B6A60;line-height:1.4">{{ s.q }}</div>
+                  <div style="font-size:15px;line-height:1.45">{{ s.a }}</div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ s.refs }}" as="r" hint-placeholder-count="1"><div style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:#E4DDD0;color:#44463E">{{ r }}</div></sc-for></div>
+                </button>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6B6A60">{{ t.nextSteps }}</div>
+              <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+                <div style="border:1.5px solid {{ s.border }};background:#FBF8F2;border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px">
+                  <button onClick="{{ s.select }}" style="flex:1;text-align:left;border:none;background:none;padding:0;display:flex;flex-direction:column;gap:6px;color:#22261F">
+                    <div style="font-size:15px;line-height:1.4">{{ s.text }}</div>
+                    <div style="font-size:11px;font-weight:600;color:#6B6A60">{{ s.ref }}</div>
+                  </button>
+                  <button onClick="{{ s.cycle }}" style="border:none;border-radius:999px;background:{{ s.color }};color:#fff;height:32px;padding:0 12px;font-size:13px;font-weight:600;flex:none">{{ s.owner }}</button>
+                </div>
+              </sc-for>
+            </div>
+            <button onClick="{{ shareSummary }}" style="height:52px;border:none;border-radius:16px;background:{{ shareBg }};color:#F3EEE4;font-size:15px;font-weight:600">{{ shareLabel }}</button>
+
+            <div style="position:sticky;bottom:0;margin:0 -20px;background:#22261F;color:#F3EEE4;border-radius:22px 22px 0 0;padding:14px 18px 34px;display:flex;flex-direction:column;gap:10px;box-shadow:0 -10px 30px rgba(34,38,31,.18)">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.7">{{ t.transcript }}</div>
+                <button onClick="{{ toggleTranscript }}" style="border:none;background:rgba(243,238,228,.12);color:#F3EEE4;border-radius:999px;height:30px;padding:0 12px;font-size:12px;font-weight:600">{{ transcriptToggle }}</button>
+              </div>
+              <div ref="{{ transcriptRef }}" style="height:{{ transcriptH }}px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;position:relative">
+                <sc-for list="{{ segs }}" as="g" hint-placeholder-count="4">
+                  <div data-seg="{{ g.id }}" style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:10px;background:{{ g.bg }}">
+                    <div style="font-size:11px;opacity:.65">{{ g.time }} · {{ g.speaker }}</div>
+                    <div style="font-size:14px;line-height:1.45;opacity:{{ g.o }}">{{ g.text }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- PAYWALL -->
+        <sc-if value="{{ isPaywall }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:20px;padding:4px 20px">
+            <button onClick="{{ back }}" style="align-self:flex-start;border:none;background:#FBF8F2;border-radius:999px;height:40px;padding:0 14px;font-size:14px;color:#22261F">✕ {{ t.notNow }}</button>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font:500 32px/1.08 'Newsreader',Georgia,serif;text-wrap:pretty">{{ t.payHead }}</div>
+              <div style="font-size:15px;line-height:1.5;color:#44463E">{{ t.paySub }}</div>
+            </div>
+            <div style="background:#FBF8F2;border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <div style="font-size:16px;font-weight:600">Kinfolk Family</div>
+                <div><span style="font:500 26px 'Newsreader',Georgia,serif">$15</span><span style="font-size:13px;color:#6B6A60"> / {{ t.month }}</span></div>
+              </div>
+              <div style="font-size:14px;line-height:1.5;color:#44463E">{{ t.planIncl }}</div>
+              <div style="font-size:13px;color:#2F5D4A;font-weight:600">{{ t.onePrice }}</div>
+            </div>
+            <button onClick="{{ toggleAddon }}" style="text-align:left;border:1.5px solid {{ addonBorder }};background:#FBF8F2;border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:10px;color:#22261F">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+                <div style="font-size:16px;font-weight:600">{{ t.addonName }}</div>
+                <div style="width:50px;height:30px;border-radius:999px;background:{{ addonTrack }};display:flex;align-items:center;padding:3px;box-sizing:border-box;justify-content:{{ addonJustify }}"><div style="width:24px;height:24px;border-radius:50%;background:#fff"></div></div>
+              </div>
+              <div style="font-size:14px;line-height:1.5;color:#44463E">{{ t.addonBody }}</div>
+              <div><span style="font:500 22px 'Newsreader',Georgia,serif">+$8</span><span style="font-size:13px;color:#6B6A60"> / {{ t.month }}</span></div>
+            </button>
+            <div style="display:flex;justify-content:space-between;font-size:15px;padding:0 4px"><div style="color:#6B6A60">{{ t.totalFamily }}</div><div style="font-weight:600">{{ payTotal }}</div></div>
+            <button onClick="{{ subscribe }}" style="height:54px;border:none;border-radius:16px;background:#2F5D4A;color:#F3EEE4;font-size:16px;font-weight:600">{{ t.startTrial }}</button>
+            <div style="font-size:12px;line-height:1.5;color:#6B6A60;text-align:center">{{ t.payFine }}</div>
+          </div>
+        </sc-if>
+
+        <!-- ROTATION -->
+        <sc-if value="{{ isRotation }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:18px;padding:4px 20px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="font-size:13px;color:#6B6A60">Sept 28 – Oct 4</div>
+              <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.whoThisWeek }}</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <sc-for list="{{ fairness }}" as="f" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:6px;background:#FBF8F2;border-radius:999px;padding:5px 10px 5px 5px;font-size:13px">
+                  <div style="width:22px;height:22px;border-radius:50%;background:{{ f.color }};color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ f.initial }}</div>{{ f.count }}
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <sc-for list="{{ rotaDays }}" as="d" hint-placeholder-count="7">
+                <div style="background:{{ d.bg }};border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline">
+                    <div style="font-size:15px;font-weight:600">{{ d.label }}</div>
+                    <div style="font-size:12px;color:#6B6A60">{{ d.note }}</div>
+                  </div>
+                  <sc-for list="{{ d.slots }}" as="s" hint-placeholder-count="1">
+                    <button onClick="{{ s.tap }}" style="text-align:left;border:none;background:transparent;padding:0;display:flex;align-items:center;gap:10px;color:#22261F">
+                      <div style="width:30px;height:30px;border-radius:50%;background:{{ s.color }};color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">{{ s.initial }}</div>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:1px;min-width:0">
+                        <div style="font-size:14px">{{ s.task }}</div>
+                        <div style="font-size:12px;color:{{ s.subColor }}">{{ s.sub }}</div>
+                      </div>
+                      <div style="font-size:12px;font-weight:600;color:#2F5D4A">{{ s.action }}</div>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- TIMELINE -->
+        <sc-if value="{{ isTimeline }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:18px;padding:4px 20px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="font-size:13px;color:#6B6A60">{{ t.sameHistory }}</div>
+              <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.timeline }}</div>
+            </div>
+            <div style="display:flex;gap:6px;overflow-x:auto">
+              <sc-for list="{{ tlFilters }}" as="f" hint-placeholder-count="5">
+                <button onClick="{{ f.pick }}" style="border:none;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:500;background:{{ f.bg }};color:{{ f.fg }};flex:none">{{ f.label }}</button>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <sc-for list="{{ tl }}" as="e" hint-placeholder-count="6">
+                <div style="display:flex;gap:14px">
+                  <div style="display:flex;flex-direction:column;align-items:center;flex:none;width:30px">
+                    <div style="width:30px;height:30px;border-radius:50%;background:{{ e.color }};color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ e.initial }}</div>
+                    <div style="flex:1;width:1.5px;background:#D6CEBF;min-height:14px"></div>
+                  </div>
+                  <button onClick="{{ e.open }}" style="flex:1;text-align:left;border:none;background:transparent;padding:4px 0 22px;display:flex;flex-direction:column;gap:5px;color:#22261F;min-width:0">
+                    <div style="display:flex;gap:8px;align-items:baseline"><div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:{{ e.kindColor }}">{{ e.kind }}</div><div style="font-size:12px;color:#6B6A60">{{ e.when }}</div></div>
+                    <div style="font-size:15px;line-height:1.45;text-wrap:pretty">{{ e.text }}</div>
+                    <div style="font-size:12px;color:#6B6A60">{{ e.who }}</div>
+                  </button>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- RECORDS: MEDS + DOCS -->
+        <sc-if value="{{ isRecords }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:18px;padding:4px 20px">
+            <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.records }}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#E4DDD0;border-radius:12px;padding:4px">
+              <button onClick="{{ showMeds }}" style="border:none;border-radius:9px;height:36px;font-size:14px;font-weight:600;background:{{ medsTabBg }};color:#22261F">{{ t.meds }}</button>
+              <button onClick="{{ showDocs }}" style="border:none;border-radius:9px;height:36px;font-size:14px;font-weight:600;background:{{ docsTabBg }};color:#22261F">{{ t.docs }}</button>
+            </div>
+            <sc-if value="{{ recMeds }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="font-size:13px;color:#6B6A60">{{ t.tapTaken }}</div>
+                <sc-for list="{{ meds }}" as="m" hint-placeholder-count="4">
+                  <div style="background:#FBF8F2;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:14px">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px;min-width:0">
+                      <div style="font-size:16px;font-weight:600">{{ m.name }}</div>
+                      <div style="font-size:13px;color:#44463E">{{ m.dose }}</div>
+                      <div style="font-size:12px;color:{{ m.noteColor }}">{{ m.note }}</div>
+                    </div>
+                    <button onClick="{{ m.toggle }}" style="border:1.5px solid {{ m.border }};background:{{ m.bg }};color:{{ m.fg }};border-radius:999px;height:40px;padding:0 14px;font-size:13px;font-weight:600;flex:none">{{ m.label }}</button>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ recDocs }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="font-size:13px;color:#6B6A60">{{ t.docsNote }}</div>
+                <div style="display:flex;flex-direction:column;background:#FBF8F2;border-radius:18px;overflow:hidden">
+                  <sc-for list="{{ docs }}" as="d" hint-placeholder-count="5">
+                    <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid rgba(34,38,31,.07)">
+                      <div style="width:38px;height:46px;border-radius:6px;background:#E9E2D4;border:1px solid rgba(34,38,31,.1);display:flex;align-items:flex-end;justify-content:center;padding-bottom:5px;box-sizing:border-box;font-size:9px;font-weight:600;color:#6B6A60;flex:none">{{ d.ext }}</div>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:3px;min-width:0">
+                        <div style="font-size:15px;font-weight:500">{{ d.name }}</div>
+                        <div style="font-size:12px;color:#6B6A60">{{ d.meta }}</div>
+                      </div>
+                      <div style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:{{ d.visBg }};color:#22261F;flex:none">{{ d.vis }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+                <button style="height:50px;border:1.5px dashed rgba(34,38,31,.25);border-radius:16px;background:transparent;font-size:15px;font-weight:500;color:#22261F">{{ t.upload }}</button>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- CIRCLE -->
+        <sc-if value="{{ isCircle }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:20px;padding:4px 20px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:13px;color:#6B6A60">{{ circleName }}</div>
+                <div style="font:500 30px/1.1 'Newsreader',Georgia,serif">{{ t.circle }}</div>
+              </div>
+              <button onClick="{{ openEmergency }}" style="border:none;background:#9E3B1E;color:#fff;border-radius:999px;height:44px;padding:0 18px;font-size:14px;font-weight:600;letter-spacing:.05em">SOS</button>
+            </div>
+            <div style="font-size:14px;line-height:1.5;color:#44463E;background:#E9E2D4;border-radius:14px;padding:12px 14px">{{ t.permIntro }}</div>
+            <div style="display:flex;flex-direction:column;background:#FBF8F2;border-radius:18px;overflow:hidden">
+              <sc-for list="{{ members }}" as="m" hint-placeholder-count="6">
+                <button onClick="{{ m.open }}" style="text-align:left;border:none;border-bottom:1px solid rgba(34,38,31,.07);background:transparent;display:flex;align-items:center;gap:12px;padding:14px 16px;color:#22261F">
+                  <div style="width:38px;height:38px;border-radius:50%;background:{{ m.color }};color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">{{ m.initial }}</div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+                    <div style="font-size:16px;font-weight:500">{{ m.name }}</div>
+                    <div style="font-size:13px;color:#6B6A60">{{ m.sub }}</div>
+                  </div>
+                  <div style="font-size:12px;color:#6B6A60">{{ m.access }}</div>
+                  <div style="color:#6B6A60;font-size:18px">›</div>
+                </button>
+              </sc-for>
+            </div>
+            <button onClick="{{ openPaywall }}" style="text-align:left;border:none;background:#FBF8F2;border-radius:18px;padding:16px;display:flex;justify-content:space-between;align-items:center;color:#22261F">
+              <div style="display:flex;flex-direction:column;gap:2px"><div style="font-size:16px;font-weight:600">{{ t.plan }}</div><div style="font-size:13px;color:#6B6A60">{{ planSub }}</div></div>
+              <div style="color:#6B6A60;font-size:18px">›</div>
+            </button>
+            <button onClick="{{ restartOnb }}" style="border:none;background:none;color:#6B6A60;font-size:13px;padding:0">{{ t.replayOnb }}</button>
+          </div>
+        </sc-if>
+
+        <!-- MEMBER PERMISSIONS -->
+        <sc-if value="{{ isMember }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:20px;padding:4px 20px">
+            <button onClick="{{ back }}" style="align-self:flex-start;border:none;background:#FBF8F2;border-radius:999px;height:40px;padding:0 14px;font-size:14px;color:#22261F">‹ {{ t.circle }}</button>
+            <div style="display:flex;align-items:center;gap:14px">
+              <div style="width:56px;height:56px;border-radius:50%;background:{{ mem.color }};color:#fff;font:600 22px 'Instrument Sans';display:flex;align-items:center;justify-content:center">{{ mem.initial }}</div>
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="font:500 26px/1.1 'Newsreader',Georgia,serif">{{ mem.name }}</div>
+                <div style="font-size:13px;color:#6B6A60">{{ mem.sub }}</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6B6A60">{{ t.canSee }}</div>
+              <div style="display:flex;flex-direction:column;background:#FBF8F2;border-radius:18px;overflow:hidden">
+                <sc-for list="{{ perms }}" as="p" hint-placeholder-count="6">
+                  <button onClick="{{ p.toggle }}" style="text-align:left;border:none;border-bottom:1px solid rgba(34,38,31,.07);background:transparent;display:flex;align-items:center;gap:12px;padding:14px 16px;color:#22261F">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                      <div style="font-size:15px;font-weight:500">{{ p.label }}</div>
+                      <div style="font-size:12px;color:#6B6A60">{{ p.desc }}</div>
+                    </div>
+                    <div style="width:50px;height:30px;border-radius:999px;background:{{ p.track }};display:flex;align-items:center;padding:3px;box-sizing:border-box;justify-content:{{ p.justify }};flex:none"><div style="width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15)"></div></div>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6B6A60">{{ t.notifications }}</div>
+              <div style="background:#FBF8F2;border-radius:18px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:15px">{{ t.channel }}</div>
+                <div style="font-size:14px;font-weight:600">{{ mem.channel }}</div>
+              </div>
+            </div>
+            <div style="font-size:13px;line-height:1.5;color:#6B6A60">{{ t.permFoot }}</div>
+          </div>
+        </sc-if>
+
+        <!-- EMERGENCY -->
+        <sc-if value="{{ isEmergency }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:#15130F;color:#FFF8EE;overflow-y:auto;padding:60px 20px 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#F2A27C">{{ t.emTitle }}</div>
+              <button onClick="{{ back }}" style="border:none;background:rgba(255,248,238,.12);color:#FFF8EE;border-radius:999px;height:40px;padding:0 16px;font-size:14px;font-weight:600">{{ t.close }}</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <div style="font:500 40px/1.05 'Newsreader',Georgia,serif">Tukiman</div>
+              <div style="font-size:17px;opacity:.85">{{ t.emAge }}</div>
+            </div>
+            <div style="background:#C4471F;border-radius:14px;padding:14px 16px;font-size:19px;font-weight:600;line-height:1.3">{{ t.emBlood }}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:rgba(255,248,238,.08);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px"><div style="font-size:12px;opacity:.7">{{ t.allergies }}</div><div style="font-size:18px;font-weight:600">{{ t.emAllergy }}</div></div>
+              <div style="background:rgba(255,248,238,.08);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px"><div style="font-size:12px;opacity:.7">{{ t.wishes }}</div><div style="font-size:18px;font-weight:600">{{ t.emCode }}</div></div>
+            </div>
+            <div style="background:rgba(255,248,238,.08);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:12px;opacity:.7">{{ t.conditions }}</div>
+              <div style="font-size:16px;line-height:1.45">{{ t.emCond }}</div>
+            </div>
+            <div style="background:rgba(255,248,238,.08);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:12px;opacity:.7">{{ t.currentMeds }}</div>
+              <div style="font-size:16px;line-height:1.55">Clopidogrel 75 mg · Amlodipine 5 mg<br>Atorvastatin 20 mg · Omeprazole 20 mg</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <sc-for list="{{ emContacts }}" as="c" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:12px;background:rgba(255,248,238,.08);border-radius:14px;padding:12px 12px 12px 16px">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:2px"><div style="font-size:16px;font-weight:600">{{ c.name }}</div><div style="font-size:13px;opacity:.7">{{ c.role }} · {{ c.phone }}</div></div>
+                  <button style="border:none;border-radius:999px;background:#FFF8EE;color:#15130F;height:44px;padding:0 18px;font-size:14px;font-weight:600">{{ t.call }}</button>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font-size:12px;opacity:.6;text-align:center;padding-top:4px">{{ t.emOffline }}</div>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- SWAP SHEET -->
+      <sc-if value="{{ swapOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeSwap }}" style="position:absolute;inset:0;background:rgba(21,19,15,.35);z-index:30"></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;z-index:31;background:#FBF8F2;border-radius:26px 26px 0 0;padding:20px 20px 40px;display:flex;flex-direction:column;gap:14px">
+          <div style="width:40px;height:5px;border-radius:3px;background:#D6CEBF;align-self:center"></div>
+          <div style="font:500 22px/1.2 'Newsreader',Georgia,serif">{{ swapTitle }}</div>
+          <div style="font-size:14px;color:#44463E">{{ t.swapSub }}</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ swapTargets }}" as="s" hint-placeholder-count="4">
+              <button onClick="{{ s.pick }}" style="text-align:left;border:none;background:#F3EEE4;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;color:#22261F">
+                <div style="width:32px;height:32px;border-radius:50%;background:{{ s.color }};color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ s.initial }}</div>
+                <div style="flex:1;font-size:15px;font-weight:500">{{ s.name }}</div>
+                <div style="font-size:12px;color:#6B6A60">{{ s.load }}</div>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- TOAST -->
+      <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:20px;right:20px;bottom:{{ toastBottom }}px;z-index:40;background:#22261F;color:#F3EEE4;border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.2)">{{ toast }}</div>
+      </sc-if>
+
+      <!-- TAB BAR -->
+      <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;left:0;right:0;bottom:0;z-index:20;background:rgba(251,248,242,.94);backdrop-filter:blur(14px);border-top:1px solid rgba(34,38,31,.08);padding:8px 8px 30px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))">
+          <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="5">
+            <button onClick="{{ tb.go }}" style="border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 0;color:{{ tb.fg }};min-height:44px">
+              <div style="width:22px;height:3px;border-radius:2px;background:{{ tb.bar }}"></div>
+              <div style="font-size:12px;font-weight:600">{{ tb.label }}</div>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const MEM = {
+  sri:{n:'Sri',c:'#2F5D4A'}, budi:{n:'Budi',c:'#B0643A'}, dewi:{n:'Dewi',c:'#6C5A8E'},
+  agus:{n:'Agus',c:'#3E6E8E'}, rina:{n:'Rina',c:'#9A7A2F'}, pak:{n:'Tukiman',c:'#22261F'}
+};
+const SIBS = ['sri','budi','dewi','agus','rina'];
+const T = {
+ en:{panelTitle:"A shared room for the family caring for Bapak.",panelBody:"Seen as Sri, the eldest and the one who organizes. Circle: Bapak Tukiman (78, five months after a stroke) and his five children. Try: today's visit → record → check the summary against the transcript → share. SOS opens the paramedic view.",language:"Language",jumpTo:"Jump to",
+  onbHead:"One place for the five of you to look after Bapak.",onbSub:"Appointments, medicines, documents and who's doing what this week. Everyone sees the same history.",onbCreate:"Create a care circle",onbInvited:"I was invited",
+  onb1Head:"Who are you caring for?",theirName:"Their name",theyAre:"They are your",mainNeed:"What takes the most coordinating?",continue:"Continue",
+  onb2Head:"Invite your siblings",onb2Sub:"They get a text message. No app needed to confirm a ride or read a visit summary.",addPerson:"+ Add someone else",onb2Note:"One subscription covers the whole family. Nobody has to split the bill.",
+  onb3Head:"Bapak decides who sees what",onb3Sub:"Some things he may want to keep to fewer people. You can change this per person at any time.",openCircle:"Open the circle",
+  today:"Tuesday, Sept 29",todayAt:"Today · 2:30 PM",neuroTitle:"Neurology follow-up",budiDrives:"Budi drives · leaves at 1:45",thisWeek:"This week",seeRota:"Rota",eveningLegend:"Evening check-in call, 7 PM. Tonight is you.",medsToday:"Medicines today",latest:"Latest",seeAll:"See all",
+  back:"Back",driver:"Driving",inRoom:"In the room",questionsToAsk:"Questions to ask",fromSiblings:"from everyone",addQuestion:"Add a question…",add:"Add",bring:"Bring",bringList:"Medication list, June MRI report, insurance card, blood pressure log.",recordThis:"Record this visit",recordThisSub:"Get the questions, the doctor's answers and next steps written up for everyone. The full transcript stays attached.",
+  consentHead:"Everyone in the room agrees",consentSub:"Ask before you start. Kinfolk won't record until each person is checked.",consentNote:"Audio is transcribed on Kinfolk's own servers and never sent to outside AI services. You can delete the recording at any time.",startRecording:"Start recording",
+  recording:"Recording",paused:"Paused",liveNotes:"Transcribing as you go",pause:"Pause",resume:"Resume",stopSave:"Stop & summarize",
+  processingHead:"Writing up the visit",processingSub:"Transcribing 4 minutes of audio, then pulling out questions, answers and next steps. The transcript will sit next to every line.",
+  home:"Home",selfHosted:"Transcribed privately",visitMeta:"Today · Dr. Rao · 4 min recording",verifyHint:"Tap any line to see exactly what was said. If something's wrong, fix it before sharing.",askedAnswered:"Asked & answered",nextSteps:"Next steps · tap name to reassign",share:"Share with the circle",shared:"Shared · texted to 4 siblings",transcript:"Transcript",expand:"Expand",collapse:"Collapse",
+  notNow:"Not now",payHead:"Every doctor's visit, written up for the whole family",paySub:"Summaries are the one thing a group chat can't do. Try both free for 14 days.",month:"month",planIncl:"Care circle for everyone in the family, appointments, rota, medicines, documents, timeline, emergency page, SMS reminders.",onePrice:"One price per family, not per person.",addonName:"Visit transcription & summaries",addonBody:"Record appointments with consent. Get questions, answers and next steps, with the original transcript alongside.",totalFamily:"Total for the family",startTrial:"Start 14-day free trial",payFine:"Cancel anytime. Anyone in the circle can pay; we won't ask the others.",
+  whoThisWeek:"Who's doing what",sameHistory:"Everyone sees the same history",timeline:"Timeline",records:"Records",meds:"Medicines",docs:"Documents",tapTaken:"Tap when a dose is given. Everyone sees it.",docsNote:"Encrypted per circle. Every change keeps the old version.",upload:"+ Upload document",
+  circle:"Circle",permIntro:"Bapak chose what each person can see. Changes are logged on the timeline.",plan:"Plan",replayOnb:"Replay onboarding",canSee:"Can see",notifications:"Notifications",channel:"Channel",permFoot:"Hidden items don't appear anywhere for this person, including the timeline and SMS.",
+  emTitle:"Emergency info",close:"Close",emAge:"78 · born 12 Mar 1948 · 64 kg",emBlood:"On blood thinner: Clopidogrel",allergies:"Allergies",emAllergy:"Penicillin",wishes:"Wishes",emCode:"Full treatment",conditions:"Conditions",emCond:"Ischemic stroke, April 2026. Right-side weakness, walks with a cane. Speech slow but understands fully. High blood pressure.",currentMeds:"Current medicines",call:"Call",emOffline:"Saved on this phone · works without signal · updated 2h ago",
+  swapSub:"They get a text and can accept with one reply.",swapTitle:"Swap your evening call",
+ },
+ id:{panelTitle:"Ruang bersama untuk keluarga yang merawat Bapak.",panelBody:"Dilihat sebagai Sri, anak sulung yang mengatur semuanya. Lingkaran: Bapak Tukiman (78, lima bulan pasca stroke) dan lima anaknya. Coba: kunjungan hari ini → rekam → cek ringkasan dengan transkrip → bagikan. SOS membuka tampilan untuk paramedis.",language:"Bahasa",jumpTo:"Langsung ke",
+  onbHead:"Satu tempat bagi kalian berlima untuk merawat Bapak.",onbSub:"Janji dokter, obat, dokumen, dan siapa mengerjakan apa minggu ini. Semua melihat riwayat yang sama.",onbCreate:"Buat lingkaran perawatan",onbInvited:"Saya diundang",
+  onb1Head:"Siapa yang Anda rawat?",theirName:"Namanya",theyAre:"Beliau adalah",mainNeed:"Apa yang paling sering perlu dikoordinasi?",continue:"Lanjut",
+  onb2Head:"Undang saudara Anda",onb2Sub:"Mereka menerima SMS. Tidak perlu pasang app untuk konfirmasi antar atau membaca ringkasan kunjungan.",addPerson:"+ Tambah orang lain",onb2Note:"Satu langganan untuk seluruh keluarga. Tidak ada yang perlu patungan.",
+  onb3Head:"Bapak yang menentukan siapa melihat apa",onb3Sub:"Beberapa hal mungkin ingin beliau batasi. Bisa diubah per orang kapan saja.",openCircle:"Buka lingkaran",
+  today:"Selasa, 29 Sept",todayAt:"Hari ini · 14.30",neuroTitle:"Kontrol neurologi",budiDrives:"Budi mengantar · berangkat 13.45",thisWeek:"Minggu ini",seeRota:"Giliran",eveningLegend:"Telepon cek malam, 19.00. Malam ini giliran Anda.",medsToday:"Obat hari ini",latest:"Terbaru",seeAll:"Lihat semua",
+  back:"Kembali",driver:"Mengantar",inRoom:"Di ruangan",questionsToAsk:"Pertanyaan untuk dokter",fromSiblings:"dari semua",addQuestion:"Tambah pertanyaan…",add:"Tambah",bring:"Bawa",bringList:"Daftar obat, hasil MRI Juni, kartu asuransi, catatan tekanan darah.",recordThis:"Rekam kunjungan ini",recordThisSub:"Pertanyaan, jawaban dokter, dan langkah berikutnya ditulis untuk semua. Transkrip lengkap tetap terlampir.",
+  consentHead:"Semua yang di ruangan setuju",consentSub:"Minta izin dulu. Kinfolk tidak merekam sebelum semua dicentang.",consentNote:"Audio ditranskripsi di server Kinfolk sendiri dan tidak dikirim ke layanan AI luar. Rekaman bisa dihapus kapan saja.",startRecording:"Mulai merekam",
+  recording:"Merekam",paused:"Dijeda",liveNotes:"Ditranskripsi sambil berjalan",pause:"Jeda",resume:"Lanjutkan",stopSave:"Stop & ringkas",
+  processingHead:"Menulis catatan kunjungan",processingSub:"Mentranskripsi 4 menit audio, lalu menyusun pertanyaan, jawaban, dan langkah berikutnya. Transkrip ada di samping setiap baris.",
+  home:"Beranda",selfHosted:"Ditranskripsi secara privat",visitMeta:"Hari ini · Dr. Rao · rekaman 4 menit",verifyHint:"Ketuk baris mana pun untuk melihat persis apa yang diucapkan. Jika ada yang salah, perbaiki sebelum dibagikan.",askedAnswered:"Ditanyakan & dijawab",nextSteps:"Langkah berikutnya · ketuk nama untuk ganti",share:"Bagikan ke lingkaran",shared:"Dibagikan · SMS ke 4 saudara",transcript:"Transkrip",expand:"Perbesar",collapse:"Perkecil",
+  notNow:"Nanti saja",payHead:"Setiap kunjungan dokter, tercatat untuk seluruh keluarga",paySub:"Ringkasan adalah hal yang tidak bisa dilakukan grup chat. Coba gratis 14 hari.",month:"bulan",planIncl:"Lingkaran perawatan untuk seluruh keluarga, janji dokter, giliran, obat, dokumen, linimasa, halaman darurat, pengingat SMS.",onePrice:"Satu harga per keluarga, bukan per orang.",addonName:"Transkripsi & ringkasan kunjungan",addonBody:"Rekam janji dokter dengan izin. Dapatkan pertanyaan, jawaban, dan langkah berikutnya, dengan transkrip asli di sampingnya.",totalFamily:"Total untuk keluarga",startTrial:"Mulai uji coba gratis 14 hari",payFine:"Batalkan kapan saja. Siapa pun di lingkaran bisa membayar; kami tidak akan menagih yang lain.",
+  whoThisWeek:"Siapa mengerjakan apa",sameHistory:"Semua melihat riwayat yang sama",timeline:"Linimasa",records:"Catatan",meds:"Obat",docs:"Dokumen",tapTaken:"Ketuk saat dosis diberikan. Semua bisa melihat.",docsNote:"Dienkripsi per lingkaran. Setiap perubahan menyimpan versi lama.",upload:"+ Unggah dokumen",
+  circle:"Lingkaran",permIntro:"Bapak memilih apa yang bisa dilihat tiap orang. Perubahan tercatat di linimasa.",plan:"Paket",replayOnb:"Ulangi onboarding",canSee:"Bisa melihat",notifications:"Notifikasi",channel:"Saluran",permFoot:"Hal yang disembunyikan tidak muncul di mana pun bagi orang ini, termasuk linimasa dan SMS.",
+  emTitle:"Info darurat",close:"Tutup",emAge:"78 · lahir 12 Mar 1948 · 64 kg",emBlood:"Minum pengencer darah: Clopidogrel",allergies:"Alergi",emAllergy:"Penisilin",wishes:"Keinginan",emCode:"Tindakan penuh",conditions:"Kondisi",emCond:"Stroke iskemik, April 2026. Lemah sisi kanan, berjalan dengan tongkat. Bicara lambat tetapi paham sepenuhnya. Tekanan darah tinggi.",currentMeds:"Obat saat ini",call:"Telepon",emOffline:"Tersimpan di ponsel ini · bisa tanpa sinyal · diperbarui 2 jam lalu",
+  swapSub:"Mereka menerima SMS dan bisa menerima dengan satu balasan.",swapTitle:"Tukar telepon malam Anda",
+ }
+};
+const SEGS = [
+ {id:'s1',t:'00:12',sp:'dr',en:"Good to see you, Mr. Tukiman. How has the past month been?",id_:"Senang bertemu lagi, Pak Tukiman. Bagaimana sebulan terakhir?"},
+ {id:'s2',t:'00:41',sp:'sri',en:"His right hand is stronger, but he still drags his right foot when he's tired. Is that still improving, or has it plateaued?",id_:"Tangan kanannya lebih kuat, tapi kaki kanan masih terseret kalau capek. Apakah masih membaik, atau sudah mentok?"},
+ {id:'s3',t:'01:05',sp:'dr',en:"Recovery is still happening at five months, just more slowly. Keep physio twice a week; gains in the leg come with repetition.",id_:"Di bulan kelima pemulihan masih berjalan, hanya lebih lambat. Lanjutkan fisioterapi dua kali seminggu; kaki membaik lewat pengulangan."},
+ {id:'s4',t:'01:52',sp:'dr',en:"I'd like a repeat MRI in about three months to compare with the June scan.",id_:"Saya ingin MRI ulang sekitar tiga bulan lagi untuk dibandingkan dengan hasil Juni."},
+ {id:'s5',t:'02:30',sp:'sri',en:"He has dental work next month. Can he stop the clopidogrel before that?",id_:"Bulan depan Bapak ada perawatan gigi. Boleh berhenti clopidogrel sebelumnya?"},
+ {id:'s6',t:'02:47',sp:'dr',en:"Please don't stop it on your own. Ask the dentist to call my office; for most fillings we keep him on it.",id_:"Tolong jangan dihentikan sendiri. Minta dokter gigi menelepon kantor saya; untuk tambal gigi biasanya tetap diminum."},
+ {id:'s7',t:'03:20',sp:'pak',en:"I don't want someone sitting with me every night.",id_:"Saya tidak mau ditunggui setiap malam."},
+ {id:'s8',t:'03:34',sp:'dr',en:"That's reasonable. Being alone in the evening is fine if he has a fall alarm he can reach and someone checks in by phone.",id_:"Itu wajar. Sendirian di malam hari tidak apa-apa asal ada alarm jatuh yang mudah dijangkau dan ada yang menelepon untuk cek."},
+];
+const QA = [
+ {id:'q1',refs:['s2','s3'],q:["Is his right-side weakness still improving?","Apakah lemah sisi kanan masih membaik?"],a:["Yes, more slowly at five months. Continue physio twice a week.","Ya, lebih lambat di bulan kelima. Lanjutkan fisioterapi dua kali seminggu."]},
+ {id:'q2',refs:['s5','s6'],q:["Can he stop clopidogrel before dental work?","Boleh berhenti clopidogrel sebelum perawatan gigi?"],a:["No. The dentist should call Dr. Rao's office first; usually he stays on it.","Tidak. Dokter gigi perlu menelepon kantor Dr. Rao dulu; biasanya tetap diminum."]},
+ {id:'q3',refs:['s7','s8'],q:["Is it safe for him to be alone in the evenings?","Amankah Bapak sendirian di malam hari?"],a:["Yes, with a reachable fall alarm and a phone check-in each evening.","Ya, dengan alarm jatuh yang terjangkau dan telepon cek setiap malam."]},
+];
+const STEPS = [
+ {id:'n1',refs:['s4'],text:["Book repeat MRI for late December","Jadwalkan MRI ulang akhir Desember"],owner:'sri'},
+ {id:'n2',refs:['s6'],text:["Ask dentist to call Dr. Rao before the October appointment","Minta dokter gigi menelepon Dr. Rao sebelum janji Oktober"],owner:'agus'},
+ {id:'n3',refs:['s8'],text:["Buy and set up a fall alarm by the bed","Beli dan pasang alarm jatuh di samping tempat tidur"],owner:'dewi'},
+];
+const PERMS = [
+ ['appts',"Appointments","Janji dokter","Dates, doctors, who's driving","Tanggal, dokter, siapa mengantar"],
+ ['recs',"Visit recordings","Rekaman kunjungan","Audio, transcripts, summaries","Audio, transkrip, ringkasan"],
+ ['meds',"Medicines","Obat","Schedule, doses given, refills","Jadwal, dosis, isi ulang"],
+ ['docs',"Documents","Dokumen","Reports, insurance, IDs","Laporan, asuransi, identitas"],
+ ['wishes',"Wishes & legal","Keinginan & hukum","Advance directive, power of attorney","Surat wasiat medis, surat kuasa"],
+ ['money',"Bills & money","Tagihan & uang","Hospital bills, pension","Tagihan RS, pensiun"],
+];
+const DAYS = [['Mon','Sen',28],['Tue','Sel',29],['Wed','Rab',30],['Thu','Kam',1],['Fri','Jum',2],['Sat','Sab',3],['Sun','Min',4]];
+
+class Component extends DCLogic {
+  scrollRef = React.createRef();
+  transcriptRef = React.createRef();
+  state = {
+    lang:'en', screen:'onb0', stack:[], recip:'Tukiman', relation:0, needs:[0,1],
+    invited:{budi:true,dewi:true,agus:true,rina:false}, privacy:1,
+    questions:[{by:'dewi',en:"Is the right-foot drag still improving, or has it plateaued?",id:"Apakah kaki kanan yang terseret masih membaik atau sudah mentok?"},{by:'agus',en:"Can he stop clopidogrel before his dental work in October?",id:"Boleh berhenti clopidogrel sebelum perawatan gigi Oktober?"},{by:'rina',en:"Is it safe for him to be alone in the evenings?",id:"Amankah Bapak sendirian di malam hari?"}],
+    draftQ:'', consent:{dr:false,pak:false,sri:true}, sec:0, paused:false,
+    subscribed:false, addon:true, visitDone:false, sel:null, owners:{n1:'sri',n2:'agus',n3:'dewi'}, shared:false, tExpanded:false,
+    evening:['budi','sri','dewi','agus','rina','budi','sri'], swapDay:null, swapPending:{},
+    tlFilter:'all', recTab:'meds', taken:{clop:true,aml:true,ator:false,ome:false},
+    member:'budi',
+    perm:{sri:{appts:1,recs:1,meds:1,docs:1,wishes:1,money:1},budi:{appts:1,recs:1,meds:1,docs:1,wishes:1,money:1},dewi:{appts:1,recs:1,meds:1,docs:1,wishes:0,money:0},agus:{appts:1,recs:1,meds:1,docs:1,wishes:1,money:1},rina:{appts:1,recs:0,meds:1,docs:0,wishes:0,money:0}},
+    toast:null,
+  };
+  componentWillUnmount(){ clearInterval(this.timer); clearTimeout(this.pt); clearTimeout(this.tt); }
+  componentDidUpdate(pp, ps){
+    if (ps.screen !== this.state.screen && this.scrollRef.current) this.scrollRef.current.scrollTop = 0;
+    if (ps.sel !== this.state.sel && this.state.sel && this.transcriptRef.current){
+      const refs = [...QA,...STEPS].find(x=>x.id===this.state.sel)?.refs || [];
+      const el = this.transcriptRef.current.querySelector(`[data-seg="${refs[0]}"]`);
+      if (el) this.transcriptRef.current.scrollTo({top: el.offsetTop - 4, behavior:'smooth'});
+    }
+  }
+  go(screen, push=true){ this.setState(s=>({screen, stack: push ? [...s.stack, s.screen] : s.stack, swapDay:null})); }
+  tab(screen){ this.setState({screen, stack:[], swapDay:null}); }
+  back = () => this.setState(s=>{ const st=[...s.stack]; const prev=st.pop()||'home'; return {screen:prev, stack:st}; });
+  flash(msg){ clearTimeout(this.tt); this.setState({toast:msg}); this.tt=setTimeout(()=>this.setState({toast:null}),2600); }
+  startTimer(){ clearInterval(this.timer); this.timer=setInterval(()=>{ if(!this.state.paused) this.setState(s=>({sec:s.sec+1})); },250); }
+
+  renderVals(){
+    const s=this.state, L=s.lang, t=T[L], pk=(en,id)=>L==='id'?id:en;
+    const ini=k=>MEM[k].n[0], col=k=>MEM[k].c, nm=k=>k==='pak'?(L==='id'?'Bapak':'Dad'):MEM[k].n;
+    const sc=s.screen;
+    const tabScreens=['home','rotation','timeline','records','circle'];
+    const showTabs=tabScreens.includes(sc);
+    const spk={dr:'Dr. Rao',sri:'Sri',pak:'Bapak'};
+    const selRefs=s.sel?([...QA,...STEPS].find(x=>x.id===s.sel)?.refs||[]):[];
+    const takenCount=Object.values(s.taken).filter(Boolean).length;
+
+    const jumpDefs=[['onb0',pk('Onboarding','Onboarding')],['home',pk('Home','Beranda')],['appt',pk('Appointment','Janji dokter')],['consent',pk('Consent','Izin')],['recording',pk('Recording','Merekam')],['summary',pk('Summary + transcript','Ringkasan + transkrip')],['rotation',pk('Rota','Giliran')],['records',pk('Medicines','Obat')],['docs',pk('Documents','Dokumen')],['timeline',pk('Timeline','Linimasa')],['member',pk('Permissions','Izin akses')],['paywall',pk('Paywall','Langganan')],['emergency','SOS']];
+    const jumps=jumpDefs.map(([k,label])=>({label,bg:(sc===k||(k==='docs'&&sc==='records'&&s.recTab==='docs')||(k==='records'&&sc==='records'&&s.recTab==='meds'))?'#fff':'#FBF8F2',go:()=>{
+      clearInterval(this.timer);
+      if(k==='docs') return this.setState({screen:'records',recTab:'docs',stack:[]});
+      if(k==='records') return this.setState({screen:'records',recTab:'meds',stack:[]});
+      if(k==='member') return this.setState({screen:'member',member:'rina',stack:['circle']});
+      if(k==='summary') return this.setState({screen:'summary',visitDone:true,subscribed:true,stack:[]});
+      if(k==='recording'){ this.setState({screen:'recording',sec:0,paused:false,stack:['appt'],subscribed:true}); return this.startTimer(); }
+      if(k==='consent') return this.setState({screen:'consent',stack:['appt']});
+      if(k==='appt'||k==='paywall'||k==='emergency') return this.setState({screen:k,stack:['home']});
+      this.setState({screen:k,stack:[]});
+    }}));
+
+    const tabs=tabScreens.map((k,i)=>({label:[pk('Home','Beranda'),pk('Rota','Giliran'),pk('Timeline','Linimasa'),pk('Records','Catatan'),pk('Circle','Lingkaran')][i],fg:sc===k?'#2F5D4A':'#6B6A60',bar:sc===k?'#2F5D4A':'transparent',go:()=>this.tab(k)}));
+
+    const relations=[pk('Father','Ayah'),pk('Mother','Ibu'),pk('Grandparent','Kakek/Nenek'),pk('Spouse','Pasangan')].map((label,i)=>{const on=s.relation===i;return {label,border:on?'#2F5D4A':'rgba(34,38,31,.18)',bg:on?'#2F5D4A':'#FBF8F2',fg:on?'#F3EEE4':'#22261F',pick:()=>this.setState({relation:i})};});
+    const needs=[pk('Doctor visits','Kunjungan dokter'),pk('Medicines','Obat'),pk('Daily check-ins','Cek harian'),pk('Paperwork','Dokumen')].map((label,i)=>{const on=s.needs.includes(i);return {label,border:on?'#2F5D4A':'rgba(34,38,31,.18)',bg:on?'#E3EBE5':'#FBF8F2',fg:'#22261F',pick:()=>this.setState(x=>({needs:on?x.needs.filter(n=>n!==i):[...x.needs,i]}))};});
+    const phones={budi:'(408) 555-0142',dewi:'(650) 555-0188',agus:'(312) 555-0107',rina:'(206) 555-0163'};
+    const invites=['budi','dewi','agus','rina'].map(k=>{const on=s.invited[k];return {name:MEM[k].n,initial:ini(k),color:col(k),phone:phones[k],bg:on?'#2F5D4A':'#E4DDD0',fg:on?'#F3EEE4':'#22261F',label:on?pk('Will text ✓','Kirim SMS ✓'):pk('Invite','Undang'),toggle:()=>this.setState(x=>({invited:{...x.invited,[k]:!x.invited[k]}}))};});
+    const nInv=Object.values(s.invited).filter(Boolean).length;
+    const privacyOpts=[[pk('Everyone sees everything','Semua melihat semuanya'),pk('Simplest. Good if the family is close and Bapak is comfortable.','Paling sederhana. Cocok jika keluarga dekat dan Bapak nyaman.')],[pk('Bapak sets it per person','Bapak atur per orang'),pk('Start with appointments and medicines shared; decide on recordings, documents and money one sibling at a time.','Mulai dengan janji dokter dan obat dibagikan; atur rekaman, dokumen, dan uang satu per satu.')]].map(([title,body],i)=>({title,body,border:s.privacy===i?'#2F5D4A':'transparent',pick:()=>this.setState({privacy:i})}));
+
+    const weekStrip=DAYS.map(([en,id,n],i)=>({dow:pk(en,id),num:n,initial:ini(s.evening[i]),color:col(s.evening[i]),bg:i===1?'#FBF8F2':'transparent'}));
+    const tl=this.timeline(pk,ini,col);
+    const homeFeed=tl.all.slice(0,3).map(e=>({text:e.text,meta:`${e.who} · ${e.when}`,initial:e.initial,color:e.color}));
+
+    const questions=s.questions.map(q=>({text:L==='id'?q.id:q.en,initial:ini(q.by),color:col(q.by)}));
+    const consentRows=[['dr','Dr. Anand Rao',pk('Neurologist','Dokter saraf')],['pak','Bapak Tukiman',pk('Patient','Pasien')],['sri','Sri',pk('You','Anda')]].map(([k,name,role])=>{const on=s.consent[k];return {name,role,mark:on?'✓':'',bg:on?'#2F5D4A':'transparent',border:on?'#2F5D4A':'rgba(34,38,31,.3)',toggle:()=>this.setState(x=>({consent:{...x.consent,[k]:!x.consent[k]}}))};});
+    const allConsent=Object.values(s.consent).every(Boolean);
+
+    const secs=Math.floor(s.sec/4)+0;
+    const recTime=`${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`;
+    const bars=Array.from({length:36},(_,i)=>{const v=s.paused?0.12:(0.25+0.75*Math.abs(Math.sin(i*1.7+s.sec*0.9)*Math.cos(i*0.45+s.sec*0.35)));return {h:Math.max(4,Math.round(v*60)),o:i>30?0.35:1};});
+    const liveCount=Math.min(SEGS.length,Math.floor(s.sec/10)+1);
+    const liveLines=SEGS.slice(0,liveCount).slice(-3).map(g=>({time:g.t,speaker:spk[g.sp],text:L==='id'?g.id_:g.en}));
+
+    const qa=QA.map(x=>({q:x.q[L==='id'?1:0],a:x.a[L==='id'?1:0],refs:x.refs.map(r=>SEGS.find(g=>g.id===r).t),border:s.sel===x.id?'#2F5D4A':'transparent',select:()=>this.setState({sel:s.sel===x.id?null:x.id,tExpanded:false})}));
+    const steps=STEPS.map(x=>{const o=s.owners[x.id];return {text:x.text[L==='id'?1:0],ref:x.refs.map(r=>SEGS.find(g=>g.id===r).t).join(', '),owner:MEM[o].n,color:col(o),border:s.sel===x.id?'#2F5D4A':'transparent',select:()=>this.setState({sel:s.sel===x.id?null:x.id}),cycle:()=>this.setState(y=>({owners:{...y.owners,[x.id]:SIBS[(SIBS.indexOf(y.owners[x.id])+1)%5]}}))};});
+    const segs=SEGS.map(g=>{const on=selRefs.includes(g.id);return {id:g.id,time:g.t,speaker:spk[g.sp],text:L==='id'?g.id_:g.en,bg:on?'rgba(201,167,124,.28)':'transparent',o:(!s.sel||on)?1:0.55};});
+
+    const load=k=>s.evening.filter(e=>e===k).length;
+    const drives={1:'budi',3:'dewi'};
+    const rotaDays=DAYS.map(([en,id,n],i)=>{
+      const ev=s.evening[i], mine=ev==='sri', pend=s.swapPending[i];
+      const slots=[];
+      if(drives[i]) slots.push({initial:ini(drives[i]),color:col(drives[i]),task:i===1?pk('Drive to neurology, 1:45 PM','Antar ke neurologi, 13.45'):pk('Drive to physio, 10:00 AM','Antar ke fisioterapi, 10.00'),sub:pk('Confirmed by SMS','Dikonfirmasi via SMS'),subColor:'#2F5D4A',action:'',tap:()=>{}});
+      slots.push({initial:ini(ev),color:col(ev),task:pk('Evening check-in call, 7 PM','Telepon cek malam, 19.00'),sub:pend?pk(`Swap asked of ${MEM[pend].n} · waiting`,`Minta tukar ke ${MEM[pend].n} · menunggu`):(mine?pk('You','Anda'):MEM[ev].n),subColor:pend?'#9E3B1E':'#6B6A60',action:mine&&!pend&&i>=1?pk('Swap','Tukar'):'',tap:()=>{ if(mine&&!pend&&i>=1) this.setState({swapDay:i}); }});
+      return {label:`${pk(en,id)} ${n}`,note:i===1?pk('Today','Hari ini'):(i===0?pk('Done','Selesai'):''),bg:i===1?'#FBF8F2':'rgba(251,248,242,.55)',slots};
+    });
+    const fairness=SIBS.map(k=>({initial:ini(k),color:col(k),count:pk(`${load(k)+(Object.values(drives).includes(k)?1:0)} tasks`,`${load(k)+(Object.values(drives).includes(k)?1:0)} tugas`)}));
+    const swapTargets=SIBS.filter(k=>k!=='sri').map(k=>({name:MEM[k].n,initial:ini(k),color:col(k),load:pk(`${load(k)} this week`,`${load(k)} minggu ini`),pick:()=>{const d=s.swapDay;this.setState(x=>({swapDay:null,swapPending:{...x.swapPending,[d]:k}}));this.flash(pk(`Texted ${MEM[k].n}: "Can you take Bapak's evening call on ${DAYS[d][0]}? Reply YES."`,`SMS ke ${MEM[k].n}: "Bisa gantikan telepon malam Bapak hari ${DAYS[d][1]}? Balas YA."`));}}));
+
+    const tlFilters=[['all',pk('All','Semua')],['visit',pk('Visits','Kunjungan')],['med',pk('Medicines','Obat')],['note',pk('Check-ins','Cek')],['doc',pk('Documents','Dokumen')]].map(([k,label])=>({label,bg:s.tlFilter===k?'#22261F':'#FBF8F2',fg:s.tlFilter===k?'#F3EEE4':'#22261F',pick:()=>this.setState({tlFilter:k})}));
+
+    const medDefs=[['clop','Clopidogrel','75 mg · '+pk('morning, with food','pagi, sesudah makan'),pk('Blood thinner. Do not stop without Dr. Rao.','Pengencer darah. Jangan berhenti tanpa Dr. Rao.'),'#9E3B1E'],['aml','Amlodipine','5 mg · '+pk('morning','pagi'),pk('Blood pressure','Tekanan darah'),'#6B6A60'],['ome','Omeprazole','20 mg · '+pk('before breakfast','sebelum sarapan'),pk('Refill in 4 days · Agus','Isi ulang 4 hari lagi · Agus'),'#9A7A2F'],['ator','Atorvastatin','20 mg · '+pk('night, 9 PM','malam, 21.00'),pk('Cholesterol','Kolesterol'),'#6B6A60']];
+    const meds=medDefs.map(([k,name,dose,note,nc])=>{const on=s.taken[k];return {name,dose,note,noteColor:nc,label:on?pk('Given ✓','Diberikan ✓'):pk('Mark given','Tandai'),bg:on?'#2F5D4A':'transparent',fg:on?'#F3EEE4':'#22261F',border:on?'#2F5D4A':'rgba(34,38,31,.2)',toggle:()=>{this.setState(x=>({taken:{...x.taken,[k]:!x.taken[k]}})); if(!on) this.flash(pk(`${name} marked given by Sri · visible to the circle`,`${name} ditandai oleh Sri · terlihat oleh lingkaran`));}};});
+    const docs=[[pk('Hospital discharge summary','Ringkasan pulang RS'),'PDF',pk('Mercy General · Apr 18 · v1','Mercy General · 18 Apr · v1'),pk('Everyone','Semua'),'#E3EBE5'],[pk('MRI brain report','Laporan MRI otak'),'PDF',pk('June 12 · v2 · Rina','12 Juni · v2 · Rina'),pk('4 people','4 orang'),'#E9E2D4'],[pk('Insurance card','Kartu asuransi'),'JPG',pk('Medicare + supplement · v3','Medicare + tambahan · v3'),pk('Everyone','Semua'),'#E3EBE5'],[pk('Advance directive','Surat wasiat medis'),'PDF',pk('Signed Mar 2025 · v1','Ditandatangani Mar 2025 · v1'),pk('3 people','3 orang'),'#F0DDD3'],[pk('Power of attorney','Surat kuasa'),'PDF',pk('Sri & Budi · v1','Sri & Budi · v1'),pk('3 people','3 orang'),'#F0DDD3']].map(([name,ext,meta,vis,visBg])=>({name,ext,meta,vis,visBg}));
+
+    const members=[{k:'pak',sub:pk('Receives care · decides access','Penerima perawatan · menentukan akses'),access:''},...SIBS.map(k=>{const p=s.perm[k];const n=Object.values(p).filter(Boolean).length;return {k,sub:k==='sri'?pk('You · organizer','Anda · pengatur'):(k==='rina'?pk('SMS only','Hanya SMS'):pk('App + SMS','App + SMS')),access:n===6?pk('Full','Penuh'):`${n}/6`};})].map(m=>({name:m.k==='pak'?'Bapak Tukiman':MEM[m.k].n,initial:ini(m.k),color:col(m.k),sub:m.sub,access:m.access,open:()=>{ if(m.k==='pak') return this.go('emergency'); this.setState({member:m.k}); this.go('member'); }}));
+    const mk=s.member;
+    const mem={name:MEM[mk].n,initial:ini(mk),color:col(mk),sub:mk==='sri'?pk('You · organizer','Anda · pengatur'):pk('Child · joined Sept 2','Anak · bergabung 2 Sept'),channel:mk==='rina'?'SMS':pk('SMS + app','SMS + app')};
+    const perms=PERMS.map(([k,en,id,den,did])=>{const on=!!s.perm[mk][k];return {label:pk(en,id),desc:pk(den,did),track:on?'#2F5D4A':'#D6CEBF',justify:on?'flex-end':'flex-start',toggle:()=>{ if(mk==='sri') return this.flash(pk('Organizers keep full access. Bapak can change the organizer.','Pengatur tetap punya akses penuh. Bapak bisa mengganti pengatur.')); this.setState(x=>({perm:{...x.perm,[mk]:{...x.perm[mk],[k]:on?0:1}}})); this.flash(pk(`${MEM[mk].n} ${on?"can no longer see":"can now see"} ${en.toLowerCase()} · logged`,`${MEM[mk].n} ${on?'tidak lagi bisa melihat':'kini bisa melihat'} ${id.toLowerCase()} · tercatat`)); }};});
+
+    const emContacts=[['Sri',pk('Daughter · primary','Anak · utama'),'(408) 555-0119'],['Budi',pk('Son · 10 min away','Anak · 10 menit'),'(408) 555-0142'],['Dr. Anand Rao',pk('Neurologist','Dokter saraf'),'(650) 555-0100']].map(([name,role,phone])=>({name,role,phone}));
+
+    const recordCta=s.visitDone?pk('Open summary','Buka ringkasan'):(s.subscribed?pk('Record visit','Rekam kunjungan'):pk('Record visit · try free','Rekam kunjungan · coba gratis'));
+    const startRecordFlow=()=>{ if(s.visitDone) return this.go('summary'); if(!s.subscribed||!s.addon) return this.go('paywall'); this.go('consent'); };
+
+    return {
+      t, isEmergency:sc==='emergency', scrollRef:this.scrollRef, transcriptRef:this.transcriptRef,
+      enBg:L==='en'?'#FBF8F2':'transparent', idBg:L==='id'?'#FBF8F2':'transparent',
+      setEn:()=>this.setState({lang:'en'}), setId:()=>this.setState({lang:'id'}), jumps,
+      bottomPad:showTabs?96:30, showTabs, tabs,
+      isOnb0:sc==='onb0',isOnb1:sc==='onb1',isOnb2:sc==='onb2',isOnb3:sc==='onb3',isHome:sc==='home',isAppt:sc==='appt',isConsent:sc==='consent',isRecording:sc==='recording',isProcessing:sc==='processing',isSummary:sc==='summary',isPaywall:sc==='paywall',isRotation:sc==='rotation',isTimeline:sc==='timeline',isRecords:sc==='records',isCircle:sc==='circle',isMember:sc==='member',
+      onbNext:()=>this.go({onb0:'onb1',onb1:'onb2',onb2:'onb3'}[sc]),
+      goHome:()=>this.tab('home'), restartOnb:()=>this.setState({screen:'onb0',stack:[]}),
+      recipName:s.recip, onRecipName:e=>this.setState({recip:e.target.value}), relations, needs, invites, privacyOpts,
+      inviteCta:nInv?pk(`Text ${nInv} invite${nInv>1?'s':''}`,`Kirim ${nInv} undangan SMS`):pk('Skip for now','Lewati dulu'),
+      circleName:pk(`${s.recip}'s care circle · 6 people`,`Lingkaran perawatan ${s.recip} · 6 orang`),
+      openEmergency:()=>this.go('emergency'), openAppt:()=>this.go('appt'), openPaywall:()=>this.go('paywall'),
+      visitBadge:s.visitDone?pk('Summary ready','Ringkasan siap'):pk('in 3h 10m','3 jam 10 mnt lagi'),
+      questionsBtn:pk(`${s.questions.length} questions`,`${s.questions.length} pertanyaan`),
+      homeVisitLabel:s.visitDone?pk('Summary','Ringkasan'):pk('Record visit','Rekam'), homeVisitAction:startRecordFlow,
+      weekStrip, goRotation:()=>this.tab('rotation'), goRecords:()=>this.setState({screen:'records',recTab:'meds',stack:[]}), goTimeline:()=>this.tab('timeline'),
+      medDeg:Math.round(takenCount/4*360), medCount:`${takenCount}/4`,
+      medNext:s.taken.ome?pk('Atorvastatin at 9 PM','Atorvastatin jam 21.00'):pk('Omeprazole due · before breakfast','Omeprazole · sebelum sarapan'),
+      homeFeed, back:this.back,
+      questions, draftQ:s.draftQ, onDraftQ:e=>this.setState({draftQ:e.target.value}),
+      addQ:()=>{ const v=s.draftQ.trim(); if(!v) return; this.setState(x=>({draftQ:'',questions:[...x.questions,{by:'sri',en:v,id:v}]})); },
+      recordCta, startRecordFlow,
+      consentRows, consentBg:allConsent?'#2F5D4A':'#A9ADA2',
+      beginRecording:()=>{ if(!allConsent) return this.flash(pk('Check everyone in the room first.','Centang semua yang di ruangan dulu.')); this.setState({sec:0,paused:false}); this.go('recording'); this.startTimer(); },
+      recState:s.paused?t.paused:t.recording, recTime, bars, liveLines,
+      pauseLabel:s.paused?t.resume:t.pause, togglePause:()=>this.setState(x=>({paused:!x.paused})),
+      stopRecording:()=>{ clearInterval(this.timer); this.go('processing',false); this.pt=setTimeout(()=>this.setState({screen:'summary',visitDone:true,stack:[]}),2400); },
+      qa, steps, segs, transcriptH:s.tExpanded?420:170,
+      transcriptToggle:s.tExpanded?t.collapse:t.expand, toggleTranscript:()=>this.setState(x=>({tExpanded:!x.tExpanded})),
+      shareBg:s.shared?'#6B6A60':'#2F5D4A', shareLabel:s.shared?t.shared:t.share,
+      shareSummary:()=>{ if(s.shared) return; this.setState({shared:true}); this.flash(pk('Summary texted to Budi, Dewi, Agus and Rina. Rina gets it without the recording.','Ringkasan dikirim ke Budi, Dewi, Agus, dan Rina. Rina menerimanya tanpa rekaman.')); },
+      addonBorder:s.addon?'#2F5D4A':'transparent', addonTrack:s.addon?'#2F5D4A':'#D6CEBF', addonJustify:s.addon?'flex-end':'flex-start',
+      toggleAddon:()=>this.setState(x=>({addon:!x.addon})), payTotal:pk(`$${s.addon?23:15} / month`,`$${s.addon?23:15} / bulan`),
+      subscribe:()=>{ this.setState({subscribed:true}); this.flash(pk('Trial started for the whole circle.','Uji coba dimulai untuk seluruh lingkaran.')); const st=[...s.stack]; if(st[st.length-1]==='appt'&&s.addon){ this.setState({screen:'consent'}); } else this.back(); },
+      planSub:s.subscribed?pk(`Family${s.addon?' + transcription':''} · trial, 14 days left`,`Keluarga${s.addon?' + transkripsi':''} · uji coba, sisa 14 hari`):pk('Free · upgrade for visit summaries','Gratis · tingkatkan untuk ringkasan'),
+      rotaDays, fairness, swapOpen:s.swapDay!==null, closeSwap:()=>this.setState({swapDay:null}), swapTargets,
+      swapTitle:s.swapDay!==null?`${t.swapTitle} · ${pk(DAYS[s.swapDay][0],DAYS[s.swapDay][1])} ${DAYS[s.swapDay][2]}`:'',
+      tlFilters, tl:s.tlFilter==='all'?tl.all:tl.all.filter(e=>e.type===s.tlFilter),
+      recMeds:s.recTab==='meds', recDocs:s.recTab==='docs', medsTabBg:s.recTab==='meds'?'#FBF8F2':'transparent', docsTabBg:s.recTab==='docs'?'#FBF8F2':'transparent',
+      showMeds:()=>this.setState({recTab:'meds'}), showDocs:()=>this.setState({recTab:'docs'}), meds, docs,
+      members, mem, perms, emContacts,
+      hasToast:!!s.toast, toast:s.toast, toastBottom:showTabs?104:40,
+    };
+  }
+  timeline(pk,ini,col){
+    const s=this.state, K={visit:[pk('Visit','Kunjungan'),'#2F5D4A'],med:[pk('Medicine','Obat'),'#9A7A2F'],note:[pk('Check-in','Cek'),'#3E6E8E'],doc:[pk('Document','Dokumen'),'#6C5A8E'],rota:[pk('Rota','Giliran'),'#B0643A']};
+    const raw=[];
+    if(s.visitDone) raw.push({type:'visit',by:'sri',when:pk('Today, 3:10 PM','Hari ini, 15.10'),text:pk('Neurology summary: keep physio 2x/week, repeat MRI in 3 months, don\'t stop clopidogrel for dental work.','Ringkasan neurologi: fisioterapi 2x/minggu, MRI ulang 3 bulan lagi, jangan hentikan clopidogrel untuk gigi.'),open:()=>this.go('summary')});
+    if(s.taken.clop) raw.push({type:'med',by:'budi',when:pk('Today, 8:05 AM','Hari ini, 08.05'),text:pk('Morning medicines given: clopidogrel, amlodipine.','Obat pagi diberikan: clopidogrel, amlodipine.')});
+    raw.push({type:'rota',by:'budi',when:pk('Today, 7:40 AM','Hari ini, 07.40'),text:pk('Confirmed by SMS: driving to neurology at 1:45.','Konfirmasi via SMS: mengantar ke neurologi jam 13.45.')});
+    raw.push({type:'note',by:'budi',when:pk('Mon, 7:10 PM','Sen, 19.10'),text:pk('Evening call: BP 132/84, ate dinner, walked to the porch with the cane. In good spirits.','Telepon malam: tensi 132/84, sudah makan malam, jalan ke teras pakai tongkat. Suasana hati baik.')});
+    raw.push({type:'visit',by:'dewi',when:'Sept 24',text:pk('Physio: right-hand grip improving. Add stair practice with the rail.','Fisioterapi: genggaman tangan kanan membaik. Tambah latihan tangga dengan pegangan.')});
+    raw.push({type:'med',by:'agus',when:'Sept 22',text:pk('Atorvastatin refilled, 30 days.','Atorvastatin diisi ulang, 30 hari.')});
+    raw.push({type:'doc',by:'rina',when:'Sept 20',text:pk('Uploaded MRI brain report (version 2).','Mengunggah laporan MRI otak (versi 2).'),open:()=>this.setState({screen:'records',recTab:'docs',stack:[]})});
+    raw.push({type:'note',by:'sri',when:'Sept 19',text:pk('Bapak asked that Rina not receive visit recordings for now. Access updated.','Bapak meminta Rina tidak menerima rekaman kunjungan untuk sementara. Akses diperbarui.')});
+    return {all:raw.map(e=>({...e,initial:ini(e.by),color:col(e.by),who:MEM[e.by].n,kind:K[e.type][0],kindColor:K[e.type][1],open:e.open||(()=>{})}))};
+  }
+}
+</script>
+</body>
+</html>
