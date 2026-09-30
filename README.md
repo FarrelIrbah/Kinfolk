@@ -14,9 +14,11 @@ This is a Kotlin Multiplatform project targeting Android, iOS.
 
 ### Local backend
 
-The app and the tests talk to a local Supabase stack (needs Docker running):
+The app and the tests talk to a local Supabase stack (needs Docker running). The first time, create the gitignored
+`supabase/.env` with the sign-in hook secret:
 
 ```
+echo "SEND_SMS_HOOK_SECRET=v1,whsec_$(openssl rand -base64 32)" > supabase/.env
 npx supabase start
 ```
 

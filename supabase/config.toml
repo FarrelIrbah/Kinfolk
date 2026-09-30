@@ -287,11 +287,11 @@ max_frequency = "1s"
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
 # OTP goes out through the send-otp Edge Function (WhatsApp, SMS fallback), not a built-in provider.
-# Local-only secret; production sets its own in the dashboard.
+# Secret from supabase/.env (gitignored, see README); production sets its own in the dashboard.
 [auth.hook.send_sms]
 enabled = true
 uri = "http://host.docker.internal:54321/functions/v1/send-otp"
-secrets = "v1,whsec_LtbDzk58HqE99zKeA/ZIyHNHTGkHeTBPDCPpM/1+38o="
+secrets = "env(SEND_SMS_HOOK_SECRET)"
 
 # Unused (the hook sends instead), but Auth disables phone login without an enabled provider.
 [auth.sms.twilio]
@@ -392,7 +392,7 @@ deno_version = 2
 # Local dev: providers are faked by the seam tests on the host. Production values are set with
 # `supabase secrets set`, never committed.
 [edge_runtime.secrets]
-SEND_SMS_HOOK_SECRET = "v1,whsec_LtbDzk58HqE99zKeA/ZIyHNHTGkHeTBPDCPpM/1+38o="
+SEND_SMS_HOOK_SECRET = "env(SEND_SMS_HOOK_SECRET)"
 WHATSAPP_API_URL = "http://host.docker.internal:54399/whatsapp"
 WHATSAPP_PHONE_NUMBER_ID = "local"
 WHATSAPP_TOKEN = "local"
