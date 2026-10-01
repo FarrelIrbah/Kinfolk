@@ -22,7 +22,7 @@ class TimelineTest {
         val neuro = sri.scheduleAppointment(AppointmentDraft(circle, recipient, rao, "Kontrol neurologi", null, now, attendeeId = budi.me())).id
         budi.scheduleAppointment(AppointmentDraft(circle, recipient, rao, "Fisioterapi", null, now + 7.days)).id
             .also { sri.cancelAppointment(it) }
-        budi.saveVisitNote(neuro, emptyMap(), listOf("Fisioterapi 2x/minggu", "MRI ulang 3 bulan lagi"), "Tensi 130/85.")
+        budi.saveVisitNote(neuro, emptyMap(), budi.steps("Fisioterapi 2x/minggu", "MRI ulang 3 bulan lagi"), "Tensi 130/85.")
 
         val entries = sri.timeline(circle)
         assertEquals(
@@ -45,7 +45,7 @@ class TimelineTest {
         // A new Attendee saving again takes the Visit Note over; the Appointment keeps who scheduled it.
         val a = sri.appointment(neuro)!!
         budi.editAppointment(neuro, a.draft().copy(attendeeId = sri.me()))
-        sri.saveVisitNote(neuro, emptyMap(), listOf("MRI ulang 3 bulan lagi"), "")
+        sri.saveVisitNote(neuro, emptyMap(), sri.steps("MRI ulang 3 bulan lagi"), "")
         assertEquals(listOf("Sri", "Sri"), sri.timeline(circle).map { it.byName })
     }
 

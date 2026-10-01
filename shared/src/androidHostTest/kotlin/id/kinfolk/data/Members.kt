@@ -91,3 +91,6 @@ suspend fun signedInSibling(admin: SupabaseClient, circleId: String, role: Role 
 
 /** Someone [admin] invited to [circleId] who accepted as a sibling. Returns their user id. */
 suspend fun joinedMember(admin: SupabaseClient, circleId: String): String = signedInSibling(admin, circleId).me()
+
+/** Next Steps with the signed-in Member as owner. */
+fun SupabaseClient.steps(vararg texts: String) = texts.map { NextStepDraft(it, me(), kotlinx.datetime.LocalDate(2026, 10, 8)) }

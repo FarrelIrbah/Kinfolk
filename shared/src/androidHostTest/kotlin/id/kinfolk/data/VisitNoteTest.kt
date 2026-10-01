@@ -52,12 +52,13 @@ class VisitNoteTest {
         assertFails { v.sri.saveVisitNote(appt, mapOf(q.id to "Boleh"), emptyList(), "") }
         assertNull(v.sri.visitNote(appt))
 
-        budi.saveVisitNote(appt, mapOf(q.id to "Jangan dihentikan."), listOf("Fisioterapi dua kali seminggu"), "Tensi 130/85.")
-        assertEquals(VisitNote(appt, listOf("Fisioterapi dua kali seminggu"), "Tensi 130/85."), v.sri.visitNote(appt))
+        budi.saveVisitNote(appt, mapOf(q.id to "Jangan dihentikan."), budi.steps("Fisioterapi dua kali seminggu"), "Tensi 130/85.")
+        val note = v.sri.visitNote(appt)!!
+        assertEquals(Triple(appt, listOf("Fisioterapi dua kali seminggu"), "Tensi 130/85."), Triple(note.appointmentId, note.steps.map { it.text }, note.notes))
         assertEquals("Jangan dihentikan.", v.sri.questions(appt).single().answer)
 
-        budi.saveVisitNote(appt, mapOf(q.id to "Jangan dihentikan untuk gigi."), listOf("Fisioterapi dua kali seminggu", "MRI ulang 3 bulan lagi"), "")
-        assertEquals(listOf("Fisioterapi dua kali seminggu", "MRI ulang 3 bulan lagi"), v.sri.visitNote(appt)!!.nextSteps)
+        budi.saveVisitNote(appt, mapOf(q.id to "Jangan dihentikan untuk gigi."), budi.steps("Fisioterapi dua kali seminggu", "MRI ulang 3 bulan lagi"), "")
+        assertEquals(listOf("Fisioterapi dua kali seminggu", "MRI ulang 3 bulan lagi"), v.sri.visitNote(appt)!!.steps.map { it.text })
         assertEquals("Jangan dihentikan untuk gigi.", v.sri.questions(appt).single().answer)
         assertFails { v.sri.saveVisitNote(appt, mapOf(q.id to "Boleh"), emptyList(), "") }
         assertEquals("Jangan dihentikan untuk gigi.", v.sri.questions(appt).single().answer)
@@ -129,7 +130,7 @@ class VisitNoteTest {
         val appt = v.at(now, attendee = v.sri.me())
         v.sri.askQuestion(v.circle, appt, "Kapan Bapak boleh menyetir lagi?")
         val q = v.sri.questions(appt).single()
-        v.sri.saveVisitNote(appt, mapOf(q.id to ""), listOf("MRI ulang"), "")
+        v.sri.saveVisitNote(appt, mapOf(q.id to ""), v.sri.steps("MRI ulang"), "")
         val rudi = signedInNewcomer().apply { createCareCircle("Warsini", null, emptySet()) }
 
         assertTrue(rudi.questions(appt).isEmpty())

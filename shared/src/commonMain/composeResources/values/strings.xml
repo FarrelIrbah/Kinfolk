@@ -324,4 +324,24 @@
     <string name="habit_ate">Makan malam</string>
     <string name="habit_walked">Berjalan</string>
     <string name="good_of_30">%1$d dari 30 baik</string>
+    <!-- tasks (#26) -->
+    <string name="tasks_title">Tugas</string>
+    <string name="tasks_sub">Dari ringkasan kunjungan dan keluarga. Pengingat dikirim via WhatsApp.</string>
+    <string name="tasks_open">Belum selesai · %1$d</string>
+    <string name="tasks_done">Selesai</string>
+    <string name="task_from">Dari %1$s</string>
+    <string name="task_refill">Pengingat isi ulang</string>
+    <string name="task_added">Ditambahkan %1$s</string>
+    <string name="remind">Ingatkan</string>
+    <string name="reminded">Diingatkan</string>
+    <string name="reminded_toast">Pengingat WhatsApp dikirim ke %1$s.</string>
+    <string name="task_done_toast">Ditandai selesai · lingkaran bisa melihat</string>
+    <string name="add_task">+ Tambah tugas</string>
+    <string name="task_text">Tugas</string>
+    <string name="task_owner">Pemilik</string>
+    <string name="task_due">Tenggat</string>
+    <string name="tasks_row">%1$d tugas belum selesai</string>
+    <string name="tasks_row_late">%1$d terlambat · %2$s</string>
+    <string name="tasks_row_owner">(%1$s)</string>
+    <string name="tasks_row_ok">Tidak ada yang terlambat</string>
 </resources>

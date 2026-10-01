@@ -32,7 +32,7 @@ class DataCategoryTest {
         val provider = sri.addProvider(circle, "Dr. Anand Rao").id
         val past = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, provider, "Kontrol psikiatri", null, now - 3.days, attendeeId = sri.me())).id
         sri.askQuestion(circle, past, "Apakah dosisnya perlu diubah?")
-        sri.saveVisitNote(past, sri.questions(past).associate { it.id to "Tetap" }, listOf("Kontrol lagi sebulan"), "Tidur membaik")
+        sri.saveVisitNote(past, sri.questions(past).associate { it.id to "Tetap" }, sri.steps("Kontrol lagi sebulan"), "Tidur membaik")
         val upcoming = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, provider, "Kontrol psikiatri", null, now + 3.days)).id
         sri.askQuestion(circle, upcoming, "Boleh menyetir lagi?")
         sri.addMedication(MedicationDraft(circle, tukiman, "Sertraline", "50 mg", "pagi", LocalTime(7, 0)))

@@ -21,10 +21,12 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import id.kinfolk.ui.Avatar
 import id.kinfolk.ui.Kf
+import id.kinfolk.ui.SvgPath
 import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
@@ -130,6 +132,12 @@ data class HomeState(
     /** Shown in place of the Appointment card when [homeCard] picks it. */
     val morning: Morning? = null,
     val evening: Evening? = null,
+    /** v3's Tasks row: "3 tugas belum selesai", and [tasksSub] in red while [tasksLate]. */
+    val tasksTitle: String = "",
+    val tasksSub: String = "",
+    /** "(Budi)" after [tasksSub]: stays when the Task's text is cut short. */
+    val tasksSubOwner: String = "",
+    val tasksLate: Boolean = false,
 )
 
 private val Cream = Color(0xFFF3EEE4)
@@ -152,6 +160,7 @@ fun HomeScreen(
     onMarkMorning: () -> Unit,
     onCall: () -> Unit,
     onCheckIn: () -> Unit,
+    onTasks: () -> Unit,
 ) {
     // design: padding:4px 20px; gap:22px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -168,7 +177,7 @@ fun HomeScreen(
                 Text(stringResource(Res.string.sos), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.em)
             }
         }
-        // ponytail: search bar, tasks row and weekly digest row hidden until those features ship.
+        // ponytail: search bar and weekly digest row hidden until those features ship.
 
         // ponytail: the after-visit card falls back to these until its ticket lands.
         if (s.evening != null) EveningCard(s.evening, onCall, onCheckIn)
@@ -180,6 +189,26 @@ fun HomeScreen(
                 EmptyStep(3, stringResource(Res.string.invite_siblings), stringResource(Res.string.joined_of, joined, total).takeIf { total > 0 }, part = total > 0, onInvite)
             }
             EmptyStep(4, stringResource(Res.string.fill_emergency), stringResource(Res.string.fill_emergency_sub), part = false, onFillEmergency)
+        }
+
+        // design: #FBF8F2, radius 18, padding 14 16, gap 12; 40px #E3EBE5 icon tile, radius 12
+        Row(
+            Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).tap(onTasks).padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(40.dp).background(Kf.GreenTint, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                SvgPath("M4 6.5l2 2 3.5-3.5M4 15.5l2 2 3.5-3.5M13 7h7M13 16h7", 20.dp, Kf.Green)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(s.tasksTitle, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Row {
+                    val color = if (s.tasksLate) Kf.Sos else Kf.Muted
+                    Text(s.tasksSub, Modifier.weight(1f, fill = false), fontSize = 13.sp, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (s.tasksSubOwner.isNotEmpty()) Text(" " + s.tasksSubOwner, fontSize = 13.sp, color = color, maxLines = 1)
+                }
+            }
+            Text("›", color = Kf.Muted, fontSize = 18.sp)
         }
 
         // Hidden until the Care Circle has a Duty (approved in #10).

@@ -91,6 +91,21 @@ import id.kinfolk.data.recipientPhone
 import id.kinfolk.data.recentCheckIns
 import id.kinfolk.data.saveCheckIn
 import id.kinfolk.ui.checkin.CheckInScreen
+import id.kinfolk.data.Task
+import id.kinfolk.data.addTask
+import id.kinfolk.data.editTask
+import id.kinfolk.data.markTaskDone
+import id.kinfolk.data.remindTask
+import id.kinfolk.data.tasks as taskList
+import id.kinfolk.ui.tasks.TaskFormScreen
+import id.kinfolk.ui.tasks.TasksScreen
+import id.kinfolk.ui.tasks.overdue
+import kinfolk.shared.generated.resources.reminded_toast
+import kinfolk.shared.generated.resources.task_done_toast
+import kinfolk.shared.generated.resources.tasks_row
+import kinfolk.shared.generated.resources.tasks_row_late
+import kinfolk.shared.generated.resources.tasks_row_ok
+import kinfolk.shared.generated.resources.tasks_row_owner
 import id.kinfolk.ui.checkin.names
 import id.kinfolk.ui.home.Evening
 import kinfolk.shared.generated.resources.ci_no_bp
@@ -276,7 +291,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -309,10 +324,13 @@ fun App() {
         var editingMed by remember { mutableStateOf<Medication?>(null) }
         var doses by remember { mutableStateOf(emptyList<DoseLog>()) } // of the day they were read
         val doseWrites = remember { Mutex() }
+        val taskWrites = remember { Mutex() } // a tick and its "Urungkan" land in tap order
         var markedMorning by remember { mutableStateOf<LocalDate?>(null) } // keeps "Semua diberikan ✓" up that day
         var checkIn by remember { mutableStateOf<CheckIn?>(null) } // of the day it was read
         var checkIns by remember { mutableStateOf(emptyList<CheckIn>()) } // Kondisi, the last 30
         var checkingIn by rememberSaveable { mutableStateOf<String?>(null) } // "2026-10-01 19:00": `checkin`'s day and Duty time, fixed when opened
+        var tasks by remember { mutableStateOf(emptyList<Task>()) }
+        var editingTask by remember { mutableStateOf<Task?>(null) }
         var contacts by remember { mutableStateOf(emptyList<CareContact>()) }
         var editingContact by remember { mutableStateOf<CareContact?>(null) }
         var invitation by remember { mutableStateOf<InvitationToMe?>(null) }
@@ -445,7 +463,7 @@ fun App() {
         fun restore(k: Snapshot) {
             circle = k.circle; recipient = k.recipient; next = k.next; questions = k.questions; note = k.note
             meds = k.medications; members = k.members; timeline = k.timeline; sosMeds = k.emergencyMedications
-            contacts = k.contacts; card = k.card; savedAt = k.savedAt; doses = k.doses; checkIn = k.checkIn
+            contacts = k.contacts; card = k.card; savedAt = k.savedAt; doses = k.doses; checkIn = k.checkIn; tasks = k.tasks
         }
         suspend fun loadHome() {
             // The card stays until the day ends: its "Tulis catatan" button is for after the visit.
@@ -618,6 +636,15 @@ fun App() {
                                             else stringResource(Res.string.legend_other, t.name, hm(t.timeOfDay), rotaPeople()[t.holder]?.name.orEmpty())
                                         }.orEmpty(),
                                         feed = timeline.take(3).map { FeedItem(author(it), text(it, tz), ago(it.at, now, tz)) },
+                                        tasksTitle = stringResource(Res.string.tasks_row, tasks.count { !it.done }),
+                                        // Approved in #26: "2 terlambat · Perpanjang izin parkir disabilitas (Budi)".
+                                        tasksSub = tasks.overdue(today).let { late ->
+                                            late.firstOrNull()?.let { t -> stringResource(Res.string.tasks_row_late, late.size, t.text) }
+                                                ?: stringResource(Res.string.tasks_row_ok)
+                                        },
+                                        tasksSubOwner = tasks.overdue(today).firstOrNull()
+                                            ?.let { t -> stringResource(Res.string.tasks_row_owner, person(t.ownerId)?.name.orEmpty()) }.orEmpty(),
+                                        tasksLate = tasks.overdue(today).isNotEmpty(),
                                         evening = if (card != HomeCard.Evening) null else Evening(
                                             hm(tonight!!.timeOfDay), recipient?.name.orEmpty(), checkIn?.takeIf { it.day == today }?.let { it.sys to it.dia },
                                         ),
@@ -654,6 +681,8 @@ fun App() {
                                         }
                                     },
                                     onCheckIn = { checkingIn = "$today ${tonight!!.timeOfDay}"; go(Screen.CheckIn) },
+                                    // Refill Tasks come from the minute job, so the list refreshes on the way in.
+                                    onTasks = { go(Screen.Tasks); scope.launch { attempt { supabase.taskList(circle!!.id) }?.let { tasks = it } } },
                                 )
                             }
                             Tab.Rota -> {
@@ -712,6 +741,7 @@ fun App() {
                             val a = v.appointment
                             VisitNoteScreen(
                                 a, v.questions, v.note, editable = a.attendeeId == me(), recipient?.name.orEmpty(), now, tz, ::colorOf,
+                                owners = dutyPeople().keys.toList(), person = { id -> rotaPeople()[id] ?: person(id) }, me = me().orEmpty(),
                                 onHome = { pick(Tab.Home) }, // v3 `goHome`
                                 save = { answers, steps, notes ->
                                     attempt { supabase.saveVisitNote(a.id, answers, steps, notes); loadHome() }
@@ -783,6 +813,43 @@ fun App() {
                                     timeline = retrying { supabase.timeline(r.circleId) }
                                 }
                             }
+                        }
+                        Screen.Tasks -> {
+                            val doneToast = stringResource(Res.string.task_done_toast)
+                            val remindedToast = tasks.associate { t -> t.id to stringResource(Res.string.reminded_toast, rotaPeople()[t.ownerId]?.name.orEmpty()) }
+                            // Shown at once like the prototype; put back with "Tidak tersambung. Coba lagi." if it can't be saved.
+                            fun swap(t: Task, to: Task) { tasks = tasks.map { if (it.id == t.id) to else it } }
+                            fun setDone(t: Task, done: Boolean) {
+                                swap(t, t.copy(done = done, doneAt = if (done) Clock.System.now() else null))
+                                scope.launch {
+                                    taskWrites.withLock {
+                                        if (attempt { supabase.markTaskDone(t.id, done) } == null) { swap(t, t); toast = noConnection }
+                                        else retrying { tasks = supabase.taskList(t.circleId) }
+                                    }
+                                }
+                            }
+                            TasksScreen(
+                                tasks, today, me().orEmpty(), { id -> rotaPeople()[id] ?: person(id) },
+                                // Former Members get no reminder (remind_task sends them nothing).
+                                canRemind = { t -> members.any { it.userId == t.ownerId && it.leftAt == null } }, onBack = ::back,
+                                onToggle = { t ->
+                                    setDone(t, !t.done)
+                                    if (!t.done) { undo = doneToast to { setDone(t.copy(done = true), false) }; toast = doneToast }
+                                },
+                                onRemind = { t ->
+                                    swap(t, t.copy(remindedAt = Clock.System.now()))
+                                    toast = remindedToast[t.id]
+                                    scope.launch { if (attempt { supabase.remindTask(t.id) } == null) { swap(t, t); toast = noConnection } }
+                                },
+                            ) { editingTask = it; go(Screen.TaskForm) }
+                        }
+                        Screen.TaskForm -> TaskFormScreen(editingTask, dutyPeople(), me().orEmpty(), today + DatePeriod(days = 7), onBack = ::back) { f ->
+                            // Not retried: adding is not idempotent.
+                            attempt {
+                                editingTask?.let { supabase.editTask(it.id, f.text, f.owner, f.due) } ?: supabase.addTask(recipient!!, f.text, f.owner, f.due)
+                                // Before leaving, so the form stays busy and can't add twice; also the Visit Note a Next Step's edit changed.
+                                loadHome()
+                            }.also { if (it != null) back() } != null
                         }
                         Screen.Contacts -> ContactsScreen(contacts, onBack = ::back) { editingContact = it; go(Screen.ContactForm) }
                         Screen.ContactForm -> ContactFormScreen(

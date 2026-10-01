@@ -28,6 +28,12 @@ import androidx.compose.ui.unit.sp
 import id.kinfolk.data.Appointment
 import id.kinfolk.data.Question
 import id.kinfolk.data.VisitNote
+import id.kinfolk.data.NextStepDraft
+import id.kinfolk.ui.home.Person
+import id.kinfolk.ui.tasks.dueOn
+import androidx.compose.foundation.shape.CircleShape
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.plus
 import id.kinfolk.ui.AddRow
 import id.kinfolk.ui.Avatar
 import id.kinfolk.ui.ErrorText
@@ -71,12 +77,19 @@ fun VisitNoteScreen(
     now: Instant,
     tz: TimeZone,
     askerColor: (String) -> Color,
+    /** Who a Next Step's owner pill cycles through, in order (v3 `cycle`). */
+    owners: List<String>,
+    person: (String) -> Person?,
+    me: String,
     onHome: () -> Unit,
-    save: suspend (answers: Map<String, String>, nextSteps: List<String>, notes: String) -> Boolean,
+    save: suspend (answers: Map<String, String>, steps: List<NextStepDraft>, notes: String) -> Boolean,
 ) {
     val scope = rememberCoroutineScope()
     val answers = remember { mutableStateMapOf(*questions.map { it.id to it.answer.orEmpty() }.toTypedArray()) }
-    val steps = remember { mutableStateListOf(*note?.nextSteps.orEmpty().toTypedArray()) }
+    val steps = remember { mutableStateListOf(*note?.steps.orEmpty().map { NextStepDraft(it.text, it.owner, it.due, it.id) }.toTypedArray()) }
+    // New ones: the Attendee's, due a week after the visit (approved in #26).
+    val defaultDue = a.startsAt.toLocalDateTime(tz).date + DatePeriod(days = 7)
+    var picking by remember { mutableStateOf<Int?>(null) }
     var draftStep by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf(note?.notes.orEmpty()) }
     var busy by remember { mutableStateOf(false) }
@@ -111,14 +124,21 @@ fun VisitNoteScreen(
 
         if (editable || steps.isNotEmpty()) Section(stringResource(Res.string.next_steps)) {
             steps.forEachIndexed { i, step ->
-                NoteCard {
-                    // Emptying a step removes it on save.
-                    if (editable) HintedInput(step, { steps[i] = it }, "", text15.copy(lineHeight = (15 * 1.4).sp))
-                    else Text(step, style = text15.copy(lineHeight = (15 * 1.4).sp))
+                NoteCard(Arrangement.spacedBy(10.dp)) {
+                    // Emptying a step removes it (and its Task) on save.
+                    if (editable) HintedInput(step.text, { steps[i] = step.copy(text = it) }, "", text15.copy(lineHeight = (15 * 1.4).sp))
+                    else Text(step.text, style = text15.copy(lineHeight = (15 * 1.4).sp))
+                    Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StepPill(dueOn(step.due), Kf.CardAlt, Kf.Ink, onClick = { picking = i }.takeIf { editable })
+                        val owner = person(step.owner)
+                        StepPill(owner?.name.orEmpty(), owner?.color ?: Kf.Muted, Color.White, onClick = {
+                            steps[i] = step.copy(owner = owners[(owners.indexOf(step.owner) + 1) % owners.size])
+                        }.takeIf { editable && owners.isNotEmpty() })
+                    }
                 }
             }
             if (editable) AddRow(draftStep, { draftStep = it }, stringResource(Res.string.add_step), stringResource(Res.string.add)) {
-                if (draftStep.isNotBlank()) { steps += draftStep.trim(); draftStep = "" }
+                if (draftStep.isNotBlank()) { steps += NextStepDraft(draftStep.trim(), me, defaultDue); draftStep = "" }
             }
         }
 
@@ -151,7 +171,8 @@ fun VisitNoteScreen(
                     if (busy) return@tap
                     scope.launch {
                         busy = true
-                        val kept = steps.map { it.trim() }.filter { it.isNotEmpty() } + listOfNotNull(draftStep.trim().ifEmpty { null })
+                        val kept = steps.map { it.copy(text = it.text.trim()) }.filter { it.text.isNotEmpty() } +
+                            listOfNotNull(draftStep.trim().ifEmpty { null }?.let { NextStepDraft(it, me, defaultDue) })
                         failed = !save(answers.mapValues { it.value.trim() }, kept, notes.trim())
                         busy = false
                     }
@@ -163,7 +184,16 @@ fun VisitNoteScreen(
             if (failed) ErrorText(stringResource(Res.string.no_connection))
         }
     }
+    picking?.let { i -> DayPicker(steps[i].due, { steps[i] = steps[i].copy(due = it); picking = null }) { picking = null } }
 }
+
+/** v3 owner pill (height 32, radius 999, 13/600, padding 0 12); the due pill beside it is approved in #26. */
+@Composable
+private fun StepPill(text: String, bg: Color, fg: Color, onClick: (() -> Unit)?) =
+    Box(
+        Modifier.height(32.dp).background(bg, CircleShape).let { m -> onClick?.let { m.tap(it) } ?: m }.padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, color = fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
 
 @Composable
 private fun Section(label: String, content: @Composable () -> Unit) =

@@ -305,8 +305,8 @@ class WhatsAppTest {
             AppointmentDraft(circle, tukiman, provider, "Kontrol neurologi", null, now - 1.hours, attendeeId = sri.client.me()),
         ).id
 
-        sri.client.saveVisitNote(appt, emptyMap(), listOf("fisioterapi 2x/minggu", "MRI ulang 3 bulan lagi."), "")
-        sri.client.saveVisitNote(appt, emptyMap(), listOf("fisioterapi 2x/minggu", "MRI ulang 3 bulan lagi."), "Tidur membaik")
+        sri.client.saveVisitNote(appt, emptyMap(), sri.client.steps("fisioterapi 2x/minggu", "MRI ulang 3 bulan lagi."), "")
+        sri.client.saveVisitNote(appt, emptyMap(), sri.client.steps("fisioterapi 2x/minggu", "MRI ulang 3 bulan lagi."), "Tidur membaik")
         deliver()
 
         assertEquals(

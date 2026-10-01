@@ -8,7 +8,7 @@ import kotlin.time.Instant
 
 // Offline cache (#14): read-only, kept on the phone after each load and shown until the next one succeeds; never written back.
 
-/** What the signed-in Member can read without a connection: Home, `appt`, `summary`, Obat, Linimasa and Emergency Info. */
+/** What the signed-in Member can read without a connection: Home (with its Tasks row), `appt`, `summary`, Obat, Linimasa and Emergency Info. */
 @Serializable
 data class Snapshot(
     val circle: CareCircle,
@@ -29,6 +29,8 @@ data class Snapshot(
     val today: LocalDate? = null,
     /** [today]'s Check-in, for the evening card. */
     val checkIn: CheckIn? = null,
+    /** Home's Tasks row. */
+    val tasks: List<Task> = emptyList(),
     val savedAt: Instant = Clock.System.now(),
 )
 
@@ -41,6 +43,6 @@ suspend fun SupabaseClient.snapshot(since: Instant, today: LocalDate): Snapshot?
         circle, recipient, next, next?.let { questions(it.id) }.orEmpty(), next?.let { visitNote(it.id) },
         medications(circle.id), members(circle.id), timeline(circle.id),
         recipient?.let { emergencyMedications(it.id) }.orEmpty(), careContacts(circle.id), recipient?.let { emergencyCard(it.id) },
-        doseLogs(circle.id, today), today, recipient?.let { checkIn(it.id, today) },
+        doseLogs(circle.id, today), today, recipient?.let { checkIn(it.id, today) }, tasks(circle.id),
     )
 }

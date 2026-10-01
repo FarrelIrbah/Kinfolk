@@ -134,7 +134,7 @@ class MemberTest {
 
         sri.removeMember(circle, budi.me())
 
-        assertFails { budi.saveVisitNote(past, emptyMap(), listOf("MRI ulang"), "") }
+        assertFails { budi.saveVisitNote(past, emptyMap(), budi.steps("MRI ulang"), "") }
         assertNull(sri.visitNote(past))
     }
 

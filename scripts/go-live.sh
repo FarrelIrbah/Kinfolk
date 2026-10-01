@@ -281,6 +281,7 @@ if run; then
   submit kinfolk_duty_reminder UTILITY "[$(body 'Hari ini: {{1}} jam {{2}}.' '["telepon cek malam","19.00"]')]"
   submit kinfolk_visit_note UTILITY "[$(body '{{1}} menulis catatan kunjungan {{2}}. {{3}}.' '["Sri","Tukiman","Kontrol neurologi: fisioterapi 2x/minggu, MRI ulang 3 bulan lagi"]')]"
   submit kinfolk_bp_high UTILITY "[$(body 'Tensi {{1}} malam ini {{2}}, 140 ke atas. Dicatat oleh {{3}}.' '["Tukiman","152/90","Sri"]')]"
+  submit kinfolk_task_reminder UTILITY "[$(body '{{1}} mengingatkan: {{2}}, tenggat {{3}}.' '["Sri","Perpanjang izin parkir disabilitas","6 Okt"]')]"
   pause "Press Enter when you've read the results"
 fi
 
