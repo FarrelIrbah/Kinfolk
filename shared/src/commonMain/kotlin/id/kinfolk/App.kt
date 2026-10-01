@@ -763,8 +763,8 @@ fun App() {
                             val (day, at) = checkingIn?.split(' ')?.let { LocalDate.parse(it[0]) to LocalTime.parse(it[1]) } ?: return@let
                             val noBp = stringResource(Res.string.ci_no_bp)
                             val saved = stringResource(Res.string.ci_saved)
-                            // v3: "Tersimpan. Tensi 140 ke atas; Budi dan Dewi diberi tahu via SMS.", WhatsApp to every other Member.
-                            val others = circleMembers().filter { !it.isMe }.map { it.name }
+                            // v3: "Tersimpan. Tensi 140 ke atas; Budi dan Dewi diberi tahu via SMS.", WhatsApp to every other Member but the Care Recipient.
+                            val others = circleMembers().filter { !it.isMe && !it.isRecipient }.map { it.name }
                             val savedHigh = stringResource(Res.string.ci_saved_high, names(others))
                             val before = checkIn?.takeIf { it.day == day }
                             CheckInScreen(hm(at), r.name, before?.draft, onBack = ::back) { d ->

@@ -73,7 +73,7 @@ class CheckInTest {
     }
 
     @Test
-    fun `140 or more texts every other Member on WhatsApp, once that day`() = runBlocking<Unit> {
+    fun `140 or more texts every other Member but the Care Recipient on WhatsApp, once`() = runBlocking<Unit> {
         val sriPhone = newNumber()
         val sri = signedInAs(sriPhone)
         val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
@@ -84,6 +84,9 @@ class CheckInTest {
         val dewiPhone = newNumber()
         sri.invite(circle, "Dewi", dewiPhone)
         val dewi = signedInAs(dewiPhone).apply { acceptInvitation(myInvitations().single().id) }
+        val tukimanPhone = newNumber()
+        sri.invite(circle, "Tukiman", tukimanPhone, Role.parent, recipientId = tukiman.id)
+        signedInAs(tukimanPhone).apply { acceptInvitation(myInvitations().single().id) }
 
         sri.saveCheckIn(tukiman, today, CheckInDraft(132, 84, Ate.yes, walked = true, Mood.good, ""))
         deliver()
@@ -101,6 +104,7 @@ class CheckInTest {
             assertTrue(""""text":"Sri"""" in alerts(phone).single().text)
         }
         assertTrue(alerts(sriPhone).isEmpty())
+        assertTrue(alerts(tukimanPhone).isEmpty()) // not the Care Recipient (#24)
 
         dewi.saveCheckIn(tukiman, LocalDate(2026, 10, 2), CheckInDraft(145, 88, Ate.no, walked = false, Mood.okay, "")) // a new day
         deliver()

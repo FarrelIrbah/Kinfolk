@@ -42,7 +42,7 @@ begin
 end $$;
 create trigger stamp_check_in before update on public.check_ins for each row execute function public.stamp_check_in();
 
--- 140 or more (v3 looks at the systolic only) tells every other Member, once per Check-in: an "Ubah" never tells them
+-- 140 or more (v3 looks at the systolic only) tells every other Member but the Care Recipient, once per Check-in: an "Ubah" never tells them
 -- again, even after going below 140 and back. "Tensi Tukiman malam ini 152/90, 140 ke atas. Dicatat oleh Sri."
 -- (owner-approved in #24)
 create function public.flag_high_bp() returns trigger language plpgsql set search_path = '' as $$
@@ -59,6 +59,7 @@ begin
     select m.user_id, 'bp_high', new.id, 'kinfolk_bp_high', array[r.name, new.sys || '/' || new.dia, public.member_name(new.circle_id, new."by")]
     from public.care_recipients r
     join public.members m on m.circle_id = new.circle_id and m.left_at is null and m.user_id <> new."by"
+      and m.user_id is distinct from r.member_id -- not the Care Recipient (owner, #24)
     where r.id = new.recipient_id;
   return new;
 end $$;

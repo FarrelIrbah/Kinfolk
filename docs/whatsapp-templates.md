@@ -55,7 +55,7 @@ Kategori UTILITY, bahasa `id`, disetujui pemilik di #13 (bentuk pesan `swap`, `y
 | `kinfolk_drive_reminder` | `Hari ini: antar {{1}} ke {{2}} jam {{3}}.` | Driver, 2 jam sebelum berangkat (atau jam janji). {{3}}: "09.00, berangkat 08.15. Bawa: KTP, kartu BPJS" |
 | `kinfolk_duty_reminder` | `Hari ini: {{1}} jam {{2}}.` | Pemegang Duty hari itu, 1 jam sebelum jamnya |
 | `kinfolk_visit_note` | `{{1}} menulis catatan kunjungan {{2}}. {{3}}.` | Visit Note pertama kali tersimpan, ke Member yang boleh membacanya (bukan penulisnya). {{3}} = teks Linimasa, mis. "Kontrol neurologi: fisioterapi 2x/minggu, MRI ulang 3 bulan lagi" |
-| `kinfolk_bp_high` | `Tensi {{1}} malam ini {{2}}, 140 ke atas. Dicatat oleh {{3}}.` | Disetujui pemilik di #24. Check-in dengan sistolik 140 ke atas, ke semua Member lain (sekali sehari: "Ubah" yang tetap tinggi tidak mengirim lagi). Contoh: "Tukiman", "152/90", "Sri" |
+| `kinfolk_bp_high` | `Tensi {{1}} malam ini {{2}}, 140 ke atas. Dicatat oleh {{3}}.` | Disetujui pemilik di #24. Check-in dengan sistolik 140 ke atas, ke semua Member lain kecuali Care Recipient (sekali sehari: "Ubah" yang tetap tinggi tidak mengirim lagi). Contoh: "Tukiman", "152/90", "Sri" |
 
 `kinfolk_swap_ask` dan `kinfolk_drive_ask` punya dua tombol QUICK_REPLY "YA" dan "TIDAK" (payload diisi saat kirim); mengetik "ya"/"tidak" juga dihitung, untuk permintaan terbaru yang masih terbuka. Kalau Meta menerima pesan tapi kemudian melaporkan gagal kirim (status `failed` di webhook, mis. nomor tanpa WhatsApp), teksnya dikirim lewat SMS. Balasan bebas (dalam 24 jam):
 
