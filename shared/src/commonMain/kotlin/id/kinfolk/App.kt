@@ -274,7 +274,7 @@ fun App() {
         var invitation by remember { mutableStateOf<InvitationToMe?>(null) }
         var sent by remember { mutableStateOf<List<Invitation>?>(null) } // null unless admin
         var card by remember { mutableStateOf<EmergencyCard?>(null) }
-        var formBack by remember { mutableStateOf(Screen.Emergency) } // where the Emergency Info form returns to
+        var stack by rememberSaveable { mutableStateOf(emptyList<Screen>()) } // where back returns to, like v3's `stack`
         var emergencyLoad by remember { mutableStateOf<Job?>(null) }
         var toast by remember { mutableStateOf<String?>(null) }
         var undo by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) } // "Urungkan" while its toast shows
@@ -345,7 +345,11 @@ fun App() {
         fun circleMembers() = members.filter { it.leftAt == null }.sortedWith(compareBy({ it.userId != owner() }, { it.userId != me() })).map {
             CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me(), sees(it), it.userId == owner())
         }
-        fun go(to: Screen, how: Nav = Nav.Push) { nav = how; screen = to }
+        // Like v3: push remembers where you came from, back returns there (Home when empty), tabs clear it.
+        fun go(to: Screen) { nav = Nav.Push; stack = stack + listOfNotNull(screen); screen = to }
+        fun back() { nav = Nav.Back; screen = stack.lastOrNull() ?: Screen.Home; stack = stack.dropLast(1) }
+        fun reset(to: Screen, how: Nav = Nav.Tab) { nav = how; stack = emptyList(); screen = to }
+        fun pick(t: Tab) { reset(Screen.Home); tab = t }
         val today = now.toLocalDateTime(tz).date
         val week = weekOf(today)
         // The rota and "Minggu ini" show everyone by their own name, yourself first in Sri's green (like `circle`).
@@ -390,9 +394,9 @@ fun App() {
             // Whoever signs in without a Care Circle but with a pending Invitation to their number sees `invitee`.
             invitation = if (circle == null) retrying { supabase.myInvitations() }.firstOrNull() else null
             when {
-                circle != null -> go(Screen.Home, Nav.Tab)
-                invitation != null -> go(Screen.Invitee, how)
-                else -> go(Screen.Onb1, how)
+                circle != null -> reset(Screen.Home)
+                invitation != null -> reset(Screen.Invitee, how)
+                else -> reset(Screen.Onb1, how)
             }
         }
         fun openForm(a: Appointment?) = scope.launch {
@@ -412,7 +416,6 @@ fun App() {
                 card = recipient?.let { r -> retrying { supabase.emergencyCard(r.id) } }
             }
         }
-        fun openEmergencyForm(from: Screen) { formBack = from; go(Screen.EmergencyForm) }
         suspend fun sendCode(sms: Boolean): Boolean = attempt {
             supabase.sendSignInCode(e164(phone), sms)
         } != null
@@ -420,13 +423,13 @@ fun App() {
             supabase.auth.awaitInitialization()
             // After rotation the sign-in screens stay; the rest reload their Care Circle from Home.
             if (screen in listOf(Screen.Onb0, Screen.Phone, Screen.Code, Screen.Onb1)) return@LaunchedEffect
-            if (supabase.auth.currentSessionOrNull() == null) return@LaunchedEffect go(Screen.Onb0, Nav.Tab)
+            if (supabase.auth.currentSessionOrNull() == null) return@LaunchedEffect reset(Screen.Onb0)
             // Offline, Home opens with what the last load kept and refreshes in place once reachable,
             // so whoever moved on meanwhile stays where they are unless the Care Circle is gone.
             val k = kept.read()?.let { runCatching { Json { ignoreUnknownKeys = true }.decodeFromString<Snapshot>(it) }.getOrNull() }
                 ?: return@LaunchedEffect land(Nav.Tab)
             restore(k)
-            go(Screen.Home, Nav.Tab)
+            reset(Screen.Home)
             loadHome()
             if (circle == null) land(Nav.Tab)
         }
@@ -459,11 +462,11 @@ fun App() {
                             onInvited = { go(Screen.Phone) },
                             onSignIn = { go(Screen.Phone) },
                         )
-                        Screen.Phone -> PhoneScreen(phone, { phone = it }, onBack = { go(Screen.Onb0, Nav.Back) }) {
+                        Screen.Phone -> PhoneScreen(phone, { phone = it }, onBack = ::back) {
                             sendCode(sms = false).also { if (it && screen == Screen.Phone) go(Screen.Code) }
                         }
                         Screen.Code -> CodeScreen(
-                            phone, onBack = { go(Screen.Phone, Nav.Back) }, send = { sendCode(it) },
+                            phone, onBack = ::back, send = { sendCode(it) },
                             verify = { code ->
                                 try {
                                     supabase.verifySignInCode(e164(phone), code)
@@ -488,13 +491,13 @@ fun App() {
                             sent.orEmpty().filter { it.pending },
                             cancel = { inv -> attempt { supabase.cancelInvitation(inv.id) } != null },
                             send = { name, phone -> attempt { supabase.invite(circle!!.id, name, phone) } != null },
-                            onDone = { scope.launch { loadHome(); if (onboarding) go(Screen.Onb3) else go(Screen.Home, Nav.Tab) } },
+                            onDone = { scope.launch { loadHome(); if (onboarding) go(Screen.Onb3) else reset(Screen.Home) } },
                         )
                         Screen.Onb3 -> Onb3(recipient?.name.orEmpty()) { perPerson ->
                             attempt {
                                 supabase.hideByDefault(circle!!.id, if (perPerson) setOf(DataCategory.visit_notes) else emptySet())
                                 onboarding = false
-                                go(Screen.Home, Nav.Tab)
+                                reset(Screen.Home)
                             } != null
                         }
                         Screen.Invitee -> invitation?.let { inv ->
@@ -538,10 +541,10 @@ fun App() {
                                 onSos = { openEmergency() }, onOpenAppointment = { opened = null; go(Screen.Appt) }, onAddAppointment = { openForm(null) },
                                 // Only the Attendee writes the Visit Note; the others add Questions until it's ready.
                                 onWriteNote = { opened = null; go(if (note != null || next?.attendeeId == me()) Screen.VisitNote else Screen.Appt) },
-                                onRota = { nav = Nav.Tab; tab = Tab.Rota }, onRecords = { nav = Nav.Tab; tab = Tab.Records },
-                                onTimeline = { nav = Nav.Tab; tab = Tab.Timeline },
+                                onRota = { pick(Tab.Rota) }, onRecords = { pick(Tab.Records) },
+                                onTimeline = { pick(Tab.Timeline) },
                                 onInvite = { go(Screen.Onb2) },
-                                onFillEmergency = { openEmergencyForm(Screen.Home) },
+                                onFillEmergency = { go(Screen.EmergencyForm) },
                             )
                             Tab.Rota -> {
                                 val taken = turns.map { stringResource(Res.string.swap_taken, it.inSentence()) }
@@ -572,7 +575,7 @@ fun App() {
                             val a = v.appointment
                             ApptScreen(
                                 a, v.questions, v.note != null, now, tz, ::person, ::colorOf, a.attendeeId == me(), recipient?.name.orEmpty(),
-                                onBack = { go(Screen.Home, Nav.Back) }, onEdit = { openForm(a) },
+                                onBack = ::back, onEdit = { openForm(a) },
                                 // Not retried: adding is not idempotent.
                                 ask = { text -> attempt { supabase.askQuestion(a.circleId, a.id, text); loadHome() } != null },
                                 onNote = { go(Screen.VisitNote) },
@@ -582,16 +585,16 @@ fun App() {
                             val a = v.appointment
                             VisitNoteScreen(
                                 a, v.questions, v.note, editable = a.attendeeId == me(), recipient?.name.orEmpty(), now, tz, ::colorOf,
-                                onHome = { go(Screen.Home, Nav.Back) },
+                                onHome = { pick(Tab.Home) }, // v3 `goHome`
                                 save = { answers, steps, notes ->
                                     attempt { supabase.saveVisitNote(a.id, answers, steps, notes); loadHome() }
-                                        .also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                                        .also { if (it != null) reset(Screen.Home, Nav.Back) } != null
                                 },
                             )
                         }
                         Screen.ApptForm -> ApptFormScreen(
                             editing, providers, supabase.auth.currentUserOrNull()?.id.orEmpty(), tz,
-                            onBack = { go(if (editing != null) Screen.Appt else Screen.Home, Nav.Back) },
+                            onBack = ::back,
                             // ponytail: not retried (not idempotent); a failed save after adding a new Provider leaves that Provider behind.
                             save = { f ->
                                 attempt {
@@ -602,45 +605,45 @@ fun App() {
                                     )
                                     editing?.let { supabase.editAppointment(it.id, draft) } ?: supabase.scheduleAppointment(draft)
                                     loadHome()
-                                }.also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                                }.also { if (it != null) reset(Screen.Home, Nav.Back) } != null
                             },
                             cancel = {
                                 attempt { editing?.let { supabase.cancelAppointment(it.id) }; loadHome() }
-                                    .also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                                    .also { if (it != null) reset(Screen.Home, Nav.Back) } != null
                             },
                         )
-                        Screen.MedForm -> MedFormScreen(editingMed, onBack = { go(Screen.Home, Nav.Back) }) { f ->
+                        Screen.MedForm -> MedFormScreen(editingMed, onBack = ::back) { f ->
                             // Not retried: adding is not idempotent.
                             attempt {
                                 val c = circle!!
                                 val draft = MedicationDraft(c.id, editingMed?.recipientId ?: recipient!!.id, f.name, f.dose, f.schedule, f.timeOfDay, f.active)
                                 editingMed?.let { supabase.editMedication(it.id, draft) } ?: supabase.addMedication(draft)
                                 loadHome()
-                            }.also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                            }.also { if (it != null) reset(Screen.Home, Nav.Back) } != null
                         }
                         Screen.DutyForm -> DutyFormScreen(
-                            editingDuty, rotaPeople(), onBack = { go(Screen.Home, Nav.Back) },
+                            editingDuty, rotaPeople(), onBack = ::back,
                             // Not retried: adding is not idempotent.
                             save = { f ->
                                 attempt { supabase.saveDuty(circle!!.id, f.name, f.timeOfDay, f.order, week, editingDuty?.dutyId); loadRota() }
-                                    .also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                                    .also { if (it != null) reset(Screen.Home, Nav.Back) } != null
                             },
                             delete = {
-                                attempt { editingDuty?.let { supabase.deleteDuty(it.dutyId) }; loadRota() }.also { if (it != null) go(Screen.Home, Nav.Back) } != null
+                                attempt { editingDuty?.let { supabase.deleteDuty(it.dutyId) }; loadRota() }.also { if (it != null) reset(Screen.Home, Nav.Back) } != null
                             },
                         )
-                        Screen.Contacts -> ContactsScreen(contacts, onBack = { go(Screen.Home, Nav.Back) }) { editingContact = it; go(Screen.ContactForm) }
+                        Screen.Contacts -> ContactsScreen(contacts, onBack = ::back) { editingContact = it; go(Screen.ContactForm) }
                         Screen.ContactForm -> ContactFormScreen(
-                            editingContact, onBack = { go(Screen.Contacts, Nav.Back) },
+                            editingContact, onBack = ::back,
                             save = { f ->
                                 attempt {
                                     val draft = CareContactDraft(circle!!.id, f.name, f.relationship, f.phone, f.group, f.emergency)
                                     editingContact?.let { supabase.editCareContact(it.id, draft) } ?: supabase.addCareContact(draft)
                                     loadHome() // before leaving, so the form stays busy and can't add twice
-                                }.also { if (it != null) go(Screen.Contacts, Nav.Back) } != null
+                                }.also { if (it != null) back() } != null
                             },
                             remove = {
-                                attempt { editingContact?.let { supabase.removeCareContact(it.id) }; loadHome() }.also { if (it != null) go(Screen.Contacts, Nav.Back) } != null
+                                attempt { editingContact?.let { supabase.removeCareContact(it.id) }; loadHome() }.also { if (it != null) back() } != null
                             },
                         )
                         Screen.Member -> circleMembers().firstOrNull { it.id == viewing }?.let { m ->
@@ -683,7 +686,7 @@ fun App() {
                                 else -> toggle
                             }
                             MemberScreen(
-                                m, iAmAdmin = sent != null, memberError, onBack = { go(Screen.Home, Nav.Back) },
+                                m, iAmAdmin = sent != null, memberError, onBack = ::back,
                                 onToggle = onToggle,
                                 onPromote = {
                                     memberError = null
@@ -695,7 +698,7 @@ fun App() {
                                     memberError = null
                                     confirm = Confirm(remove.first, remove.second, remove.third) {
                                         scope.launch {
-                                            if (attempt { supabase.removeMember(c.id, m.id); loadHome() } != null) go(Screen.Home, Nav.Back)
+                                            if (attempt { supabase.removeMember(c.id, m.id); loadHome() } != null) back()
                                             else memberError = offline
                                         }
                                     }
@@ -723,7 +726,7 @@ fun App() {
                         Screen.Emergency -> recipient?.let { r ->
                             EmergencyScreen(
                                 r.name, r.allergies, r.conditions, sosMeds, contacts, card, savedAt?.let { updatedAgo(it, now) },
-                                onClose = { go(Screen.Home, Nav.Back) }, onEdit = { openEmergencyForm(Screen.Emergency) },
+                                onClose = ::back, onEdit = { go(Screen.EmergencyForm) },
                                 // Refreshes "terakhir dipindai" when reachable; the card on screen already works.
                                 onQr = { go(Screen.Qr); scope.launch { attempt { supabase.emergencyCard(r.id) }?.let { card = it } } },
                             )
@@ -732,18 +735,18 @@ fun App() {
                             card?.let { c ->
                                 QrScreen(
                                     r.name, r.allergies, c, c.lastScannedAt?.let { whenLabel(it, now, tz) } ?: stringResource(Res.string.never),
-                                    admin = sent != null, onBack = { go(Screen.Emergency, Nav.Back) }, onShare = { share(c.url) },
+                                    admin = sent != null, onBack = ::back, onShare = { share(c.url) },
                                     revoke = { attempt { card = supabase.reissueEmergencyCard(r.id); toast = revoked; scope.launch { loadHome() } } != null },
                                 )
                             }
                         }
                         Screen.EmergencyForm -> recipient?.let { r ->
-                            EmergencyFormScreen(r.allergies, r.conditions, onBack = { go(formBack, Nav.Back) }) { allergies, conditions ->
+                            EmergencyFormScreen(r.allergies, r.conditions, onBack = ::back) { allergies, conditions ->
                                 attempt {
                                     supabase.saveEmergencyInfo(r.id, allergies, conditions)
                                     recipient = r.copy(allergies = allergies, conditions = conditions)
                                     scope.launch { loadHome() } // keeps the offline copy current without holding the form
-                                }.also { if (it != null) go(formBack, Nav.Back) } != null
+                                }.also { if (it != null) back() } != null
                             }
                         }
                     }
@@ -751,7 +754,7 @@ fun App() {
             }
             ConfirmSheet(confirm, stringResource(Res.string.cancel)) { confirm = null }
             if (offline && screen != null) OfflineBanner(stringResource(Res.string.offline), Modifier.align(Alignment.TopCenter))
-            if (screen == Screen.Home) TabBar(tab, { nav = Nav.Tab; tab = it }, Modifier.align(Alignment.BottomCenter))
+            if (screen == Screen.Home) TabBar(tab, ::pick, Modifier.align(Alignment.BottomCenter))
             Toast(
                 toast, Modifier.align(Alignment.BottomCenter), overTabs = screen == Screen.Home,
                 action = stringResource(Res.string.undo).takeIf { toast != null && undo?.first == toast },
