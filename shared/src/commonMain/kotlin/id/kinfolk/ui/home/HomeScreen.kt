@@ -50,6 +50,15 @@ import kinfolk.shared.generated.resources.see_rota
 import kinfolk.shared.generated.resources.sos
 import kinfolk.shared.generated.resources.this_week
 import kinfolk.shared.generated.resources.write_note
+import kinfolk.shared.generated.resources.all_given
+import kinfolk.shared.generated.resources.dose_due
+import kinfolk.shared.generated.resources.given
+import kinfolk.shared.generated.resources.mark_all_given
+import kinfolk.shared.generated.resources.morning_eyebrow
+import kinfolk.shared.generated.resources.morning_title
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
 import org.jetbrains.compose.resources.stringResource
 
 data class Person(val name: String, val color: Color) {
@@ -66,6 +75,28 @@ data class NextAppointment(
     val questionCount: Int,
     val noteReady: Boolean,
 )
+
+/** v3's main Home cards, in priority order (#22). */
+enum class HomeCard { AfterVisit, VisitToday, Evening, Morning, Next, Empty }
+
+/**
+ * Which card Home shows at [now]: after-visit > appointment today without a Visit Note > evening (from 17.00, if I
+ * hold tonight's Duty) > morning (before 11.00, while morning doses are due) > next appointment > empty.
+ * [visitOn] is the day of the next Appointment, today's included until the day ends.
+ */
+fun homeCard(now: LocalDateTime, visitOn: LocalDate?, noteReady: Boolean, holdsTonight: Boolean, morningDue: Boolean) = when {
+    visitOn == now.date && noteReady -> HomeCard.AfterVisit
+    visitOn == now.date -> HomeCard.VisitToday
+    now.time >= LocalTime(17, 0) && holdsTonight -> HomeCard.Evening
+    now.time < LocalTime(11, 0) && morningDue -> HomeCard.Morning
+    visitOn != null -> HomeCard.Next
+    else -> HomeCard.Empty
+}
+
+data class MorningDose(val name: String, val given: Boolean)
+
+/** v3's morning card: "08.00 · obat pagi", each dose, and the next visit (null hides the line). */
+data class Morning(val at: String, val recipient: String, val doses: List<MorningDose>, val nextVisit: String?)
 
 data class DutyDay(val dow: String, val num: Int, val member: Person, val isToday: Boolean)
 data class FeedItem(val by: Person, val text: String, val whenLabel: String)
@@ -85,6 +116,8 @@ data class HomeState(
     val feed: List<FeedItem>,
     /** Joined and total non-cancelled Invitations for `empty` row 3; null hides the row (admins only). */
     val invites: Pair<Int, Int>? = null,
+    /** Shown in place of the Appointment card when [homeCard] picks it. */
+    val morning: Morning? = null,
 )
 
 private val Cream = Color(0xFFF3EEE4)
@@ -104,6 +137,7 @@ fun HomeScreen(
     onTimeline: () -> Unit,
     onInvite: () -> Unit,
     onFillEmergency: () -> Unit,
+    onMarkMorning: () -> Unit,
 ) {
     // design: padding:4px 20px; gap:22px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -122,7 +156,9 @@ fun HomeScreen(
         }
         // ponytail: search bar, tasks row and weekly digest row hidden until those features ship.
 
-        s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) } ?: Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // ponytail: evening and after-visit cards fall back to these until their tickets land.
+        if (s.morning != null) MorningCard(s.morning, onMarkMorning)
+        else s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) } ?: Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             EmptyStep(1, stringResource(Res.string.add_appt), stringResource(Res.string.add_appt_sub), part = false, onAddAppointment)
             EmptyStep(2, stringResource(Res.string.add_meds), stringResource(Res.string.add_meds_sub), part = false, onRecords)
             s.invites?.let { (joined, total) ->
@@ -225,6 +261,28 @@ private fun AppointmentCard(a: NextAppointment, onOpen: () -> Unit, onWriteNote:
             CardButton(stringResource(Res.string.questions_count, a.questionCount), CreamBtn, Cream, onOpen, Modifier.weight(1f))
             CardButton(stringResource(if (a.noteReady) Res.string.open_summary else Res.string.write_note), Cream, Kf.Green, onWriteNote, Modifier.weight(1f))
         }
+    }
+}
+
+@Composable
+private fun MorningCard(m: Morning, onMark: () -> Unit) {
+    val all = m.doses.all { it.given }
+    Column(
+        Modifier.fillMaxWidth().background(Kf.Green, RoundedCornerShape(22.dp)).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(stringResource(Res.string.morning_eyebrow, m.at), fontSize = 13.sp, color = Cream.copy(alpha = .85f))
+        Text(stringResource(Res.string.morning_title, m.recipient), style = serifStyle(26f, 1.15f).copy(color = Cream))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            m.doses.forEach { d ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(d.name, fontSize = 15.sp, color = Cream, modifier = Modifier.weight(1f))
+                    Text(stringResource(if (d.given) Res.string.given else Res.string.dose_due), fontSize = 13.sp, color = Cream.copy(alpha = .85f))
+                }
+            }
+        }
+        CardButton(stringResource(if (all) Res.string.all_given else Res.string.mark_all_given), Cream, Kf.Green, { if (!all) onMark() }, Modifier.fillMaxWidth())
+        m.nextVisit?.let { Text(it, fontSize = 13.sp, color = Cream.copy(alpha = .85f)) }
     }
 }
 

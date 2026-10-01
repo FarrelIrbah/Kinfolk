@@ -76,11 +76,17 @@ data class DoseLog(
 )
 
 /** Marks [med] given on [day] by the signed-in Member; marking it again changes nothing. */
-suspend fun SupabaseClient.giveDose(med: Medication, day: LocalDate) {
-    from("dose_logs").upsert(buildJsonObject {
-        put("circle_id", med.circleId); put("medication_id", med.id); put("day", day.toString())
+suspend fun SupabaseClient.giveDose(med: Medication, day: LocalDate) = giveDoses(listOf(med), day)
+
+/** [giveDose] for all of [meds] in one write, so "Tandai semua diberikan" saves all or none. */
+suspend fun SupabaseClient.giveDoses(meds: List<Medication>, day: LocalDate) {
+    from("dose_logs").upsert(meds.map { med ->
+        buildJsonObject { put("circle_id", med.circleId); put("medication_id", med.id); put("day", day.toString()) }
     }) { onConflict = "medication_id,day"; ignoreDuplicates = true }
 }
+
+/** The morning doses (before 12.00) of these current Medications, for Home's morning card. */
+fun List<Medication>.morning() = filter { it.timeOfDay < LocalTime(12, 0) }
 
 /** Untoggles "Diberikan": the Dose Log and its Timeline entry go. */
 suspend fun SupabaseClient.takeBackDose(med: Medication, day: LocalDate) {

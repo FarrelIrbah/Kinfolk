@@ -24,4 +24,9 @@ class DoseProgressTest {
         assertEquals(DoseProgress(4, 4, meds[0]), meds.progress(meds.map { given(it.id) }))
         assertEquals(DoseProgress(0, 0, null), emptyList<Medication>().progress(emptyList()))
     }
+
+    @Test
+    fun `morning doses are the ones before noon`() {
+        assertEquals(meds.take(3), (meds + med("Noon", 12)).morning())
+    }
 }

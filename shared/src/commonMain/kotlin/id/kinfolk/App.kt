@@ -85,7 +85,8 @@ import id.kinfolk.data.myInvitations
 import id.kinfolk.data.roleIn
 import id.kinfolk.data.DoseLog
 import id.kinfolk.data.Medication
-import id.kinfolk.data.giveDose
+import id.kinfolk.data.giveDoses
+import id.kinfolk.data.morning
 import id.kinfolk.data.progress
 import id.kinfolk.data.takeBackDose
 import id.kinfolk.data.MedicationDraft
@@ -173,7 +174,11 @@ import id.kinfolk.data.removeMember
 import id.kinfolk.ui.contacts.ContactFormScreen
 import id.kinfolk.ui.contacts.ContactsScreen
 import id.kinfolk.ui.home.FeedItem
+import id.kinfolk.ui.home.HomeCard
 import id.kinfolk.ui.home.HomeScreen
+import id.kinfolk.ui.home.Morning
+import id.kinfolk.ui.home.MorningDose
+import id.kinfolk.ui.home.homeCard
 import id.kinfolk.ui.home.NextAppointment
 import id.kinfolk.ui.home.Person
 import id.kinfolk.ui.onboarding.CodeScreen
@@ -201,6 +206,10 @@ import kinfolk.shared.generated.resources.tab_rota
 import kinfolk.shared.generated.resources.tab_timeline
 import kinfolk.shared.generated.resources.no_meds
 import kinfolk.shared.generated.resources.dose_marked
+import kinfolk.shared.generated.resources.morning_marked
+import kinfolk.shared.generated.resources.next_visit
+import kinfolk.shared.generated.resources.picks_up
+import kinfolk.shared.generated.resources.picks_up_no_time
 import kinfolk.shared.generated.resources.never
 import kinfolk.shared.generated.resources.qr_revoked
 import kinfolk.shared.generated.resources.you
@@ -236,6 +245,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.atStartOfDayIn
@@ -284,6 +294,7 @@ fun App() {
         var editingMed by remember { mutableStateOf<Medication?>(null) }
         var doses by remember { mutableStateOf(emptyList<DoseLog>()) } // of the day they were read
         val doseWrites = remember { Mutex() }
+        var markedMorning by remember { mutableStateOf<LocalDate?>(null) } // keeps "Semua diberikan ✓" up that day
         var contacts by remember { mutableStateOf(emptyList<CareContact>()) }
         var editingContact by remember { mutableStateOf<CareContact?>(null) }
         var invitation by remember { mutableStateOf<InvitationToMe?>(null) }
@@ -370,6 +381,24 @@ fun App() {
         val week = weekOf(today)
         val given = doses.filter { it.day == today }.map { it.medicationId }.toSet()
         val progress = meds.current().progress(doses.filter { it.day == today })
+        val noConnection = stringResource(Res.string.no_connection)
+        // Shown at once like the prototype; only these doses are taken back if they can't be saved.
+        fun markDoses(ms: List<Medication>, give: Boolean) {
+            val ids = ms.map { it.id }.toSet()
+            fun flip(on: Boolean) {
+                doses = doses.filterNot { it.medicationId in ids && it.day == today } +
+                    if (on) ms.map { DoseLog(it.id, today, me().orEmpty(), Clock.System.now()) } else emptyList()
+            }
+            flip(give)
+            // Not retried: offline, the tap is undone rather than sent later. One write at a time, in
+            // tap order, so a quick "Tandai" then undo lands in that order.
+            scope.launch {
+                doseWrites.withLock {
+                    val ok = attempt { if (give) supabase.giveDoses(ms, today) else supabase.takeBackDose(ms.single(), today) } != null
+                    if (ok) retrying { timeline = supabase.timeline(circle!!.id) } else { flip(!give); toast = noConnection }
+                }
+            }
+        }
         // The rota and "Minggu ini" show everyone by their own name, yourself first in Sri's green (like `circle`).
         fun rotaPeople() = circleMembers().associate { it.id to Person(it.name, it.color) }
         suspend fun loadRota() {
@@ -532,40 +561,66 @@ fun App() {
                         }
                         Screen.Home -> when (t) {
                             // ponytail: header, Appointment, Medications and Terbaru are real; the rest is prototype sample data until its tickets land.
-                            Tab.Home -> HomeScreen(
-                                s = SampleData.home.copy(
-                                    todayLabel = longDate(now.toLocalDateTime(tz).date),
-                                    circleName = circle?.name.orEmpty(), memberCount = circle?.memberCount ?: 0,
-                                    next = next?.let { a ->
-                                        NextAppointment(
-                                            whenLabel(a.startsAt, now, tz), countdown(a.startsAt, now, tz), a.title,
-                                            a.withWhom(),
-                                            person(a.driverId), a.departsAt?.let { hm(it.toLocalDateTime(tz).time) },
-                                            questionCount = questions.size, noteReady = note != null,
-                                        )
+                            Tab.Home -> {
+                                val morningMeds = meds.current().morning()
+                                val card = homeCard(
+                                    now.toLocalDateTime(tz), next?.startsAt?.toLocalDateTime(tz)?.date, note != null,
+                                    holdsTonight = turns.any { it.holder == me() },
+                                    morningDue = morningMeds.any { it.id !in given } || (morningMeds.isNotEmpty() && markedMorning == today),
+                                )
+                                val morningMarked = stringResource(Res.string.morning_marked, members.firstOrNull { it.userId == me() }?.name.orEmpty())
+                                HomeScreen(
+                                    s = SampleData.home.copy(
+                                        todayLabel = longDate(now.toLocalDateTime(tz).date),
+                                        circleName = circle?.name.orEmpty(), memberCount = circle?.memberCount ?: 0,
+                                        next = next?.let { a ->
+                                            NextAppointment(
+                                                whenLabel(a.startsAt, now, tz), countdown(a.startsAt, now, tz), a.title,
+                                                a.withWhom(),
+                                                person(a.driverId), a.departsAt?.let { hm(it.toLocalDateTime(tz).time) },
+                                                questionCount = questions.size, noteReady = note != null,
+                                            )
+                                        },
+                                        invites = sent?.let { all -> all.count { !it.pending } to all.size },
+                                        medsGiven = progress.given, medsToday = progress.total,
+                                        nextMed = progress.next
+                                            ?.let { m -> listOf(m.name, m.schedule).filter { it.isNotBlank() }.joinToString(" · ") }
+                                            ?: stringResource(Res.string.no_meds),
+                                        week = turns.firstOrNull()?.let { t -> rotaPeople()[t.holder] }?.let { p ->
+                                            (0..6).map { i -> (week + DatePeriod(days = i)).let { d -> DutyDay(shortDay(d), d.day, p, d == today) } }
+                                        }.orEmpty(),
+                                        dutyLegend = turns.firstOrNull()?.let { t ->
+                                            if (t.holder == me()) stringResource(Res.string.legend_you, t.name, hm(t.timeOfDay))
+                                            else stringResource(Res.string.legend_other, t.name, hm(t.timeOfDay), rotaPeople()[t.holder]?.name.orEmpty())
+                                        }.orEmpty(),
+                                        feed = timeline.take(3).map { FeedItem(author(it), text(it, tz), ago(it.at, now, tz)) },
+                                        morning = if (card != HomeCard.Morning) null else Morning(
+                                            hm(morningMeds.first().timeOfDay), recipient?.name.orEmpty(),
+                                            morningMeds.map { MorningDose("${it.name} ${it.dose}".trim(), it.id in given) },
+                                            // Approved in #22: "Kontrol neurologi, Besok · 09.00 · Budi menjemput 08.15".
+                                            next?.let { a ->
+                                                val pickup = person(a.driverId)?.let { p ->
+                                                    a.departsAt?.let { stringResource(Res.string.picks_up, p.name, hm(it.toLocalDateTime(tz).time)) }
+                                                        ?: stringResource(Res.string.picks_up_no_time, p.name)
+                                                }
+                                                listOfNotNull(stringResource(Res.string.next_visit, a.title, whenLabel(a.startsAt, now, tz)), pickup).joinToString(" · ")
+                                            },
+                                        ),
+                                    ),
+                                    onSos = { openEmergency() }, onOpenAppointment = { opened = null; go(Screen.Appt) }, onAddAppointment = { openForm(null) },
+                                    // Only the Attendee writes the Visit Note; the others add Questions until it's ready.
+                                    onWriteNote = { opened = null; go(if (note != null || next?.attendeeId == me()) Screen.VisitNote else Screen.Appt) },
+                                    onRota = { pick(Tab.Rota) }, onRecords = { pick(Tab.Records) },
+                                    onTimeline = { pick(Tab.Timeline) },
+                                    onInvite = { go(Screen.Onb2) },
+                                    onFillEmergency = { go(Screen.EmergencyForm) },
+                                    onMarkMorning = {
+                                        markDoses(morningMeds.filter { it.id !in given }, give = true)
+                                        markedMorning = today
+                                        toast = morningMarked
                                     },
-                                    invites = sent?.let { all -> all.count { !it.pending } to all.size },
-                                    medsGiven = progress.given, medsToday = progress.total,
-                                    nextMed = progress.next
-                                        ?.let { m -> listOf(m.name, m.schedule).filter { it.isNotBlank() }.joinToString(" · ") }
-                                        ?: stringResource(Res.string.no_meds),
-                                    week = turns.firstOrNull()?.let { t -> rotaPeople()[t.holder] }?.let { p ->
-                                        (0..6).map { i -> (week + DatePeriod(days = i)).let { d -> DutyDay(shortDay(d), d.day, p, d == today) } }
-                                    }.orEmpty(),
-                                    dutyLegend = turns.firstOrNull()?.let { t ->
-                                        if (t.holder == me()) stringResource(Res.string.legend_you, t.name, hm(t.timeOfDay))
-                                        else stringResource(Res.string.legend_other, t.name, hm(t.timeOfDay), rotaPeople()[t.holder]?.name.orEmpty())
-                                    }.orEmpty(),
-                                    feed = timeline.take(3).map { FeedItem(author(it), text(it, tz), ago(it.at, now, tz)) },
-                                ),
-                                onSos = { openEmergency() }, onOpenAppointment = { opened = null; go(Screen.Appt) }, onAddAppointment = { openForm(null) },
-                                // Only the Attendee writes the Visit Note; the others add Questions until it's ready.
-                                onWriteNote = { opened = null; go(if (note != null || next?.attendeeId == me()) Screen.VisitNote else Screen.Appt) },
-                                onRota = { pick(Tab.Rota) }, onRecords = { pick(Tab.Records) },
-                                onTimeline = { pick(Tab.Timeline) },
-                                onInvite = { go(Screen.Onb2) },
-                                onFillEmergency = { go(Screen.EmergencyForm) },
-                            )
+                                )
+                            }
                             Tab.Rota -> {
                                 val taken = turns.map { stringResource(Res.string.swap_taken, it.inSentence()) }
                                 val declined = turns.map { stringResource(Res.string.swap_declined, rotaPeople()[it.holder]?.name.orEmpty()) }
@@ -592,26 +647,12 @@ fun App() {
                                 val marked = meds.associate { m ->
                                     m.id to stringResource(Res.string.dose_marked, m.name, members.firstOrNull { it.userId == me() }?.name.orEmpty())
                                 }
-                                val noConnection = stringResource(Res.string.no_connection)
                                 RecordsScreen(
                                     meds, given, today, { id -> rotaPeople()[id]?.name },
                                     onToggle = { m ->
-                                        // Shown at once like the prototype; only this tap is taken back if it can't be saved.
                                         val on = m.id in given
-                                        fun flip(give: Boolean) {
-                                            doses = doses.filterNot { it.medicationId == m.id && it.day == today } +
-                                                listOfNotNull(DoseLog(m.id, today, me().orEmpty(), Clock.System.now()).takeIf { give })
-                                        }
-                                        flip(!on)
+                                        markDoses(listOf(m), !on)
                                         if (!on) toast = marked[m.id]
-                                        // Not retried: offline, the tap is undone rather than sent later. One write at a time, in
-                                        // tap order, so a quick "Tandai" then undo lands in that order.
-                                        scope.launch {
-                                            doseWrites.withLock {
-                                                val ok = attempt { if (on) supabase.takeBackDose(m, today) else supabase.giveDose(m, today) } != null
-                                                if (ok) retrying { timeline = supabase.timeline(circle!!.id) } else { flip(on); toast = noConnection }
-                                            }
-                                        }
                                     },
                                 ) { editingMed = it; go(Screen.MedForm) }
                             }

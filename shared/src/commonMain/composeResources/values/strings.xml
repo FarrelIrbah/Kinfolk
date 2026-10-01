@@ -68,6 +68,15 @@
     <string name="mark_given">Tandai</string>
     <string name="given">Diberikan ✓</string>
     <string name="dose_marked">%1$s ditandai oleh %2$s · terlihat oleh lingkaran</string>
+    <string name="morning_eyebrow">%1$s · obat pagi</string>
+    <string name="morning_title">Obat pagi %1$s</string>
+    <string name="dose_due">Belum</string>
+    <string name="mark_all_given">Tandai semua diberikan</string>
+    <string name="all_given">Semua diberikan ✓</string>
+    <string name="morning_marked">Obat pagi ditandai oleh %1$s · terlihat oleh lingkaran</string>
+    <string name="next_visit">%1$s, %2$s</string>
+    <string name="picks_up">%1$s menjemput %2$s</string>
+    <string name="picks_up_no_time">%1$s menjemput</string>
     <string name="med_note">Catatan</string>
     <string name="blood_thinner">Pengencer darah</string>
     <string name="refill">Isi ulang</string>
