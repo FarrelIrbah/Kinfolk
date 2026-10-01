@@ -88,6 +88,7 @@ import id.kinfolk.data.DoseLog
 import id.kinfolk.data.CheckIn
 import id.kinfolk.data.checkIn
 import id.kinfolk.data.recipientPhone
+import id.kinfolk.data.recentCheckIns
 import id.kinfolk.data.saveCheckIn
 import id.kinfolk.ui.checkin.CheckInScreen
 import id.kinfolk.ui.checkin.names
@@ -310,6 +311,7 @@ fun App() {
         val doseWrites = remember { Mutex() }
         var markedMorning by remember { mutableStateOf<LocalDate?>(null) } // keeps "Semua diberikan ✓" up that day
         var checkIn by remember { mutableStateOf<CheckIn?>(null) } // of the day it was read
+        var checkIns by remember { mutableStateOf(emptyList<CheckIn>()) } // Kondisi, the last 30
         var checkingIn by rememberSaveable { mutableStateOf<String?>(null) } // "2026-10-01 19:00": `checkin`'s day and Duty time, fixed when opened
         var contacts by remember { mutableStateOf(emptyList<CareContact>()) }
         var editingContact by remember { mutableStateOf<CareContact?>(null) }
@@ -457,6 +459,7 @@ fun App() {
             sent = retrying { if (supabase.roleIn(k.circle.id) == Role.admin) supabase.invitations(k.circle.id) else null }
             hidden = retrying { supabase.hidden(k.circle.id) }
             changes = retrying { supabase.accessChanges(k.circle.id) }
+            checkIns = k.recipient?.let { r -> retrying { supabase.recentCheckIns(r.id) } }.orEmpty()
             loadRota()
         }
         suspend fun land(how: Nav) {
@@ -682,7 +685,7 @@ fun App() {
                                     m.id to stringResource(Res.string.dose_marked, m.name, members.firstOrNull { it.userId == me() }?.name.orEmpty())
                                 }
                                 RecordsScreen(
-                                    meds, given, today, { id -> rotaPeople()[id]?.name },
+                                    meds, given, checkIns, today, { id -> rotaPeople()[id]?.name },
                                     onToggle = { m ->
                                         val on = m.id in given
                                         markDoses(listOf(m), !on)
@@ -776,6 +779,7 @@ fun App() {
                                 reset(Screen.Home, Nav.Back)
                                 scope.launch {
                                     checkIn = retrying { supabase.checkIn(r.id, day) }
+                                    checkIns = retrying { supabase.recentCheckIns(r.id) }
                                     timeline = retrying { supabase.timeline(r.circleId) }
                                 }
                             }

@@ -1,7 +1,9 @@
 package id.kinfolk.data
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.minus
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -54,6 +56,18 @@ class CheckInTest {
             "Telepon malam: tensi 128/80, sudah makan malam, berjalan, suasana hati baik. Agak lelah",
             budi.timeline(circle).single { it.kind == TimelineEntry.Kind.check_in }.text,
         )
+    }
+
+    @Test
+    fun `Kondisi reads the last 30 Check-ins, oldest first`() = runBlocking<Unit> {
+        val sri = signedInNewcomer()
+        val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        val tukiman = sri.careRecipients(circle).single()
+        val budi = signedInSibling(sri, circle)
+        val days = (0 until 32).map { today.minus(DatePeriod(days = it)) }
+        days.forEach { sri.saveCheckIn(tukiman, it, CheckInDraft(128, 80, Ate.yes, walked = true, Mood.good, "")) }
+
+        assertEquals(days.take(30).reversed(), budi.recentCheckIns(tukiman.id).map { it.day })
     }
 
     @Test

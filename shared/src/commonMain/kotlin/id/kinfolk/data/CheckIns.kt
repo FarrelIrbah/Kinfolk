@@ -2,12 +2,14 @@ package id.kinfolk.data
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.math.roundToInt
 import kotlin.time.Instant
 
 // Check-in API (see CONTEXT.md): v3's `checkin`, one per Care Recipient per day, readable by every Member.
@@ -56,6 +58,24 @@ suspend fun SupabaseClient.saveCheckIn(recipient: CareRecipient, day: LocalDate,
 
 suspend fun SupabaseClient.checkIn(recipientId: String, day: LocalDate): CheckIn? =
     from("check_ins").select { filter { eq("recipient_id", recipientId); eq("day", day.toString()) } }.decodeSingleOrNull()
+
+/** Up to [recipientId]'s last 30 Check-ins, oldest first: Kondisi's chart and grids. */
+suspend fun SupabaseClient.recentCheckIns(recipientId: String): List<CheckIn> =
+    from("check_ins").select {
+        filter { eq("recipient_id", recipientId) }
+        order("day", Order.DESCENDING)
+        limit(30)
+    }.decodeList<CheckIn>().last30()
+
+fun List<CheckIn>.last30() = sortedBy { it.day }.takeLast(30)
+
+/** Kondisi's numbers: v3's averages ("Rata-rata 30 hari 131/83 · 2 kali 140 ke atas") and "N dari 30 baik" counts. */
+data class Trend(val sys: Int, val dia: Int, val high: Int, val ate: Int, val walked: Int, val good: Int)
+
+fun List<CheckIn>.trend() = Trend(
+    map { it.sys }.average().roundToInt(), map { it.dia }.average().roundToInt(), count { it.sys >= 140 },
+    count { it.ate == Ate.yes }, count { it.walked }, count { it.mood == Mood.good },
+)
 
 /** The Care Recipient's number, "+62…", while they are a Member; null otherwise. */
 suspend fun SupabaseClient.recipientPhone(recipientId: String): String? =

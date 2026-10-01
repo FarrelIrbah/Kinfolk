@@ -314,4 +314,14 @@
     <string name="ci_no_bp">Isi tekanan darah.</string>
     <string name="ci_saved">Tersimpan di linimasa dan tren.</string>
     <string name="ci_saved_high">Tersimpan. Tensi 140 ke atas; %1$s diberi tahu via WhatsApp.</string>
+    <!-- records › Kondisi -->
+    <string name="trends_note">Dari cek malam, 30 hari terakhir.</string>
+    <string name="trends_empty">Belum ada cek malam. Tren muncul setelah cek malam pertama dicatat.</string>
+    <string name="sys">Sistolik</string>
+    <string name="dia">Diastolik</string>
+    <string name="line140">Batas 140</string>
+    <string name="bp_avg">Rata-rata 30 hari %1$d/%2$d · %3$d kali 140 ke atas</string>
+    <string name="habit_ate">Makan malam</string>
+    <string name="habit_walked">Berjalan</string>
+    <string name="good_of_30">%1$d dari 30 baik</string>
 </resources>

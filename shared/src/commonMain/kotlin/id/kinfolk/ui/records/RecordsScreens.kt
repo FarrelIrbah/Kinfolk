@@ -1,6 +1,31 @@
 package id.kinfolk.ui.records
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import id.kinfolk.data.Ate
+import id.kinfolk.data.CheckIn
+import id.kinfolk.data.Mood
+import id.kinfolk.data.trend
+import id.kinfolk.ui.appointment.dayMonth
+import id.kinfolk.ui.timeline.EmptyBox
+import kinfolk.shared.generated.resources.bp_avg
+import kinfolk.shared.generated.resources.bp_label
+import kinfolk.shared.generated.resources.ci_mood
+import kinfolk.shared.generated.resources.dia
+import kinfolk.shared.generated.resources.good_of_30
+import kinfolk.shared.generated.resources.habit_ate
+import kinfolk.shared.generated.resources.habit_walked
+import kinfolk.shared.generated.resources.line140
+import kinfolk.shared.generated.resources.sys
+import kinfolk.shared.generated.resources.today
+import kinfolk.shared.generated.resources.trends_empty
+import kinfolk.shared.generated.resources.trends_note
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -109,12 +134,14 @@ private enum class RecTab(val label: StringResource) {
 /**
  * `records` (docs/screen-map.md): v3's four tabs; Obat marks today's doses ("Tandai" / "Diberikan ✓", [given] =
  * Medication ids). Approved deviation (#11): "+ Tambah obat", a "Tidak diminum lagi" group, tap a card to edit.
- * ponytail: Dokumen, Biaya and Kondisi stay empty until their tickets.
+ * Kondisi (#25) charts [checkIns], the last 30 oldest first.
+ * ponytail: Dokumen and Biaya stay empty until their tickets.
  */
 @Composable
 fun RecordsScreen(
     meds: List<Medication>,
     given: Set<String>,
+    checkIns: List<CheckIn>,
     today: LocalDate,
     nameOf: (String) -> String?,
     onToggle: (Medication) -> Unit,
@@ -147,8 +174,98 @@ fun RecordsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { stopped.forEach { MedCard(it, null, onOpen) {} } }
             }
         }
+        if (tab == RecTab.Health) Trends(checkIns)
     }
 }
+
+private val Tan = Color(0xFFC9A77C)
+private val Rust = Color(0xFFC4471F)
+
+/**
+ * v3's Kondisi: blood pressure on a 60–160 scale with the dashed 140 line, and a 30-column grid per habit filled
+ * from the right. Owner-approved in #25: the first Check-in's day ("31 Agu") under the grid, the empty box before
+ * any. The "Bawa ke dokter" button waits for Export.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Trends(checkIns: List<CheckIn>) {
+    // design: gap 12
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(Res.string.trends_note), fontSize = 13.sp, color = Kf.Muted)
+        if (checkIns.isEmpty()) return@Column EmptyBox(stringResource(Res.string.trends_empty))
+        val t = checkIns.trend()
+        val last = checkIns.last()
+        // design: #FBF8F2, r18, p16, gap 12
+        Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(Res.string.bp_label), Modifier.alignByBaseline(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text("${last.sys}/${last.dia}", Modifier.alignByBaseline(), style = serifStyle(24f))
+            }
+            BpChart(checkIns)
+            // design: wrap, gap 12, 12px #44463E; swatches 12x2, gap 6
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Legend(stringResource(Res.string.sys)) { Box(Modifier.width(12.dp).height(2.dp).background(Kf.Green)) }
+                Legend(stringResource(Res.string.dia)) { Box(Modifier.width(12.dp).height(2.dp).background(Tan)) }
+                Legend(stringResource(Res.string.line140)) {
+                    Canvas(Modifier.width(12.dp).height(1.dp)) {
+                        val dash = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
+                        drawLine(Kf.Sos, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx(), pathEffect = dash)
+                    }
+                }
+            }
+            Text(stringResource(Res.string.bp_avg, t.sys, t.dia, t.high), fontSize = 13.sp, color = Kf.Ink2)
+        }
+        // design: #FBF8F2, r18, p16, gap 14
+        Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Habit(stringResource(Res.string.habit_ate), t.ate, checkIns) { when (it.ate) { Ate.yes -> Kf.Green; Ate.some -> Tan; Ate.no -> Rust } }
+            Habit(stringResource(Res.string.habit_walked), t.walked, checkIns) { if (it.walked) Kf.Green else Kf.Sand }
+            Habit(stringResource(Res.string.ci_mood), t.good, checkIns) { when (it.mood) { Mood.good -> Kf.Green; Mood.okay -> Tan; Mood.low -> Rust } }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(dayMonth(checkIns.first().day), fontSize = 11.sp, color = Kf.Muted)
+                Text(stringResource(Res.string.today), fontSize = 11.sp, color = Kf.Muted)
+            }
+        }
+    }
+}
+
+/** v3's svg: viewBox 300x120 stretched, y = 120 - (v - 60) / 100 * 120, so 140 sits at 24. */
+@Composable
+private fun BpChart(checkIns: List<CheckIn>) = Canvas(Modifier.fillMaxWidth().height(120.dp)) {
+    val y = { v: Int -> size.height - (v - 60) / 100f * size.height }
+    // One Check-in has no line yet: a dot on today's side.
+    val x = { i: Int -> if (checkIns.size == 1) size.width else i * size.width / (checkIns.size - 1) }
+    drawLine(
+        Kf.Sos.copy(alpha = .6f), Offset(0f, y(140)), Offset(size.width, y(140)), 1.dp.toPx(),
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
+    )
+    listOf<Pair<Color, (CheckIn) -> Int>>(Kf.Green to { it.sys }, Tan to { it.dia }).forEach { (color, v) ->
+        if (checkIns.size == 1) return@forEach drawCircle(color, 2.dp.toPx(), Offset(x(0), y(v(checkIns[0]))))
+        val path = Path().apply { checkIns.forEachIndexed { i, c -> if (i == 0) moveTo(x(i), y(v(c))) else lineTo(x(i), y(v(c))) } }
+        drawPath(path, color, style = Stroke(2.dp.toPx(), join = StrokeJoin.Round))
+    }
+}
+
+@Composable
+private fun Legend(label: String, swatch: @Composable () -> Unit) =
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        swatch()
+        Text(label, fontSize = 12.sp, color = Kf.Ink2)
+    }
+
+/** "Makan malam · 27 dari 30 baik" over 30 cells (h14, r3, gap 2); before 30 Check-ins the left ones stay #E4DDD0. */
+@Composable
+private fun Habit(label: String, good: Int, checkIns: List<CheckIn>, color: (CheckIn) -> Color) =
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(Res.string.good_of_30, good), fontSize = 14.sp, color = Kf.Muted)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            (List(30 - checkIns.size) { Kf.Sand } + checkIns.map(color)).forEach {
+                Box(Modifier.weight(1f).height(14.dp).background(it, RoundedCornerShape(3.dp)))
+            }
+        }
+    }
 
 @Composable
 private fun MedCard(m: Medication, note: Pair<String, Color>?, onOpen: (Medication) -> Unit, action: @Composable () -> Unit) {

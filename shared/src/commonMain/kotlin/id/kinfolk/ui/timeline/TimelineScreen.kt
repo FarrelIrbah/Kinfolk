@@ -100,7 +100,7 @@ fun TimelineScreen(rows: List<TimelineRow>, filter: EntryType?, onFilter: (Entry
             Text(stringResource(Res.string.same_history), fontSize = 13.sp, color = Kf.Muted)
             Text(stringResource(Res.string.tab_timeline), style = serifStyle(30f, 1.1f))
         }
-        if (rows.isEmpty()) EmptyTimeline()
+        if (rows.isEmpty()) EmptyBox(stringResource(Res.string.timeline_empty))
         // design: display:flex; gap:6px; overflow-x:auto
         else Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Filters.forEach { f ->
@@ -139,9 +139,9 @@ fun TimelineScreen(rows: List<TimelineRow>, filter: EntryType?, onFilter: (Entry
 
 /** The `empty` screen's box: 1.5px dashed rgba(34,38,31,.2), radius 18, padding 20, 14px/1.5 muted, centered. */
 @Composable
-fun EmptyTimeline() {
+fun EmptyBox(text: String) {
     Text(
-        stringResource(Res.string.timeline_empty),
+        text,
         fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Kf.Muted, textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth().dashed(EmptyLine, 18.dp).padding(20.dp),
     )
