@@ -179,9 +179,11 @@ import id.kinfolk.ui.onboarding.PhoneScreen
 import id.kinfolk.ui.onboarding.e164
 import id.kinfolk.ui.records.MedFormScreen
 import id.kinfolk.ui.records.RecordsScreen
+import id.kinfolk.ui.timeline.EntryType
 import id.kinfolk.ui.timeline.TimelineRow
 import id.kinfolk.ui.timeline.TimelineScreen
 import id.kinfolk.ui.timeline.text
+import id.kinfolk.ui.timeline.type
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.exceptions.RestException
 import kinfolk.shared.generated.resources.Res
@@ -264,6 +266,7 @@ fun App() {
         var note by remember { mutableStateOf<VisitNote?>(null) } // of next
         var opened by remember { mutableStateOf<Visit?>(null) } // from the Timeline; `appt` and `summary` show next while null
         var timeline by remember { mutableStateOf(emptyList<TimelineEntry>()) }
+        var timelineFilter by remember { mutableStateOf<EntryType?>(null) } // kept across tabs, like the prototype
         var opening by remember { mutableStateOf<Job?>(null) }
         var editing by remember { mutableStateOf<Appointment?>(null) }
         var providers by remember { mutableStateOf(emptyList<Provider>()) }
@@ -564,7 +567,10 @@ fun App() {
                                     onEdit = { editingDuty = it; go(Screen.DutyForm) },
                                 )
                             }
-                            Tab.Timeline -> TimelineScreen(timeline.map { e -> TimelineRow(author(e), ago(e.at, now, tz), text(e, tz)) { openFromTimeline(e) } })
+                            Tab.Timeline -> TimelineScreen(
+                                timeline.map { e -> TimelineRow(author(e), type(e.kind), ago(e.at, now, tz), text(e, tz)) { openFromTimeline(e) } },
+                                timelineFilter,
+                            ) { timelineFilter = it }
                             Tab.Records -> RecordsScreen(meds) { editingMed = it; go(Screen.MedForm) }
                             Tab.Circle -> CircleScreen(
                                 circle?.name.orEmpty(), recipient?.name.orEmpty(), circleMembers(), onSos = { openEmergency() },

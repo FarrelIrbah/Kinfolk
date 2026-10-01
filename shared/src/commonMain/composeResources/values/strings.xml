@@ -195,6 +195,11 @@
     <!-- timeline -->
     <string name="same_history">Semua melihat riwayat yang sama</string>
     <string name="kind_visit">Kunjungan</string>
+    <string name="kind_medicine">Obat</string>
+    <string name="kind_checkin">Cek</string>
+    <string name="kind_document">Dokumen</string>
+    <string name="kind_rota">Giliran</string>
+    <string name="filter_all">Semua</string>
     <string name="timeline_empty">Linimasa masih kosong. Akan terisi saat keluarga mencatat kunjungan, obat, dan cek malam.</string>
     <!-- rotation (#10) -->
     <string name="who_this_week">Siapa mengerjakan apa</string>

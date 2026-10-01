@@ -216,6 +216,34 @@ class WhatsAppTest {
     }
 
     @Test
+    fun `a Driver's YA is a Rota entry on the Timeline for everyone who sees the Appointment`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = joins(sri, circle, "Budi")
+        val dewi = joins(sri, circle, "Dewi")
+        val tukiman = sri.client.careRecipients(circle).single().id
+        val provider = sri.client.addProvider(circle, "Dr. Anand Rao").id
+        val startsAt = now + 3.days
+        val draft = AppointmentDraft(circle, tukiman, provider, "Kontrol neurologi", null, startsAt, startsAt - 45.minutes, driverId = budi.client.me())
+        val appt = sri.client.scheduleAppointment(draft).id
+        deliver()
+        reply(budi, "YA", to = budi.last("kinfolk_drive_ask"))
+
+        val departs = (startsAt - 45.minutes).toLocalDateTime(wib).let { "%02d.%02d".format(it.hour, it.minute) }
+        val entry = sri.client.timeline(circle).first()
+        assertEquals(TimelineEntry.Kind.drive_confirmed to "Budi", entry.kind to entry.byName)
+        assertEquals("Konfirmasi via WhatsApp: mengantar ke kontrol neurologi jam $departs.", entry.text)
+        assertEquals(appt to budi.client.me(), entry.appointmentId to entry.by)
+        assertEquals(entry, budi.client.timeline(circle).first())
+
+        // Hidden with the Appointment's Data Category, and gone with a cancelled Appointment.
+        sri.client.setHidden(tukiman, dewi.client.me(), DataCategory.appointments, hidden = true)
+        assertTrue(dewi.client.timeline(circle).isEmpty())
+        assertTrue(signedInNewcomer().timeline(circle).isEmpty())
+        sri.client.cancelAppointment(appt)
+        assertTrue(sri.client.timeline(circle).isEmpty())
+    }
+
+    @Test
     fun `assigning yourself asks nothing`() = runBlocking {
         val (sri, circle) = sriWithCircle()
         val tukiman = sri.client.careRecipients(circle).single().id
