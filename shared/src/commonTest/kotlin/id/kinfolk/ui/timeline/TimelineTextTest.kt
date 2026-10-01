@@ -53,6 +53,7 @@ class TimelineTextTest {
         assertEquals(EntryType.Visit, type(Kind.visit_note))
         assertEquals(EntryType.Rota, type(Kind.drive_confirmed))
         assertEquals(EntryType.CheckIn, type(Kind.access_change))
+        assertEquals(EntryType.Medicine, type(Kind.dose_given))
         assertEquals(
             listOf(0xFF2F5D4A, 0xFF9A7A2F, 0xFF3E6E8E, 0xFF6C5A8E, 0xFFB0643A).map { Color(it) },
             EntryType.entries.map { it.color },

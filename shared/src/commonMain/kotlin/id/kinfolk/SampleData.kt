@@ -25,6 +25,7 @@ object SampleData {
         ),
         week = emptyList(),
         dutyLegend = "",
+        medsGiven = 2,
         medsToday = 4,
         nextMed = "Omeprazole · sebelum sarapan",
         feed = emptyList(),

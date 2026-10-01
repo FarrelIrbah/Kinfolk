@@ -3,9 +3,13 @@ package id.kinfolk.data
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlin.time.Instant
 
 // Medication and Care Contact API used by the app and by the seam tests (see CONTEXT.md for the terms).
 
@@ -18,6 +22,11 @@ data class MedicationDraft(
     val schedule: String, // "pagi, sesudah makan"
     @SerialName("time_of_day") val timeOfDay: LocalTime,
     val active: Boolean = true,
+    val note: String = "",
+    @SerialName("blood_thinner") val bloodThinner: Boolean = false,
+    @SerialName("refill_on") val refillOn: LocalDate? = null,
+    /** The Member who refills it. */
+    @SerialName("refill_by") val refillBy: String? = null,
 )
 
 @Serializable
@@ -30,8 +39,12 @@ data class Medication(
     val schedule: String,
     @SerialName("time_of_day") val timeOfDay: LocalTime,
     val active: Boolean,
+    val note: String = "",
+    @SerialName("blood_thinner") val bloodThinner: Boolean = false,
+    @SerialName("refill_on") val refillOn: LocalDate? = null,
+    @SerialName("refill_by") val refillBy: String? = null,
 ) {
-    fun draft() = MedicationDraft(circleId, recipientId, name, dose, schedule, timeOfDay, active)
+    fun draft() = MedicationDraft(circleId, recipientId, name, dose, schedule, timeOfDay, active, note, bloodThinner, refillOn, refillBy)
 }
 
 suspend fun SupabaseClient.addMedication(draft: MedicationDraft): Medication =
@@ -53,8 +66,39 @@ suspend fun SupabaseClient.medications(circleId: String): List<Medication> =
 /** The Medications Tukiman takes now; the ones he stopped don't count. */
 fun List<Medication>.current() = filter { it.active }
 
-/** The first of these (in time order) due at or after [now], else the first one tomorrow. */
-fun List<Medication>.next(now: LocalTime): Medication? = firstOrNull { it.timeOfDay >= now } ?: firstOrNull()
+/** [medicationId] was given on [day] by the Member [givenBy] ("Diberikan"). */
+@Serializable
+data class DoseLog(
+    @SerialName("medication_id") val medicationId: String,
+    val day: LocalDate,
+    @SerialName("given_by") val givenBy: String,
+    val at: Instant,
+)
+
+/** Marks [med] given on [day] by the signed-in Member; marking it again changes nothing. */
+suspend fun SupabaseClient.giveDose(med: Medication, day: LocalDate) {
+    from("dose_logs").upsert(buildJsonObject {
+        put("circle_id", med.circleId); put("medication_id", med.id); put("day", day.toString())
+    }) { onConflict = "medication_id,day"; ignoreDuplicates = true }
+}
+
+/** Untoggles "Diberikan": the Dose Log and its Timeline entry go. */
+suspend fun SupabaseClient.takeBackDose(med: Medication, day: LocalDate) {
+    from("dose_logs").delete { filter { eq("medication_id", med.id); eq("day", day.toString()) } }
+}
+
+/** [circleId]'s Dose Logs on [day], of the Medications the signed-in Member sees. */
+suspend fun SupabaseClient.doseLogs(circleId: String, day: LocalDate): List<DoseLog> =
+    from("dose_logs").select { filter { eq("circle_id", circleId); eq("day", day.toString()) } }.decodeList()
+
+/** Home's ring: [given] of [total] of today's doses, and the [next] one not yet given (else the first tomorrow). */
+data class DoseProgress(val given: Int, val total: Int, val next: Medication?)
+
+/** Of these current Medications (in time order), how today's [logs] stand. */
+fun List<Medication>.progress(logs: List<DoseLog>): DoseProgress {
+    val given = logs.map { it.medicationId }.toSet()
+    return DoseProgress(count { it.id in given }, size, firstOrNull { it.id !in given } ?: firstOrNull())
+}
 
 /** Prototype groups on `contacts`: "Medis", "Rumah & tetangga", "Darurat". */
 @Serializable

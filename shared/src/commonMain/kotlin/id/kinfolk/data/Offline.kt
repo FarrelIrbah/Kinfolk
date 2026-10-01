@@ -1,6 +1,7 @@
 package id.kinfolk.data
 
 import io.github.jan.supabase.SupabaseClient
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -23,11 +24,14 @@ data class Snapshot(
     val emergencyMedications: List<Medication>,
     val contacts: List<CareContact>,
     val card: EmergencyCard?,
+    /** [today]'s Dose Logs: offline the ring still counts them. */
+    val doses: List<DoseLog> = emptyList(),
+    val today: LocalDate? = null,
     val savedAt: Instant = Clock.System.now(),
 )
 
 /** Everything a [Snapshot] holds, as the server lets the signed-in Member read it now; null without a Care Circle. */
-suspend fun SupabaseClient.snapshot(since: Instant): Snapshot? {
+suspend fun SupabaseClient.snapshot(since: Instant, today: LocalDate): Snapshot? {
     val circle = myCareCircle() ?: return null
     val recipient = careRecipients(circle.id).firstOrNull()
     val next = nextAppointment(circle.id, since)
@@ -35,5 +39,6 @@ suspend fun SupabaseClient.snapshot(since: Instant): Snapshot? {
         circle, recipient, next, next?.let { questions(it.id) }.orEmpty(), next?.let { visitNote(it.id) },
         medications(circle.id), members(circle.id), timeline(circle.id),
         recipient?.let { emergencyMedications(it.id) }.orEmpty(), careContacts(circle.id), recipient?.let { emergencyCard(it.id) },
+        doseLogs(circle.id, today), today,
     )
 }

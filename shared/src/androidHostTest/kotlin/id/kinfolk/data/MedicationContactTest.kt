@@ -39,7 +39,7 @@ class MedicationContactTest {
 
         val meds = sri.medications(circle)
         assertEquals(listOf("Omeprazole"), meds.current().map { it.name })
-        assertEquals("Omeprazole", meds.current().next(LocalTime(6, 45))?.name)
+        assertEquals("Omeprazole", meds.current().progress(emptyList()).next?.name)
         assertEquals("150 mg", meds.single { !it.active }.dose)
 
         sri.editMedication(clop.id, clop.draft())

@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,6 +78,8 @@ data class HomeState(
     /** Who holds the first Duty each day of this week; empty hides "Minggu ini". */
     val week: List<DutyDay>,
     val dutyLegend: String,
+    /** Today's doses given, of [medsToday] (#21). */
+    val medsGiven: Int,
     val medsToday: Int,
     val nextMed: String,
     val feed: List<FeedItem>,
@@ -154,10 +157,14 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // ponytail: ring drawn full; dose progress returns with dose logging (docs/screen-map.md).
-            Box(Modifier.size(44.dp).background(Kf.Green, CircleShape), contentAlignment = Alignment.Center) {
+            // design: conic-gradient(#2F5D4A {{ medDeg }}deg, #E4DDD0 0), "2/4" inside
+            val sweep = if (s.medsToday == 0) 0f else 360f * s.medsGiven / s.medsToday
+            Box(
+                Modifier.size(44.dp).background(Kf.Sand, CircleShape).drawBehind { drawArc(Kf.Green, -90f, sweep, useCenter = true) },
+                contentAlignment = Alignment.Center,
+            ) {
                 Box(Modifier.size(34.dp).background(Kf.Card, CircleShape), contentAlignment = Alignment.Center) {
-                    Text(s.medsToday.toString(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (s.medsToday == 0) "0" else "${s.medsGiven}/${s.medsToday}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

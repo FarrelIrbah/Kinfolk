@@ -320,32 +320,36 @@ fun ApptFormScreen(
         }
     }
 
-    if (picking) {
-        val state = rememberDatePickerState(
-            initialSelectedDateMillis = date?.let { LocalDate.parse(it).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds() },
-        )
-        // Picking a day closes the calendar, so it needs no buttons (and no copy the design doesn't have).
-        LaunchedEffect(state.selectedDateMillis) {
-            state.selectedDateMillis?.let {
-                val picked = Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.UTC).date.toString()
-                if (picked != date) { date = picked; picking = false }
-            }
+    if (picking) DayPicker(date?.let(LocalDate::parse), { date = it.toString(); picking = false }) { picking = false }
+}
+
+/** Material calendar in Kinfolk's colours (#6). Picking a day closes it, so it needs no buttons (and no copy the design doesn't have). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DayPicker(day: LocalDate?, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = day?.atStartOfDayIn(TimeZone.UTC)?.toEpochMilliseconds(),
+    )
+    LaunchedEffect(state.selectedDateMillis) {
+        state.selectedDateMillis?.let {
+            val picked = Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.UTC).date
+            if (picked != day) onPick(picked)
         }
-        val colors = DatePickerDefaults.colors(
-            containerColor = Kf.Paper, selectedDayContainerColor = Kf.Green, selectedDayContentColor = Kf.Paper,
-            todayDateBorderColor = Kf.Green, todayContentColor = Kf.Green, dayContentColor = Kf.Ink,
+    }
+    val colors = DatePickerDefaults.colors(
+        containerColor = Kf.Paper, selectedDayContainerColor = Kf.Green, selectedDayContentColor = Kf.Paper,
+        todayDateBorderColor = Kf.Green, todayContentColor = Kf.Green, dayContentColor = Kf.Ink,
+    )
+    val sans = LocalTextStyle.current.fontFamily
+    val type = Typography().run {
+        copy(
+            titleSmall = titleSmall.copy(fontFamily = sans), bodyLarge = bodyLarge.copy(fontFamily = sans),
+            labelLarge = labelLarge.copy(fontFamily = sans), labelMedium = labelMedium.copy(fontFamily = sans),
         )
-        val sans = LocalTextStyle.current.fontFamily
-        val type = Typography().run {
-            copy(
-                titleSmall = titleSmall.copy(fontFamily = sans), bodyLarge = bodyLarge.copy(fontFamily = sans),
-                labelLarge = labelLarge.copy(fontFamily = sans), labelMedium = labelMedium.copy(fontFamily = sans),
-            )
-        }
-        MaterialTheme(typography = type) {
-            DatePickerDialog(onDismissRequest = { picking = false }, confirmButton = {}, colors = colors) {
-                DatePicker(state, title = null, headline = null, showModeToggle = false, colors = colors)
-            }
+    }
+    MaterialTheme(typography = type) {
+        DatePickerDialog(onDismissRequest = onDismiss, confirmButton = {}, colors = colors) {
+            DatePicker(state, title = null, headline = null, showModeToggle = false, colors = colors)
         }
     }
 }
