@@ -6,6 +6,8 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
@@ -34,10 +36,11 @@ data class InvitationToMe(
     val name: String,
     val inviter: String? = null,
     val circle: String,
-    /** The Care Circle's first Duty and who holds it next week, for "Satu hal kecil, jika bisa" (#10). */
+    /** The first open day (a swap asked, not yet answered) of any Duty, for "Satu hal kecil, jika bisa" (#23). */
     @SerialName("duty_id") val dutyId: String? = null,
     val duty: String? = null,
-    @SerialName("duty_holder") val dutyHolder: String? = null,
+    @SerialName("duty_day") val dutyDay: LocalDate? = null,
+    @SerialName("duty_time") val dutyTime: LocalTime? = null,
     /** What they will start without, for "Bapak membagikan kepada Anda" (#9). */
     val hidden: List<DataCategory> = emptyList(),
 )

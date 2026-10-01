@@ -1,7 +1,8 @@
 package id.kinfolk.data
 
 import id.kinfolk.ui.appointment.shortDate
-import id.kinfolk.ui.rota.weekRange
+import id.kinfolk.ui.appointment.dayMonth
+import id.kinfolk.ui.appointment.dayName
 import io.github.jan.supabase.SupabaseClient
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDateTime
@@ -32,7 +33,8 @@ class WhatsAppTest {
 
     private val wib = TimeZone.of("Asia/Jakarta")
     private val now = Clock.System.now()
-    private val week = weekOf(Clock.System.todayIn(wib))
+    private val today = Clock.System.todayIn(wib)
+    private val day = "${dayName(today)} ${dayMonth(today)}" // "Minggu 4 Okt"
     private val sevenPm = LocalTime(19, 0)
 
     /** Someone signed in by phone, so WhatsApp can reach them. */
@@ -96,67 +98,67 @@ class WhatsAppTest {
     fun `a Member asked to swap accepts with the YA button, and the asker is told`() = runBlocking {
         val (sri, circle) = sriWithCircle()
         val budi = joins(sri, circle, "Budi")
-        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), week)
-        sri.client.askSwap(duty, week, budi.client.me())
+        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), today)
+        sri.client.askSwap(duty, today, budi.client.me())
         deliver()
 
         val ask = budi.last("kinfolk_swap_ask")
-        assertEquals(listOf("Sri", "telepon cek malam", "${weekRange(week)}, 19.00"), ask.params)
+        assertEquals(listOf("Sri", "telepon cek malam Tukiman", "$day, 19.00"), ask.params)
         assertTrue("quick_reply" in ask.text)
 
         assertEquals(200, reply(budi, "YA", to = ask))
         deliver()
 
-        assertEquals(budi.client.me(), sri.client.dutyWeek(circle, week).single().holder)
-        assertEquals("Terima kasih, Budi. Anda pegang telepon cek malam minggu ini. Sri sudah diberi tahu.", budi.replies().last())
-        assertEquals(listOf("Budi", "telepon cek malam"), sri.last("kinfolk_swap_yes").params)
+        assertEquals(budi.client.me(), sri.client.dutyWeek(circle, today).single { it.day == today }.holder)
+        assertEquals("Terima kasih, Budi. Anda pegang telepon cek malam hari $day. Sri sudah diberi tahu.", budi.replies().last())
+        assertEquals(listOf("Budi", "telepon cek malam", day), sri.last("kinfolk_swap_yes").params)
     }
 
     @Test
     fun `typing TIDAK declines the swap, and a second answer finds it no longer open`() = runBlocking {
         val (sri, circle) = sriWithCircle()
         val budi = joins(sri, circle, "Budi")
-        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), week)
-        sri.client.askSwap(duty, week, budi.client.me())
+        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), today)
+        sri.client.askSwap(duty, today, budi.client.me())
         deliver()
 
         reply(budi, "tidak")
         deliver()
-        assertEquals(sri.client.me(), sri.client.dutyWeek(circle, week).single().holder)
-        assertNull(sri.client.dutyWeek(circle, week).single().swapTo)
+        assertEquals(sri.client.me(), sri.client.dutyWeek(circle, today).single { it.day == today }.holder)
+        assertNull(sri.client.dutyWeek(circle, today).single { it.day == today }.swapTo)
         assertEquals("Ditolak. Sri akan bertanya ke yang lain.", budi.replies().last())
-        assertEquals(listOf("Budi", "telepon cek malam"), sri.last("kinfolk_swap_no").params)
+        assertEquals(listOf("Budi", "telepon cek malam", day), sri.last("kinfolk_swap_no").params)
 
         reply(budi, "YA")
         assertEquals("Permintaan ini sudah tidak berlaku.", budi.replies().last())
-        assertEquals(sri.client.me(), sri.client.dutyWeek(circle, week).single().holder)
+        assertEquals(sri.client.me(), sri.client.dutyWeek(circle, today).single { it.day == today }.holder)
     }
 
     @Test
     fun `a swap answered in the app can't be answered again on WhatsApp`() = runBlocking {
         val (sri, circle) = sriWithCircle()
         val budi = joins(sri, circle, "Budi")
-        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), week)
-        val swap = sri.client.askSwap(duty, week, budi.client.me())
+        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), today)
+        val swap = sri.client.askSwap(duty, today, budi.client.me())
         deliver()
         budi.client.answerSwap(swap, accept = false)
 
         reply(budi, "YA", to = budi.last("kinfolk_swap_ask"))
         assertEquals("Permintaan ini sudah tidak berlaku.", budi.replies().last())
-        assertEquals(sri.client.me(), sri.client.dutyWeek(circle, week).single().holder)
+        assertEquals(sri.client.me(), sri.client.dutyWeek(circle, today).single { it.day == today }.holder)
     }
 
     @Test
     fun `a typed answer goes to the newest ask still open`() = runBlocking<Unit> {
         val (sri, circle) = sriWithCircle()
         val budi = joins(sri, circle, "Budi")
-        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), week)
+        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), today)
         val tukiman = sri.client.careRecipients(circle).single().id
         val provider = sri.client.addProvider(circle, "Dr. Anand Rao").id
         val appt = sri.client.scheduleAppointment(
             AppointmentDraft(circle, tukiman, provider, "Kontrol neurologi", null, now + 3.days, driverId = budi.client.me()),
         ).id
-        val swap = sri.client.askSwap(duty, week, budi.client.me())
+        val swap = sri.client.askSwap(duty, today, budi.client.me())
         deliver()
         budi.client.answerSwap(swap, accept = false) // the newer ask, answered in the app
 
@@ -168,15 +170,15 @@ class WhatsAppTest {
     fun `a WhatsApp message Meta can't deliver goes by SMS`() = runBlocking {
         val (sri, circle) = sriWithCircle()
         val budi = joins(sri, circle, "Budi")
-        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), week)
-        sri.client.askSwap(duty, week, budi.client.me())
+        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me(), budi.client.me()), today)
+        sri.client.askSwap(duty, today, budi.client.me())
         deliver()
 
         val ask = budi.last("kinfolk_swap_ask")
         webhook("""{"statuses":[{"id":"${ask.id}","status":"failed","recipient_id":"${budi.digits}","errors":[{"code":131026}]}]}""")
         webhook("""{"statuses":[{"id":"${ask.id}","status":"failed","recipient_id":"${budi.digits}","errors":[{"code":131026}]}]}""")
         assertEquals(
-            listOf("Sri bertanya: bisa ambil telepon cek malam minggu ${weekRange(week)}, 19.00? Balas YA atau TIDAK."),
+            listOf("Sri bertanya: bisa ambil telepon cek malam Tukiman $day, 19.00? Balas YA atau TIDAK."),
             budi.inbox().filter { it.channel == "sms" }.map { it.text },
         )
     }
@@ -277,12 +279,11 @@ class WhatsAppTest {
     }
 
     @Test
-    fun `the Duty holder is reminded an hour before, each day of their week`() = runBlocking {
+    fun `the Duty holder is reminded an hour before on their day`() = runBlocking {
         val (sri, circle) = sriWithCircle()
         val budi = joins(sri, circle, "Budi")
         Providers.notOnWhatsApp += budi.digits // reads the SMS fallback, as the template is filled in
-        sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(budi.client.me(), sri.client.me()), week)
-        val today = Clock.System.todayIn(wib)
+        sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(budi.client.me(), sri.client.me()), today)
         fun at(h: Int, m: Int) = LocalDateTime(today, LocalTime(h, m)).toInstant(wib)
 
         deliver(at(17, 59))

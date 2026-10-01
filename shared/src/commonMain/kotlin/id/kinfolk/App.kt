@@ -58,6 +58,7 @@ import id.kinfolk.data.saveDuty
 import id.kinfolk.data.takeTurn
 import id.kinfolk.data.weekOf
 import id.kinfolk.ui.Sheet
+import id.kinfolk.ui.appointment.dayName
 import id.kinfolk.ui.appointment.shortDay
 import id.kinfolk.ui.home.DutyDay
 import id.kinfolk.ui.rota.DutyFormScreen
@@ -227,6 +228,7 @@ import kinfolk.shared.generated.resources.remove_title
 import kinfolk.shared.generated.resources.legend_other
 import kinfolk.shared.generated.resources.legend_you
 import kinfolk.shared.generated.resources.swap_declined
+import kinfolk.shared.generated.resources.swap_sent
 import kinfolk.shared.generated.resources.swap_taken
 import kinfolk.shared.generated.resources.admins_full
 import kinfolk.shared.generated.resources.hide_body
@@ -312,7 +314,7 @@ fun App() {
         var viewing by rememberSaveable { mutableStateOf<String?>(null) } // on `member`
         var memberError by remember { mutableStateOf<String?>(null) }
         var confirm by remember { mutableStateOf<Confirm?>(null) }
-        var turns by remember { mutableStateOf(emptyList<DutyTurn>()) } // this week
+        var turns by remember { mutableStateOf(emptyList<DutyTurn>()) } // each day this week
         var drives by remember { mutableStateOf(emptyList<Appointment>()) } // this week, with a Driver
         var swapping by remember { mutableStateOf<DutyTurn?>(null) }
         var editingDuty by remember { mutableStateOf<DutyTurn?>(null) }
@@ -401,6 +403,8 @@ fun App() {
         }
         // The rota and "Minggu ini" show everyone by their own name, yourself first in Sri's green (like `circle`).
         fun rotaPeople() = circleMembers().associate { it.id to Person(it.name, it.color) }
+        // Who takes Duty days: like v3's SIBS, not the Care Recipient (Role parent) nor viewers.
+        fun dutyPeople() = circleMembers().filter { it.role != Role.parent && it.role != Role.viewer }.associate { it.id to Person(it.name, it.color) }
         suspend fun loadRota() {
             val c = circle ?: return
             turns = retrying { supabase.dutyWeek(c.id, week) }
@@ -554,7 +558,7 @@ fun App() {
                                 attempt { supabase.acceptInvitation(inv.id) }?.let {
                                     // Joined already, so a turn that can't be taken now must not keep them out.
                                     // ponytail: dropped silently offline; they can still swap on the rota.
-                                    if (take) inv.dutyId?.let { d -> attempt { supabase.takeTurn(d, week + DatePeriod(days = 7)) } }
+                                    if (take) inv.dutyId?.let { d -> attempt { supabase.takeTurn(d, inv.dutyDay!!) } }
                                     land(Nav.Tab)
                                 } != null
                             }
@@ -565,7 +569,7 @@ fun App() {
                                 val morningMeds = meds.current().morning()
                                 val card = homeCard(
                                     now.toLocalDateTime(tz), next?.startsAt?.toLocalDateTime(tz)?.date, note != null,
-                                    holdsTonight = turns.any { it.holder == me() },
+                                    holdsTonight = turns.any { it.day == today && it.holder == me() },
                                     morningDue = morningMeds.any { it.id !in given } || (morningMeds.isNotEmpty() && markedMorning == today),
                                 )
                                 val morningMarked = stringResource(Res.string.morning_marked, members.firstOrNull { it.userId == me() }?.name.orEmpty())
@@ -586,10 +590,10 @@ fun App() {
                                         nextMed = progress.next
                                             ?.let { m -> listOf(m.name, m.schedule).filter { it.isNotBlank() }.joinToString(" · ") }
                                             ?: stringResource(Res.string.no_meds),
-                                        week = turns.firstOrNull()?.let { t -> rotaPeople()[t.holder] }?.let { p ->
-                                            (0..6).map { i -> (week + DatePeriod(days = i)).let { d -> DutyDay(shortDay(d), d.day, p, d == today) } }
-                                        }.orEmpty(),
-                                        dutyLegend = turns.firstOrNull()?.let { t ->
+                                        week = turns.filter { it.dutyId == turns.first().dutyId }.mapNotNull { t ->
+                                            rotaPeople()[t.holder]?.let { p -> DutyDay(shortDay(t.day), t.day.day, p, t.day == today) }
+                                        },
+                                        dutyLegend = turns.firstOrNull { it.day == today }?.let { t ->
                                             if (t.holder == me()) stringResource(Res.string.legend_you, t.name, hm(t.timeOfDay))
                                             else stringResource(Res.string.legend_other, t.name, hm(t.timeOfDay), rotaPeople()[t.holder]?.name.orEmpty())
                                         }.orEmpty(),
@@ -622,11 +626,13 @@ fun App() {
                                 )
                             }
                             Tab.Rota -> {
-                                val taken = turns.map { stringResource(Res.string.swap_taken, it.inSentence()) }
+                                val taken = turns.map { stringResource(Res.string.swap_taken, it.inSentence(), dayName(it.day)) }
                                 val declined = turns.map { stringResource(Res.string.swap_declined, rotaPeople()[it.holder]?.name.orEmpty()) }
                                 val offline = stringResource(Res.string.no_connection)
                                 RotaScreen(
-                                    week, today, tz, turns, drives, rotaPeople(), me().orEmpty(), admin = sent != null,
+                                    week, today, tz, turns, drives,
+                                    // Anyone already holding a day stays visible, even if added before parents were left out.
+                                    rotaPeople().filterKeys { id -> id in dutyPeople() || turns.any { it.holder == id } }, me().orEmpty(), admin = sent != null,
                                     onSwap = { swapping = it },
                                     onAnswer = { t, yes ->
                                         val i = turns.indexOf(t)
@@ -715,10 +721,10 @@ fun App() {
                             }.also { if (it != null) reset(Screen.Home, Nav.Back) } != null
                         }
                         Screen.DutyForm -> DutyFormScreen(
-                            editingDuty, rotaPeople(), onBack = ::back,
+                            editingDuty, dutyPeople(), onBack = ::back,
                             // Not retried: adding is not idempotent.
                             save = { f ->
-                                attempt { supabase.saveDuty(circle!!.id, f.name, f.timeOfDay, f.order, week, editingDuty?.dutyId); loadRota() }
+                                attempt { supabase.saveDuty(circle!!.id, f.name, f.timeOfDay, f.order, today, editingDuty?.dutyId); loadRota() }
                                     .also { if (it != null) reset(Screen.Home, Nav.Back) } != null
                             },
                             delete = {
@@ -861,10 +867,13 @@ fun App() {
             )
             swapping?.let { t ->
                 val offline = stringResource(Res.string.no_connection)
+                val others = dutyPeople().filterKeys { it != me() }
+                // v3's toast, "SMS" → "WhatsApp": WhatsApp ke Budi: "Bisa gantikan telepon cek malam Tukiman hari Min? Balas YA."
+                val sent = others.mapValues { (_, p) -> stringResource(Res.string.swap_sent, p.name, t.inSentence(), circle?.name.orEmpty(), shortDay(t.day)) }
                 Sheet(t, { swapping = null }) {
-                    SwapSheet(t, rotaPeople().filterKeys { it != me() }, { load(it, turns, drives) }) { to ->
+                    SwapSheet(t, others, { load(it, turns, drives) }) { to ->
                         swapping = null
-                        scope.launch { if (attempt { supabase.askSwap(t.dutyId, week, to); loadRota() } == null) toast = offline }
+                        scope.launch { toast = if (attempt { supabase.askSwap(t.dutyId, t.day, to); loadRota() } == null) offline else sent[to] }
                     }
                 }
             }

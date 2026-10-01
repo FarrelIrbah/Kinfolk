@@ -221,7 +221,7 @@
     <string name="kind_rota">Giliran</string>
     <string name="filter_all">Semua</string>
     <string name="timeline_empty">Linimasa masih kosong. Akan terisi saat keluarga mencatat kunjungan, obat, dan cek malam.</string>
-    <!-- rotation (#10) -->
+    <!-- rotation (#10, per day #23) -->
     <string name="who_this_week">Siapa mengerjakan apa</string>
     <string name="day_done">Selesai</string>
     <string name="today">Hari ini</string>
@@ -231,11 +231,12 @@
     <string name="swap">Tukar</string>
     <string name="swap_waiting">Minta tukar ke %1$s · menunggu</string>
     <string name="swap_asked">%1$s meminta Anda ambil</string>
-    <string name="swap_title">Tukar %1$s Anda · minggu ini</string>
+    <string name="swap_title">Tukar %1$s Anda · %2$s</string>
     <string name="swap_sub">Mereka menerima pesan WhatsApp dan bisa menerima dengan satu balasan.</string>
     <string name="drive_confirmed">Dikonfirmasi via WhatsApp</string>
     <string name="load_this_week">%1$d minggu ini</string>
-    <string name="swap_taken">Anda pegang %1$s minggu ini.</string>
+    <string name="swap_taken">Anda pegang %1$s hari %2$s.</string>
+    <string name="swap_sent">WhatsApp ke %1$s: "Bisa gantikan %2$s %3$s hari %4$s? Balas YA."</string>
     <string name="swap_declined">Ditolak. %1$s akan bertanya ke yang lain.</string>
     <string name="take_it">Saya ambil</string>
     <string name="not_this_week">Minggu ini tidak</string>
@@ -243,11 +244,10 @@
     <string name="duty_form_head">Giliran</string>
     <string name="duty_order">Urutan</string>
     <string name="delete_duty">Hapus giliran</string>
-    <string name="legend_you">%1$s, %2$s. Minggu ini giliran Anda.</string>
-    <string name="legend_other">%1$s, %2$s. Minggu ini giliran %3$s.</string>
+    <string name="legend_you">%1$s, %2$s. Malam ini giliran Anda.</string>
+    <string name="legend_other">%1$s, %2$s. Malam ini giliran %3$s.</string>
     <string name="inv_ask_title">Satu hal kecil, jika bisa</string>
-    <string name="inv_ask_body">%1$s minggu depan dipegang %2$s.</string>
-    <string name="inv_took">Anda pegang %1$s minggu depan.</string>
+    <string name="inv_ask_body">%1$s hari %2$s jam %3$s masih kosong. Hanya 10 menit, dari mana saja.</string>
     <string name="inv_skipped">Tidak apa-apa. %1$s akan bertanya ke yang lain.</string>
     <!-- Data Category restrictions (#9): onb3, circle, member, invitee -->
     <string name="onb3_head">%1$s yang menentukan siapa melihat apa</string>

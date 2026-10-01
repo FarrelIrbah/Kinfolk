@@ -37,6 +37,8 @@ import id.kinfolk.ui.Field
 import id.kinfolk.ui.Hairline
 import id.kinfolk.ui.Kf
 import id.kinfolk.ui.PrimaryButton
+import id.kinfolk.ui.appointment.dayName
+import id.kinfolk.ui.appointment.hm
 import id.kinfolk.ui.contacts.localPhone
 import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
@@ -49,7 +51,6 @@ import kinfolk.shared.generated.resources.invite
 import kinfolk.shared.generated.resources.inv_ask_body
 import kinfolk.shared.generated.resources.inv_ask_title
 import kinfolk.shared.generated.resources.inv_skipped
-import kinfolk.shared.generated.resources.inv_took
 import kinfolk.shared.generated.resources.not_this_week
 import kinfolk.shared.generated.resources.take_it
 import kinfolk.shared.generated.resources.no_connection
@@ -59,6 +60,7 @@ import kinfolk.shared.generated.resources.onb2_sub
 import kinfolk.shared.generated.resources.open_circle
 import kinfolk.shared.generated.resources.send_invites
 import kinfolk.shared.generated.resources.skip_for_now
+import kinfolk.shared.generated.resources.swap_taken
 import kinfolk.shared.generated.resources.will_send
 import kinfolk.shared.generated.resources.inv_see_hidden
 import kinfolk.shared.generated.resources.inv_see_label
@@ -237,7 +239,7 @@ private fun InviteRow(name: String, phone: String, color: Color, label: String, 
 }
 
 /**
- * `invitee`: head, the Duty ask (#10), what they will see (#9) and the button; last visit (#7) stays hidden.
+ * `invitee`: head, the open day of a Duty (#23), what they will see (#9) and the button; last visit (#7) stays hidden.
  * "Saya ambil" is kept until [accept] joins, since only Members hold turns. [accept] returns false when offline.
  */
 @Composable
@@ -257,14 +259,15 @@ fun Invitee(invitation: InvitationToMe, accept: suspend (takeTurn: Boolean) -> B
             )
         }
         val duty = invitation.duty
-        val holder = invitation.dutyHolder
-        if (duty != null && holder != null) Column(
+        val day = invitation.dutyDay
+        val at = invitation.dutyTime
+        if (duty != null && day != null && at != null) Column(
             Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(20.dp)).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val task = duty.replaceFirstChar { it.lowercase() }
             Text(stringResource(Res.string.inv_ask_title), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(stringResource(Res.string.inv_ask_body, duty, holder), fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Kf.Ink2)
+            Text(stringResource(Res.string.inv_ask_body, duty, dayName(day), hm(at)), fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Kf.Ink2)
             when (took) {
                 null -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(
@@ -277,7 +280,7 @@ fun Invitee(invitation: InvitationToMe, accept: suspend (takeTurn: Boolean) -> B
                     ) { Text(stringResource(Res.string.not_this_week), fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 }
                 else -> Text(
-                    if (took == true) stringResource(Res.string.inv_took, task) else stringResource(Res.string.inv_skipped, invitation.inviter.orEmpty()),
+                    if (took == true) stringResource(Res.string.swap_taken, task, dayName(day)) else stringResource(Res.string.inv_skipped, invitation.inviter.orEmpty()),
                     fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Kf.Green,
                 )
             }

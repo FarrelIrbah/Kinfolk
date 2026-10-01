@@ -265,15 +265,15 @@ fi
 
 # ──────────────────────────────────────────────────────────────────────────
 stage "Meta: submit the 11 message templates"
-say "Copy is owner-approved (#3, #4, #13) and matches template_body(). Don't edit it here."
+say "Copy is owner-approved (#3, #4, #13, #23) and matches template_body(). Don't edit it here."
 note "A rejection is kept for the summary; bring it back before changing any copy."
 if run; then
   WABA_ID=$(_existing WABA_ID || true); WHATSAPP_TOKEN=$(_existing WHATSAPP_TOKEN || true)
   submit kinfolk_otp AUTHENTICATION '[{"type":"BODY","add_security_recommendation":true},{"type":"FOOTER","code_expiration_minutes":10},{"type":"BUTTONS","buttons":[{"type":"OTP","otp_type":"COPY_CODE"}]}]'
   submit kinfolk_invite UTILITY "[$(body '{{1}} mengundang Anda ke lingkaran perawatan {{2}} di Kinfolk. Buka tautan ini untuk bergabung, tanpa perlu pasang app: {{3}}' '["Sri","Tukiman","https://kinfolk.id/undangan?t=contoh"]')]"
-  submit kinfolk_swap_ask UTILITY "[$(body '{{1}} bertanya: bisa ambil {{2}} minggu {{3}}? Balas YA atau TIDAK.' '["Sri","telepon cek malam","28 Sept – 4 Okt, 19.00"]'),$YA_TIDAK]"
-  submit kinfolk_swap_yes UTILITY "[$(body '{{1}} pegang {{2}} minggu ini.' '["Budi","telepon cek malam"]')]"
-  submit kinfolk_swap_no UTILITY "[$(body '{{1}} tidak bisa ambil {{2}} minggu ini.' '["Budi","telepon cek malam"]')]"
+  submit kinfolk_swap_ask UTILITY "[$(body '{{1}} bertanya: bisa ambil {{2}} {{3}}? Balas YA atau TIDAK.' '["Sri","telepon cek malam Tukiman","Minggu 4 Okt, 19.00"]'),$YA_TIDAK]"
+  submit kinfolk_swap_yes UTILITY "[$(body '{{1}} pegang {{2}} hari {{3}}.' '["Budi","telepon cek malam","Minggu 4 Okt"]')]"
+  submit kinfolk_swap_no UTILITY "[$(body '{{1}} tidak bisa ambil {{2}} hari {{3}}.' '["Budi","telepon cek malam","Minggu 4 Okt"]')]"
   submit kinfolk_drive_ask UTILITY "[$(body '{{1}} bertanya: bisa mengantar {{2}} ke {{3}}, {{4}}? Balas YA atau TIDAK.' '["Sri","Tukiman","Kontrol neurologi","Kam, 1 Okt · 09.00, berangkat 08.15"]'),$YA_TIDAK]"
   submit kinfolk_drive_yes UTILITY "[$(body '{{1}} mengantar {{2}} {{3}}.' '["Budi","Tukiman","Kam, 1 Okt · 09.00"]')]"
   submit kinfolk_drive_no UTILITY "[$(body '{{1}} tidak bisa mengantar {{2}} {{3}}.' '["Budi","Tukiman","Kam, 1 Okt · 09.00"]')]"

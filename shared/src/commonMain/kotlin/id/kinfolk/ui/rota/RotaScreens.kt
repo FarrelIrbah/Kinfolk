@@ -85,7 +85,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.stringResource
 
-// `rotation` from design v3, week view only, with the deviations approved in #10 (docs/screen-map.md).
+// `rotation` from design v3, week view only, one holder a day (#23), with the deviations approved in #10 (docs/screen-map.md).
 
 private val PastDay = Color(0x8CFBF8F2) // rgba(251,248,242,.55)
 private val OutlineBtn = Color(0x2E22261F) // rgba(34,38,31,.18)
@@ -96,13 +96,13 @@ fun weekRange(week: LocalDate) = "${dayMonth(week)} – ${dayMonth(week + DatePe
 /** "Telepon cek malam" → "telepon cek malam", inside a sentence. */
 fun DutyTurn.inSentence() = name.replaceFirstChar { it.lowercase() }
 
-/** How many Duties and drives [id] has this week, for the fairness pills and the swap sheet. */
+/** How many Duty days and drives [id] has this week, for the fairness pills and the swap sheet. */
 fun load(id: String, turns: List<DutyTurn>, drives: List<Appointment>) = turns.count { it.holder == id } + drives.count { it.driverId == id }
 
 /**
  * [people]: the current Members by id, yourself ([me]) first, with their own names and circle colors. Admins add
- * Duties ([onAdd]) and change one by tapping its slot ([onEdit]); holders ask for a swap ([onSwap]); the one asked
- * answers on today's card ([onAnswer]).
+ * Duties ([onAdd]) and change one by tapping its slot ([onEdit]); holders ask to swap a day ([onSwap]); the one asked
+ * answers on that day's card ([onAnswer]).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -167,7 +167,7 @@ fun RotaScreen(
                             if (confirmed) stringResource(Res.string.drive_confirmed) else sub(id), if (confirmed) Kf.Green else Kf.Muted, null, {},
                         ) {}
                     }
-                    turns.forEach { t ->
+                    turns.filter { it.day == day }.forEach { t ->
                         val id = t.holder ?: return@forEach
                         val p = people[id] ?: return@forEach
                         val waiting = t.swapTo?.takeIf { id == me }
@@ -183,7 +183,7 @@ fun RotaScreen(
                             stringResource(Res.string.swap).takeIf { id == me && t.swapTo == null && day >= today },
                             { onSwap(t) },
                         ) { if (admin) onEdit(t) }
-                        if (askedOfMe && isToday) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (askedOfMe && day >= today) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(
                                 Modifier.weight(1f).height(46.dp).background(Kf.Green, RoundedCornerShape(12.dp)).tap { onAnswer(t, true) },
                                 contentAlignment = Alignment.Center,
@@ -217,7 +217,8 @@ private fun Slot(p: Person, task: String, sub: String, subColor: Color, action: 
 /** SWAP SHEET body: the other Members with their load this week. */
 @Composable
 fun ColumnScope.SwapSheet(turn: DutyTurn, others: Map<String, Person>, load: (String) -> Int, onPick: (String) -> Unit) {
-    Text(stringResource(Res.string.swap_title, turn.inSentence()), style = serifStyle(22f, 1.2f))
+    // "Tukar telepon cek malam Anda · Min 4"
+    Text(stringResource(Res.string.swap_title, turn.inSentence(), "${shortDay(turn.day)} ${turn.day.day}"), style = serifStyle(22f, 1.2f))
     Text(stringResource(Res.string.swap_sub), fontSize = 14.sp, color = Kf.Ink2)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         others.forEach { (id, p) ->
