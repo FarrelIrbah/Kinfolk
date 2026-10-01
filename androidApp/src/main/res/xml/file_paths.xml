@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The camera's photo and opened Documents, shared with other apps (System.android.kt). -->
+<paths>
+    <cache-path name="cache" path="." />
+</paths>

@@ -62,6 +62,10 @@
     <string name="still_taking">Masih diminum</string>
     <string name="rec_meds">Obat</string>
     <string name="rec_docs">Dokumen</string>
+    <string name="docs_note">Dienkripsi per lingkaran. Setiap perubahan menyimpan versi lama.</string>
+    <string name="upload_doc">+ Unggah dokumen</string>
+    <string name="vis_all">Semua</string>
+    <string name="vis_n">%1$d orang</string>
     <string name="rec_costs">Biaya</string>
     <string name="rec_health">Kondisi</string>
     <string name="tap_taken">Ketuk saat dosis diberikan. Semua bisa melihat.</string>

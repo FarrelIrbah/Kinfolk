@@ -15,3 +15,14 @@ class Kept(val read: () -> String?, val write: (String?) -> Unit)
 
 @Composable
 expect fun rememberKept(key: String): Kept
+
+/** A file the Member picked: its name without the extension (blank for a photo), "PDF", "JPG" or "PNG", and its bytes. */
+class PickedFile(val name: String, val ext: String, val bytes: ByteArray)
+
+/** Opens the system picker for a PDF, JPG or PNG, with the camera offered too; [onPicked] gets what was chosen. */
+@Composable
+expect fun rememberFilePicker(onPicked: (PickedFile) -> Unit): () -> Unit
+
+/** Opens [bytes] in the system viewer for its type. */
+@Composable
+expect fun rememberFileViewer(): (name: String, ext: String, bytes: ByteArray) -> Unit

@@ -7,6 +7,8 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.serializer.KotlinXSerializer
+import io.github.jan.supabase.storage.Storage
+import io.github.jan.supabase.storage.resumable.MemoryResumableCache
 import kotlinx.serialization.json.Json
 
 /** Default publishable key of every local Supabase stack; not a secret. */
@@ -23,4 +25,5 @@ fun kinfolkClient(url: String = HOSTED_SUPABASE_URL.ifEmpty { localSupabaseUrl }
         install(Auth, auth)
         install(Postgrest)
         install(Functions)
+        install(Storage) { resumable { cache = MemoryResumableCache() } } // unused (uploads are whole); its default needs Android settings, not in host tests
     }

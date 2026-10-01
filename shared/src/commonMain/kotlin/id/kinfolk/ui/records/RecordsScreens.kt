@@ -10,6 +10,15 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import id.kinfolk.data.Ate
 import id.kinfolk.data.Expense
+import id.kinfolk.data.DataCategory
+import id.kinfolk.data.Document
+import id.kinfolk.ui.circle.CircleMember
+import kinfolk.shared.generated.resources.cat_wishes
+import kinfolk.shared.generated.resources.docs_note
+import kinfolk.shared.generated.resources.upload_doc
+import kinfolk.shared.generated.resources.vis_all
+import kinfolk.shared.generated.resources.vis_n
+import kotlin.time.Instant
 import id.kinfolk.ui.Avatar
 import id.kinfolk.ui.Card
 import id.kinfolk.ui.Hairline
@@ -154,7 +163,7 @@ fun soFar(today: LocalDate) = "${monthNames[today.month.ordinal]} sejauh ini"
 private val Gold = Color(0xFF9A7A2F)
 private val GivenBorder = Color(0x3322261F) // rgba(34,38,31,.2)
 
-private enum class RecTab(val label: StringResource) {
+enum class RecTab(val label: StringResource) {
     Meds(Res.string.rec_meds), Docs(Res.string.rec_docs), Costs(Res.string.rec_costs), Health(Res.string.rec_health),
 }
 
@@ -170,14 +179,16 @@ fun RecordsScreen(
     meds: List<Medication>,
     given: Set<String>,
     checkIns: List<CheckIn>,
+    docs: Docs?,
     costs: Costs?,
     today: LocalDate,
+    picked: RecTab,
+    onPick: (RecTab) -> Unit,
     nameOf: (String) -> String?,
     onToggle: (Medication) -> Unit,
     onOpen: (Medication?) -> Unit,
 ) {
-    var picked by rememberSaveable { mutableStateOf(RecTab.Meds) }
-    val tabs = RecTab.entries.filter { it != RecTab.Costs || costs != null }
+    val tabs = RecTab.entries.filter { (it != RecTab.Costs || costs != null) && (it != RecTab.Docs || docs != null) }
     val tab = picked.takeIf { it in tabs } ?: RecTab.Meds
     // design: padding:4px 20px; gap:18px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -186,7 +197,7 @@ fun RecordsScreen(
         Row(Modifier.fillMaxWidth().background(Kf.Sand, RoundedCornerShape(12.dp)).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             tabs.forEach { t ->
                 Box(
-                    Modifier.weight(1f).height(36.dp).background(if (t == tab) Kf.Card else Color.Transparent, RoundedCornerShape(9.dp)).tap { picked = t },
+                    Modifier.weight(1f).height(36.dp).background(if (t == tab) Kf.Card else Color.Transparent, RoundedCornerShape(9.dp)).tap { onPick(t) },
                     contentAlignment = Alignment.Center,
                 ) { Text(stringResource(t.label), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
             }
@@ -205,8 +216,106 @@ fun RecordsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { stopped.forEach { MedCard(it, null, onOpen) {} } }
             }
         }
+        if (tab == RecTab.Docs && docs != null) Docs(docs, today)
         if (tab == RecTab.Costs && costs != null) Costs(costs, today)
         if (tab == RecTab.Health) Trends(checkIns)
+    }
+}
+
+/**
+ * Dokumen: [list] the newest version of each, [seenBy] its pill (null = "Semua"), [person] who uploaded it, [day] when.
+ * [open] shows a file, [upload] starts the picker.
+ */
+class Docs(
+    val list: List<Document>,
+    val seenBy: (DataCategory) -> Int?,
+    val person: (String) -> Person,
+    val day: (Instant) -> LocalDate,
+    val open: (Document) -> Unit,
+    val upload: () -> Unit,
+)
+
+/** v3's pill: null ("Semua") when every Member but the Care Recipient sees [category], else how many do. */
+fun seenBy(members: List<CircleMember>, category: DataCategory): Int? {
+    val others = members.filterNot { it.isRecipient }
+    return others.count { category in it.sees }.takeIf { it < others.size }
+}
+
+/** v3's "12 Juni · v2 · Rina", the day as elsewhere ("12 Jun"), with its year when not this one. */
+fun docMeta(day: LocalDate, today: LocalDate, version: Int, by: String) =
+    "${dayMonth(day)}${if (day.year != today.year) " ${day.year}" else ""} · v$version · $by"
+
+private val PillAll = Color(0xFFE3EBE5)
+private val PillSome = Color(0xFFE9E2D4)
+private val PillLegal = Color(0xFFF0DDD3)
+private val TileBorder = Color(0x1A22261F) // rgba(34,38,31,.1)
+
+/** v3's Dokumen: the note, the list, "+ Unggah dokumen". "Ekspor untuk dokter baru" waits for Export (#33). */
+@Composable
+private fun Docs(d: Docs, today: LocalDate) {
+    // design: gap 10
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(stringResource(Res.string.docs_note), fontSize = 13.sp, color = Kf.Muted)
+        if (d.list.isNotEmpty()) Card {
+            d.list.forEach { doc ->
+                val n = d.seenBy(doc.category)
+                // design: padding 14px 16px, gap 14, border-bottom rgba(34,38,31,.07)
+                Row(Modifier.fillMaxWidth().tap { d.open(doc) }.padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // design: 38x46, r6, #E9E2D4, 1px rgba(34,38,31,.1), ext at the bottom (padding-bottom 5), 9px 600 #6B6A60
+                    Box(
+                        Modifier.width(38.dp).height(46.dp).background(PillSome, RoundedCornerShape(6.dp)).border(1.dp, TileBorder, RoundedCornerShape(6.dp)).padding(bottom = 5.dp),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) { Text(doc.ext, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Kf.Muted) }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(doc.name, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        Text(docMeta(d.day(doc.at), today, doc.version, d.person(doc.by).name), fontSize = 12.sp, color = Kf.Muted)
+                    }
+                    // design: 11px 600, padding 3px 8px, r999
+                    Text(
+                        if (n == null) stringResource(Res.string.vis_all) else stringResource(Res.string.vis_n, n),
+                        Modifier.background(if (doc.legal) PillLegal else if (n == null) PillAll else PillSome, CircleShape).padding(horizontal = 8.dp, vertical = 3.dp),
+                        fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Hairline()
+            }
+        }
+        DashedButton(stringResource(Res.string.upload_doc), d.upload)
+    }
+}
+
+/** Approved deviation (#29): after the picker, its name ("Nama", from the file) and whether it is legal. */
+class DocForm(val name: String, val legal: Boolean)
+
+/**
+ * The form after picking a file, styled like Form Obat: "Dokumen", "Nama", the "Keinginan & hukum" switch (only for
+ * whoever sees both categories; [legalOnly]: sees just that one), "Simpan".
+ */
+@Composable
+fun DocFormScreen(picked: String, canChoose: Boolean, legalOnly: Boolean, onBack: () -> Unit, save: suspend (DocForm) -> Boolean) {
+    val scope = rememberCoroutineScope()
+    var name by rememberSaveable { mutableStateOf(picked) }
+    var legal by rememberSaveable { mutableStateOf(legalOnly) }
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    val input = LocalTextStyle.current.copy(fontSize = 17.sp)
+
+    // design (onb1): padding 12px 24px, gap 26
+    Column(Modifier.padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
+        Pill(stringResource(Res.string.back), onBack)
+        Text(stringResource(Res.string.rec_docs), style = serifStyle(30f, 1.1f))
+        Field(stringResource(Res.string.med_name)) { BasicTextField(name, { name = it }, Modifier.fillMaxWidth(), textStyle = input, singleLine = true) }
+        if (canChoose) Toggle(stringResource(Res.string.cat_wishes), legal) { legal = it }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            PrimaryButton(stringResource(Res.string.save), Modifier.padding(top = 12.dp)) {
+                if (name.isNotBlank() && !busy) scope.launch {
+                    busy = true
+                    failed = !save(DocForm(name.trim(), legal))
+                    busy = false
+                }
+            }
+            if (failed) ErrorText(stringResource(Res.string.no_connection))
+        }
     }
 }
 

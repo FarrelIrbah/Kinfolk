@@ -23,3 +23,10 @@ actual fun rememberKept(key: String): Kept = remember {
     val defaults = NSUserDefaults.standardUserDefaults
     Kept({ defaults.stringForKey(key) }, { v -> if (v == null) defaults.removeObjectForKey(key) else defaults.setObject(v, key) })
 }
+
+// ponytail: iOS picks and opens nothing yet; UIDocumentPickerViewController and QLPreviewController when iOS ships.
+@Composable
+actual fun rememberFilePicker(onPicked: (PickedFile) -> Unit): () -> Unit = remember { {} }
+
+@Composable
+actual fun rememberFileViewer(): (name: String, ext: String, bytes: ByteArray) -> Unit = remember { { _, _, _ -> } }

@@ -49,6 +49,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import id.kinfolk.data.Appointment
 import id.kinfolk.data.Expense
+import id.kinfolk.data.Document
+import id.kinfolk.data.documentFile
+import id.kinfolk.data.documents
+import id.kinfolk.data.latest
+import id.kinfolk.data.uploadDocument
+import id.kinfolk.ui.PickedFile
+import id.kinfolk.ui.rememberFilePicker
+import id.kinfolk.ui.rememberFileViewer
+import id.kinfolk.ui.records.DocFormScreen
+import id.kinfolk.ui.records.Docs
+import id.kinfolk.ui.records.RecTab
+import id.kinfolk.ui.records.seenBy
 import id.kinfolk.data.addExpense
 import id.kinfolk.data.expenses
 import id.kinfolk.ui.records.Costs
@@ -302,7 +314,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -319,6 +331,7 @@ fun App() {
         var screen by rememberSaveable { mutableStateOf<Screen?>(null) } // null while checking the saved session
         var nav by remember { mutableStateOf(Nav.Tab) }
         var tab by rememberSaveable { mutableStateOf(Tab.Home) }
+        var recTab by rememberSaveable { mutableStateOf(RecTab.Meds) }
         var phone by rememberSaveable { mutableStateOf("") }
         var circle by remember { mutableStateOf<CareCircle?>(null) }
         var recipient by remember { mutableStateOf<CareRecipient?>(null) }
@@ -340,6 +353,8 @@ fun App() {
         var checkIn by remember { mutableStateOf<CheckIn?>(null) } // of the day it was read
         var checkIns by remember { mutableStateOf(emptyList<CheckIn>()) } // Kondisi, the last 30
         var expenses by remember { mutableStateOf(emptyList<Expense>()) } // Biaya
+        var documents by remember { mutableStateOf(emptyList<Document>()) } // Dokumen, every version
+        var uploading by remember { mutableStateOf<PickedFile?>(null) } // the file DocForm saves
         var checkingIn by rememberSaveable { mutableStateOf<String?>(null) } // "2026-10-01 19:00": `checkin`'s day and Duty time, fixed when opened
         var tasks by remember { mutableStateOf(emptyList<Task>()) }
         var editingTask by remember { mutableStateOf<Task?>(null) }
@@ -434,6 +449,8 @@ fun App() {
         val progress = meds.current().progress(doses.filter { it.day == today })
         val noConnection = stringResource(Res.string.no_connection)
         val uri = LocalUriHandler.current
+        val pickFile = rememberFilePicker { f -> uploading = f; go(Screen.DocForm) }
+        val viewFile = rememberFileViewer()
         // The Duty I hold tonight: its time heads the evening card and `checkin`.
         val tonight = turns.firstOrNull { it.day == today && it.holder == me() }
         // Shown at once like the prototype; only these doses are taken back if they can't be saved.
@@ -465,6 +482,7 @@ fun App() {
         }
         // Not retried: offline, the tap does nothing rather than jumping there later. The latest tap wins.
         fun openFromTimeline(e: TimelineEntry) {
+            if (e.kind == TimelineEntry.Kind.document) { pick(Tab.Records); recTab = RecTab.Docs; return } // like v3
             val id = e.appointmentId ?: return // an access change opens nothing
             opening?.cancel()
             opening = scope.launch {
@@ -494,6 +512,7 @@ fun App() {
             changes = retrying { supabase.accessChanges(k.circle.id) }
             checkIns = k.recipient?.let { r -> retrying { supabase.recentCheckIns(r.id) } }.orEmpty()
             expenses = retrying { supabase.expenses(k.circle.id) }
+            documents = retrying { supabase.documents(k.circle.id) }
             loadRota()
         }
         suspend fun land(how: Nav) {
@@ -741,8 +760,16 @@ fun App() {
                                         if (ok) expenses = retrying { supabase.expenses(c.id) } else toast = noConnection
                                     }
                                 }
+                                val mine = circleMembers().firstOrNull { it.isMe }?.sees.orEmpty()
+                                // Gone while both Dokumen and Keinginan & hukum are hidden from me (#29).
+                                val docs = if (c == null || r == null || DataCategory.documents !in mine && DataCategory.wishes !in mine) null
+                                else Docs(
+                                    documents.latest(), { seenBy(circleMembers(), it) }, { named(it) }, { it.toLocalDateTime(tz).date },
+                                    open = { d -> scope.launch { attempt { supabase.documentFile(d) }?.let { viewFile(d.name, d.ext, it) } ?: run { toast = noConnection } } },
+                                    upload = pickFile,
+                                )
                                 RecordsScreen(
-                                    meds, given, checkIns, costs, today, { id -> rotaPeople()[id]?.name },
+                                    meds, given, checkIns, docs, costs, today, recTab, { recTab = it }, { id -> rotaPeople()[id]?.name },
                                     onToggle = { m ->
                                         val on = m.id in given
                                         markDoses(listOf(m), !on)
@@ -891,6 +918,19 @@ fun App() {
                                 }
                             }
                         }
+                        Screen.DocForm -> uploading?.let { f ->
+                            val mine = circleMembers().firstOrNull { it.isMe }?.sees.orEmpty()
+                            DocFormScreen(
+                                f.name, DataCategory.documents in mine && DataCategory.wishes in mine, DataCategory.documents !in mine, onBack = ::back,
+                            ) { form ->
+                                val c = circle ?: return@DocFormScreen false
+                                val r = recipient ?: return@DocFormScreen false
+                                // Not retried: adding is not idempotent. Reloads apart, so a failed one can't invite a second upload.
+                                (attempt { supabase.uploadDocument(c.id, r.id, form.name, f.ext, f.bytes, form.legal) } != null).also { ok ->
+                                    if (ok) { back(); documents = retrying { supabase.documents(c.id) }; timeline = retrying { supabase.timeline(c.id) } }
+                                }
+                            }
+                        } ?: LaunchedEffect(Unit) { back() } // the picked file doesn't survive recreation
                         Screen.Contacts -> ContactsScreen(contacts, onBack = ::back) { editingContact = it; go(Screen.ContactForm) }
                         Screen.ContactForm -> ContactFormScreen(
                             editingContact, onBack = ::back,
