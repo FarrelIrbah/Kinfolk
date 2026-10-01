@@ -85,6 +85,17 @@ import id.kinfolk.data.invite
 import id.kinfolk.data.myInvitations
 import id.kinfolk.data.roleIn
 import id.kinfolk.data.DoseLog
+import id.kinfolk.data.CheckIn
+import id.kinfolk.data.checkIn
+import id.kinfolk.data.recipientPhone
+import id.kinfolk.data.saveCheckIn
+import id.kinfolk.ui.checkin.CheckInScreen
+import id.kinfolk.ui.checkin.names
+import id.kinfolk.ui.home.Evening
+import kinfolk.shared.generated.resources.ci_no_bp
+import kinfolk.shared.generated.resources.ci_saved
+import kinfolk.shared.generated.resources.ci_saved_high
+import androidx.compose.ui.platform.LocalUriHandler
 import id.kinfolk.data.Medication
 import id.kinfolk.data.giveDoses
 import id.kinfolk.data.morning
@@ -248,6 +259,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.atStartOfDayIn
@@ -263,7 +275,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -297,6 +309,8 @@ fun App() {
         var doses by remember { mutableStateOf(emptyList<DoseLog>()) } // of the day they were read
         val doseWrites = remember { Mutex() }
         var markedMorning by remember { mutableStateOf<LocalDate?>(null) } // keeps "Semua diberikan ✓" up that day
+        var checkIn by remember { mutableStateOf<CheckIn?>(null) } // of the day it was read
+        var checkingIn by rememberSaveable { mutableStateOf<String?>(null) } // "2026-10-01 19:00": `checkin`'s day and Duty time, fixed when opened
         var contacts by remember { mutableStateOf(emptyList<CareContact>()) }
         var editingContact by remember { mutableStateOf<CareContact?>(null) }
         var invitation by remember { mutableStateOf<InvitationToMe?>(null) }
@@ -384,6 +398,9 @@ fun App() {
         val given = doses.filter { it.day == today }.map { it.medicationId }.toSet()
         val progress = meds.current().progress(doses.filter { it.day == today })
         val noConnection = stringResource(Res.string.no_connection)
+        val uri = LocalUriHandler.current
+        // The Duty I hold tonight: its time heads the evening card and `checkin`.
+        val tonight = turns.firstOrNull { it.day == today && it.holder == me() }
         // Shown at once like the prototype; only these doses are taken back if they can't be saved.
         fun markDoses(ms: List<Medication>, give: Boolean) {
             val ids = ms.map { it.id }.toSet()
@@ -426,7 +443,7 @@ fun App() {
         fun restore(k: Snapshot) {
             circle = k.circle; recipient = k.recipient; next = k.next; questions = k.questions; note = k.note
             meds = k.medications; members = k.members; timeline = k.timeline; sosMeds = k.emergencyMedications
-            contacts = k.contacts; card = k.card; savedAt = k.savedAt; doses = k.doses
+            contacts = k.contacts; card = k.card; savedAt = k.savedAt; doses = k.doses; checkIn = k.checkIn
         }
         suspend fun loadHome() {
             // The card stays until the day ends: its "Tulis catatan" button is for after the visit.
@@ -569,7 +586,7 @@ fun App() {
                                 val morningMeds = meds.current().morning()
                                 val card = homeCard(
                                     now.toLocalDateTime(tz), next?.startsAt?.toLocalDateTime(tz)?.date, note != null,
-                                    holdsTonight = turns.any { it.day == today && it.holder == me() },
+                                    holdsTonight = tonight != null,
                                     morningDue = morningMeds.any { it.id !in given } || (morningMeds.isNotEmpty() && markedMorning == today),
                                 )
                                 val morningMarked = stringResource(Res.string.morning_marked, members.firstOrNull { it.userId == me() }?.name.orEmpty())
@@ -598,6 +615,9 @@ fun App() {
                                             else stringResource(Res.string.legend_other, t.name, hm(t.timeOfDay), rotaPeople()[t.holder]?.name.orEmpty())
                                         }.orEmpty(),
                                         feed = timeline.take(3).map { FeedItem(author(it), text(it, tz), ago(it.at, now, tz)) },
+                                        evening = if (card != HomeCard.Evening) null else Evening(
+                                            hm(tonight!!.timeOfDay), recipient?.name.orEmpty(), checkIn?.takeIf { it.day == today }?.let { it.sys to it.dia },
+                                        ),
                                         morning = if (card != HomeCard.Morning) null else Morning(
                                             hm(morningMeds.first().timeOfDay), recipient?.name.orEmpty(),
                                             morningMeds.map { MorningDose("${it.name} ${it.dose}".trim(), it.id in given) },
@@ -623,6 +643,14 @@ fun App() {
                                         markedMorning = today
                                         toast = morningMarked
                                     },
+                                    // Approved in #24: the Care Recipient's own number while they are a Member, else an empty dialer.
+                                    onCall = {
+                                        scope.launch {
+                                            val phone = recipient?.let { r -> attempt { supabase.recipientPhone(r.id).orEmpty() } }
+                                            runCatching { uri.openUri("tel:${phone.orEmpty()}") }
+                                        }
+                                    },
+                                    onCheckIn = { checkingIn = "$today ${tonight!!.timeOfDay}"; go(Screen.CheckIn) },
                                 )
                             }
                             Tab.Rota -> {
@@ -731,6 +759,27 @@ fun App() {
                                 attempt { editingDuty?.let { supabase.deleteDuty(it.dutyId) }; loadRota() }.also { if (it != null) reset(Screen.Home, Nav.Back) } != null
                             },
                         )
+                        Screen.CheckIn -> recipient?.let { r ->
+                            val (day, at) = checkingIn?.split(' ')?.let { LocalDate.parse(it[0]) to LocalTime.parse(it[1]) } ?: return@let
+                            val noBp = stringResource(Res.string.ci_no_bp)
+                            val saved = stringResource(Res.string.ci_saved)
+                            // v3: "Tersimpan. Tensi 140 ke atas; Budi dan Dewi diberi tahu via SMS.", WhatsApp to every other Member.
+                            val others = circleMembers().filter { !it.isMe }.map { it.name }
+                            val savedHigh = stringResource(Res.string.ci_saved_high, names(others))
+                            val before = checkIn?.takeIf { it.day == day }
+                            CheckInScreen(hm(at), r.name, before?.draft, onBack = ::back) { d ->
+                                if (d == null) { toast = noBp; return@CheckInScreen }
+                                // Not retried: offline, the form stays filled for another tap.
+                                if (attempt { supabase.saveCheckIn(r, day, d) } == null) { toast = noConnection; return@CheckInScreen }
+                                // The server tells the others once per Check-in, when it first reaches 140.
+                                toast = if (d.high && before?.alerted != true && others.isNotEmpty()) savedHigh else saved
+                                reset(Screen.Home, Nav.Back)
+                                scope.launch {
+                                    checkIn = retrying { supabase.checkIn(r.id, day) }
+                                    timeline = retrying { supabase.timeline(r.circleId) }
+                                }
+                            }
+                        }
                         Screen.Contacts -> ContactsScreen(contacts, onBack = ::back) { editingContact = it; go(Screen.ContactForm) }
                         Screen.ContactForm -> ContactFormScreen(
                             editingContact, onBack = ::back,

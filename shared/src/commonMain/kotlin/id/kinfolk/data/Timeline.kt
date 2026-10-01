@@ -11,7 +11,7 @@ import kotlin.time.Instant
 
 /**
  * An Appointment being scheduled, its Visit Note being saved, an event about it (a Driver confirming), or an access
- * change or a given dose, by [by] at [at]. Title, provider and start are the Appointment's, null for the last two.
+ * change, a given dose or a Check-in, by [by] at [at]. Title, provider and start are the Appointment's, null for the last two.
  */
 @Serializable
 data class TimelineEntry(
@@ -29,7 +29,7 @@ data class TimelineEntry(
     /** An event's text, fixed when it happened. */
     val text: String = "",
 ) {
-    @Suppress("EnumEntryName") enum class Kind { appointment, visit_note, drive_confirmed, access_change, dose_given }
+    @Suppress("EnumEntryName") enum class Kind { appointment, visit_note, drive_confirmed, access_change, dose_given, check_in }
 }
 
 // ponytail: the whole history in one read; page it when a Care Circle's gets long.

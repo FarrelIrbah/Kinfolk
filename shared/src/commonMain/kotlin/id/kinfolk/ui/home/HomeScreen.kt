@@ -56,6 +56,14 @@ import kinfolk.shared.generated.resources.given
 import kinfolk.shared.generated.resources.mark_all_given
 import kinfolk.shared.generated.resources.morning_eyebrow
 import kinfolk.shared.generated.resources.morning_title
+import kinfolk.shared.generated.resources.call_recipient
+import kinfolk.shared.generated.resources.edit
+import kinfolk.shared.generated.resources.evening_body
+import kinfolk.shared.generated.resources.evening_body_logged
+import kinfolk.shared.generated.resources.evening_eyebrow
+import kinfolk.shared.generated.resources.evening_title
+import kinfolk.shared.generated.resources.evening_title_logged
+import kinfolk.shared.generated.resources.log_checkin
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -98,6 +106,9 @@ data class MorningDose(val name: String, val given: Boolean)
 /** v3's morning card: "08.00 · obat pagi", each dose, and the next visit (null hides the line). */
 data class Morning(val at: String, val recipient: String, val doses: List<MorningDose>, val nextVisit: String?)
 
+/** v3's evening card: "19.00 · cek malam"; [bp] (sys to dia) once tonight's Check-in is logged. */
+data class Evening(val at: String, val recipient: String, val bp: Pair<Int, Int>?)
+
 data class DutyDay(val dow: String, val num: Int, val member: Person, val isToday: Boolean)
 data class FeedItem(val by: Person, val text: String, val whenLabel: String)
 
@@ -118,6 +129,7 @@ data class HomeState(
     val invites: Pair<Int, Int>? = null,
     /** Shown in place of the Appointment card when [homeCard] picks it. */
     val morning: Morning? = null,
+    val evening: Evening? = null,
 )
 
 private val Cream = Color(0xFFF3EEE4)
@@ -138,6 +150,8 @@ fun HomeScreen(
     onInvite: () -> Unit,
     onFillEmergency: () -> Unit,
     onMarkMorning: () -> Unit,
+    onCall: () -> Unit,
+    onCheckIn: () -> Unit,
 ) {
     // design: padding:4px 20px; gap:22px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -156,8 +170,9 @@ fun HomeScreen(
         }
         // ponytail: search bar, tasks row and weekly digest row hidden until those features ship.
 
-        // ponytail: evening and after-visit cards fall back to these until their tickets land.
-        if (s.morning != null) MorningCard(s.morning, onMarkMorning)
+        // ponytail: the after-visit card falls back to these until its ticket lands.
+        if (s.evening != null) EveningCard(s.evening, onCall, onCheckIn)
+        else if (s.morning != null) MorningCard(s.morning, onMarkMorning)
         else s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) } ?: Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             EmptyStep(1, stringResource(Res.string.add_appt), stringResource(Res.string.add_appt_sub), part = false, onAddAppointment)
             EmptyStep(2, stringResource(Res.string.add_meds), stringResource(Res.string.add_meds_sub), part = false, onRecords)
@@ -283,6 +298,27 @@ private fun MorningCard(m: Morning, onMark: () -> Unit) {
         }
         CardButton(stringResource(if (all) Res.string.all_given else Res.string.mark_all_given), Cream, Kf.Green, { if (!all) onMark() }, Modifier.fillMaxWidth())
         m.nextVisit?.let { Text(it, fontSize = 13.sp, color = Cream.copy(alpha = .85f)) }
+    }
+}
+
+@Composable
+private fun EveningCard(e: Evening, onCall: () -> Unit, onCheckIn: () -> Unit) {
+    // design: #22261F, radius 22, padding 20, gap 14
+    Column(
+        Modifier.fillMaxWidth().background(Kf.Ink, RoundedCornerShape(22.dp)).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(stringResource(Res.string.evening_eyebrow, e.at), fontSize = 13.sp, color = Cream.copy(alpha = .8f))
+        Text(stringResource(if (e.bp == null) Res.string.evening_title else Res.string.evening_title_logged), style = serifStyle(26f, 1.15f).copy(color = Cream))
+        Text(
+            e.bp?.let { (sys, dia) -> stringResource(Res.string.evening_body_logged, sys, dia) }
+                ?: stringResource(Res.string.evening_body, e.recipient),
+            fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Cream.copy(alpha = .85f),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CardButton(stringResource(Res.string.call_recipient, e.recipient), CreamBtn, Cream, onCall, Modifier.weight(1f))
+            CardButton(stringResource(if (e.bp == null) Res.string.log_checkin else Res.string.edit), Cream, Kf.Ink, onCheckIn, Modifier.weight(1f))
+        }
     }
 }
 

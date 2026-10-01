@@ -59,7 +59,8 @@ fun text(e: TimelineEntry, tz: TimeZone): String = when (e.kind) {
         e.notes.isNotBlank() -> "${e.title}: ${e.notes}"
         else -> e.title.orEmpty()
     }
-    TimelineEntry.Kind.drive_confirmed, TimelineEntry.Kind.access_change, TimelineEntry.Kind.dose_given -> e.text
+    TimelineEntry.Kind.drive_confirmed, TimelineEntry.Kind.access_change, TimelineEntry.Kind.dose_given,
+    TimelineEntry.Kind.check_in -> e.text
 }
 
 /** The v3 kinds, with their uppercase label and colour (`timeline()` in the prototype). */
@@ -76,6 +77,7 @@ fun type(kind: TimelineEntry.Kind) = when (kind) {
     TimelineEntry.Kind.drive_confirmed -> EntryType.Rota
     TimelineEntry.Kind.access_change -> EntryType.CheckIn // #20
     TimelineEntry.Kind.dose_given -> EntryType.Medicine // #21
+    TimelineEntry.Kind.check_in -> EntryType.CheckIn // #24
 }
 
 /** The filter chips: Semua (null), then a chip per kind but Rota, which only Semua shows. */

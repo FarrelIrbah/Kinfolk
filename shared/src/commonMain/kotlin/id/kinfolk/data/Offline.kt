@@ -27,6 +27,8 @@ data class Snapshot(
     /** [today]'s Dose Logs: offline the ring still counts them. */
     val doses: List<DoseLog> = emptyList(),
     val today: LocalDate? = null,
+    /** [today]'s Check-in, for the evening card. */
+    val checkIn: CheckIn? = null,
     val savedAt: Instant = Clock.System.now(),
 )
 
@@ -39,6 +41,6 @@ suspend fun SupabaseClient.snapshot(since: Instant, today: LocalDate): Snapshot?
         circle, recipient, next, next?.let { questions(it.id) }.orEmpty(), next?.let { visitNote(it.id) },
         medications(circle.id), members(circle.id), timeline(circle.id),
         recipient?.let { emergencyMedications(it.id) }.orEmpty(), careContacts(circle.id), recipient?.let { emergencyCard(it.id) },
-        doseLogs(circle.id, today), today,
+        doseLogs(circle.id, today), today, recipient?.let { checkIn(it.id, today) },
     )
 }

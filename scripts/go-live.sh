@@ -264,8 +264,8 @@ if run; then
 fi
 
 # ──────────────────────────────────────────────────────────────────────────
-stage "Meta: submit the 11 message templates"
-say "Copy is owner-approved (#3, #4, #13, #23) and matches template_body(). Don't edit it here."
+stage "Meta: submit the 12 message templates"
+say "Copy is owner-approved (#3, #4, #13, #23, #24) and matches template_body(). Don't edit it here."
 note "A rejection is kept for the summary; bring it back before changing any copy."
 if run; then
   WABA_ID=$(_existing WABA_ID || true); WHATSAPP_TOKEN=$(_existing WHATSAPP_TOKEN || true)
@@ -280,6 +280,7 @@ if run; then
   submit kinfolk_drive_reminder UTILITY "[$(body 'Hari ini: antar {{1}} ke {{2}} jam {{3}}.' '["Tukiman","Kontrol neurologi","09.00, berangkat 08.15. Bawa: KTP, kartu BPJS"]')]"
   submit kinfolk_duty_reminder UTILITY "[$(body 'Hari ini: {{1}} jam {{2}}.' '["telepon cek malam","19.00"]')]"
   submit kinfolk_visit_note UTILITY "[$(body '{{1}} menulis catatan kunjungan {{2}}. {{3}}.' '["Sri","Tukiman","Kontrol neurologi: fisioterapi 2x/minggu, MRI ulang 3 bulan lagi"]')]"
+  submit kinfolk_bp_high UTILITY "[$(body 'Tensi {{1}} malam ini {{2}}, 140 ke atas. Dicatat oleh {{3}}.' '["Tukiman","152/90","Sri"]')]"
   pause "Press Enter when you've read the results"
 fi
 
@@ -393,7 +394,7 @@ fi
 # ──────────────────────────────────────────────────────────────────────────
 stage "Wait for Meta template approval"
 open_url "https://business.facebook.com/wa/manage/message-templates/"
-say "All 11 kinfolk_* templates must show Active before the real-number tests."
+say "All 12 kinfolk_* templates must show Active before the real-number tests."
 pause "Press Enter when they're approved"
 
 # ──────────────────────────────────────────────────────────────────────────
