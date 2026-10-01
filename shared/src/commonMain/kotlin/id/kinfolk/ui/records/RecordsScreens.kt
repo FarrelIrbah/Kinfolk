@@ -9,6 +9,22 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import id.kinfolk.data.Ate
+import id.kinfolk.data.Expense
+import id.kinfolk.ui.Avatar
+import id.kinfolk.ui.Card
+import id.kinfolk.ui.Hairline
+import id.kinfolk.ui.HintedInput
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import kinfolk.shared.generated.resources.add_expense
+import kinfolk.shared.generated.resources.costs_note
+import kinfolk.shared.generated.resources.paid_by
+import kinfolk.shared.generated.resources.what_ph
 import id.kinfolk.data.CheckIn
 import id.kinfolk.data.Mood
 import id.kinfolk.data.trend
@@ -124,6 +140,17 @@ fun Medication.noteLine(today: LocalDate, refiller: String?): Pair<String, Color
     }
 }
 
+/** Approved deviation: Rupiah, not v3's dollars. "Rp 250.000" */
+fun rupiah(amount: Long) = "Rp " + amount.toString().reversed().chunked(3).joinToString(".").reversed()
+
+/** What was typed in the "Rp" box: dots are thousands, so only the digits count; null for nothing or zero. */
+fun parseRupiah(typed: String): Long? = typed.filter { it.isDigit() }.takeIf { it.length <= 15 }?.toLongOrNull()?.takeIf { it > 0 }
+
+private val monthNames = listOf("Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember")
+
+/** v3's "September sejauh ini", for [today]'s month. */
+fun soFar(today: LocalDate) = "${monthNames[today.month.ordinal]} sejauh ini"
+
 private val Gold = Color(0xFF9A7A2F)
 private val GivenBorder = Color(0x3322261F) // rgba(34,38,31,.2)
 
@@ -134,28 +161,32 @@ private enum class RecTab(val label: StringResource) {
 /**
  * `records` (docs/screen-map.md): v3's four tabs; Obat marks today's doses ("Tandai" / "Diberikan ✓", [given] =
  * Medication ids). Approved deviation (#11): "+ Tambah obat", a "Tidak diminum lagi" group, tap a card to edit.
- * Kondisi (#25) charts [checkIns], the last 30 oldest first.
- * ponytail: Dokumen and Biaya stay empty until their tickets.
+ * Kondisi (#25) charts [checkIns], the last 30 oldest first. Biaya (#28) shows [costs], gone while Tagihan & uang
+ * is hidden from me (null).
+ * ponytail: Dokumen stays empty until its ticket.
  */
 @Composable
 fun RecordsScreen(
     meds: List<Medication>,
     given: Set<String>,
     checkIns: List<CheckIn>,
+    costs: Costs?,
     today: LocalDate,
     nameOf: (String) -> String?,
     onToggle: (Medication) -> Unit,
     onOpen: (Medication?) -> Unit,
 ) {
-    var tab by rememberSaveable { mutableStateOf(RecTab.Meds) }
+    var picked by rememberSaveable { mutableStateOf(RecTab.Meds) }
+    val tabs = RecTab.entries.filter { it != RecTab.Costs || costs != null }
+    val tab = picked.takeIf { it in tabs } ?: RecTab.Meds
     // design: padding:4px 20px; gap:18px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Text(stringResource(Res.string.tab_records), style = serifStyle(30f, 1.1f))
         // design: grid 4 cols, gap 4, #E4DDD0, r12, p4; buttons r9, h36, 13px 600
         Row(Modifier.fillMaxWidth().background(Kf.Sand, RoundedCornerShape(12.dp)).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            RecTab.entries.forEach { t ->
+            tabs.forEach { t ->
                 Box(
-                    Modifier.weight(1f).height(36.dp).background(if (t == tab) Kf.Card else Color.Transparent, RoundedCornerShape(9.dp)).tap { tab = t },
+                    Modifier.weight(1f).height(36.dp).background(if (t == tab) Kf.Card else Color.Transparent, RoundedCornerShape(9.dp)).tap { picked = t },
                     contentAlignment = Alignment.Center,
                 ) { Text(stringResource(t.label), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
             }
@@ -174,9 +205,137 @@ fun RecordsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { stopped.forEach { MedCard(it, null, onOpen) {} } }
             }
         }
+        if (tab == RecTab.Costs && costs != null) Costs(costs, today)
         if (tab == RecTab.Health) Trends(checkIns)
     }
 }
+
+/**
+ * Biaya: [expenses] newest first, [payers] the "Dibayar oleh" chips and bars (v3's SIBS, me first), [person] for
+ * anyone who paid. [add] gets what was typed and returns true once saved, clearing the draft.
+ */
+class Costs(
+    val expenses: List<Expense>,
+    val payers: Map<String, Person>,
+    val me: String,
+    val person: (String) -> Person,
+    val add: suspend (what: String, amount: Long?, paidBy: String) -> Boolean,
+)
+
+private val BarTrack = Color(0xFFEDE7DB)
+private val InputLine = Color(0x2422261F) // rgba(34,38,31,.14)
+
+/** v3's Biaya: the note, this month's total with a bar per payer, the list, and "Tambah pengeluaran". */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Costs(c: Costs, today: LocalDate) {
+    val scope = rememberCoroutineScope()
+    var what by rememberSaveable { mutableStateOf("") }
+    var amount by rememberSaveable { mutableStateOf("") }
+    var picked by rememberSaveable { mutableStateOf(c.me) }
+    // Me until another is picked; whoever left meanwhile falls back too.
+    val by = picked.takeIf { it in c.payers } ?: c.me.takeIf { it in c.payers } ?: c.payers.keys.firstOrNull().orEmpty()
+    var busy by remember { mutableStateOf(false) }
+    val month = c.expenses.filter { it.day.year == today.year && it.day.month == today.month }
+    val sums = c.payers.keys.associateWith { id -> month.filter { it.paidBy == id }.sumOf { it.amount } }
+    val max = maxOf(1L, sums.values.maxOrNull() ?: 0L)
+    val field = LocalTextStyle.current.copy(fontSize = 15.sp, color = Kf.Ink)
+    // design: gap 12
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(Res.string.costs_note), fontSize = 13.sp, lineHeight = (13 * 1.5).sp, color = Kf.Muted)
+        // design: #FBF8F2, r18, p16, gap 12
+        Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(soFar(today), Modifier.alignByBaseline(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(rupiah(month.sumOf { it.amount }), Modifier.alignByBaseline(), style = serifStyle(24f))
+            }
+            // design: grid 44px 1fr 56px, gap 10, 13px; track h8 r4 #EDE7DB. A column each, so the bars line up.
+            // The amount column is as wide as its widest, at least 56px: "Rp 250.000" doesn't fit 56 (Rupiah deviation).
+            @Composable fun Cell(modifier: Modifier = Modifier, content: @Composable () -> Unit) =
+                Box(modifier.height(16.dp), contentAlignment = Alignment.CenterStart) { content() }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.width(44.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    c.payers.values.forEach { Cell { Text(it.name, fontSize = 13.sp, maxLines = 1) } }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    c.payers.forEach { (id, p) ->
+                        Cell {
+                            Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(BarTrack)) {
+                                Box(Modifier.fillMaxWidth(sums.getValue(id).toFloat() / max).fillMaxHeight().background(p.color))
+                            }
+                        }
+                    }
+                }
+                Column(Modifier.width(IntrinsicSize.Max).widthIn(min = 56.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    c.payers.keys.forEach { id ->
+                        Cell(Modifier.fillMaxWidth()) {
+                            Text(rupiah(sums.getValue(id)), Modifier.fillMaxWidth(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
+                        }
+                    }
+                }
+            }
+        }
+        if (c.expenses.isNotEmpty()) Card {
+            c.expenses.forEach { e ->
+                val p = c.person(e.paidBy)
+                // design: padding 12px 16px, gap 12, border-bottom rgba(34,38,31,.07)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Avatar(p.initial, p.color, 30.dp, 12.sp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(e.what, fontSize = 15.sp)
+                        Text("${p.name} · ${if (e.day == today) stringResource(Res.string.today) else dayMonth(e.day)}", fontSize = 12.sp, color = Kf.Muted)
+                    }
+                    Text(rupiah(e.amount), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Hairline()
+            }
+        }
+        // design: #FBF8F2, r18, p16, gap 12
+        Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(Res.string.add_expense), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            // design: inputs h46, 1px rgba(34,38,31,.14), r12, #fff, padding 0 12px, 15px; the amount 80px wide
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InputBox(Modifier.weight(1f)) { HintedInput(what, { what = it }, stringResource(Res.string.what_ph), field, singleLine = true) }
+                InputBox(Modifier.width(80.dp)) {
+                    BasicTextField(
+                        amount, { amount = it }, Modifier.fillMaxWidth(), textStyle = field, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        decorationBox = { f -> Box { if (amount.isEmpty()) Text("Rp", style = field.copy(color = Kf.Muted)); f() } },
+                    )
+                }
+            }
+            Text(stringResource(Res.string.paid_by), fontSize = 12.sp, color = Kf.Muted)
+            // design: wrap, gap 6; chips 1px border, r999, padding 8px 14px, 14px; picked in the payer's colour
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                c.payers.forEach { (id, p) ->
+                    val on = id == by
+                    Text(
+                        p.name, color = if (on) Color.White else Kf.Ink, fontSize = 14.sp,
+                        modifier = Modifier.background(if (on) p.color else Color.Transparent, CircleShape)
+                            .border(1.dp, if (on) p.color else Kf.InputBorder, CircleShape).tap { picked = id }.padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                }
+            }
+            // design: h46, r12, #22261F, 14px 600
+            Box(
+                Modifier.fillMaxWidth().height(46.dp).background(Kf.Ink, RoundedCornerShape(12.dp)).tap {
+                    if (!busy) scope.launch {
+                        busy = true
+                        if (c.add(what, parseRupiah(amount), by)) { what = ""; amount = "" }
+                        busy = false
+                    }
+                },
+                contentAlignment = Alignment.Center,
+            ) { Text(stringResource(Res.string.save), color = Kf.Paper, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+        }
+    }
+}
+
+@Composable
+private fun InputBox(modifier: Modifier, input: @Composable () -> Unit) = Box(
+    modifier.height(46.dp).background(Color.White, RoundedCornerShape(12.dp)).border(1.dp, InputLine, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
+    contentAlignment = Alignment.CenterStart,
+) { input() }
 
 private val Tan = Color(0xFFC9A77C)
 private val Rust = Color(0xFFC4471F)

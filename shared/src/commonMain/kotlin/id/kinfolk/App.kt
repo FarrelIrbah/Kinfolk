@@ -48,6 +48,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import id.kinfolk.data.Appointment
+import id.kinfolk.data.Expense
+import id.kinfolk.data.addExpense
+import id.kinfolk.data.expenses
+import id.kinfolk.ui.records.Costs
+import kinfolk.shared.generated.resources.expense_missing
 import id.kinfolk.data.DutyTurn
 import id.kinfolk.data.answerSwap
 import id.kinfolk.data.appointmentsBetween
@@ -334,6 +339,7 @@ fun App() {
         var markedMorning by remember { mutableStateOf<LocalDate?>(null) } // keeps "Semua diberikan ✓" up that day
         var checkIn by remember { mutableStateOf<CheckIn?>(null) } // of the day it was read
         var checkIns by remember { mutableStateOf(emptyList<CheckIn>()) } // Kondisi, the last 30
+        var expenses by remember { mutableStateOf(emptyList<Expense>()) } // Biaya
         var checkingIn by rememberSaveable { mutableStateOf<String?>(null) } // "2026-10-01 19:00": `checkin`'s day and Duty time, fixed when opened
         var tasks by remember { mutableStateOf(emptyList<Task>()) }
         var editingTask by remember { mutableStateOf<Task?>(null) }
@@ -487,6 +493,7 @@ fun App() {
             hidden = retrying { supabase.hidden(k.circle.id) }
             changes = retrying { supabase.accessChanges(k.circle.id) }
             checkIns = k.recipient?.let { r -> retrying { supabase.recentCheckIns(r.id) } }.orEmpty()
+            expenses = retrying { supabase.expenses(k.circle.id) }
             loadRota()
         }
         suspend fun land(how: Nav) {
@@ -722,8 +729,20 @@ fun App() {
                                 val marked = meds.associate { m ->
                                     m.id to stringResource(Res.string.dose_marked, m.name, members.firstOrNull { it.userId == me() }?.name.orEmpty())
                                 }
+                                val missing = stringResource(Res.string.expense_missing)
+                                val c = circle
+                                val r = recipient
+                                // Gone while Tagihan & uang is hidden from me (#28).
+                                val costs = if (c == null || r == null || circleMembers().firstOrNull { it.isMe }?.sees?.contains(DataCategory.money) != true) null
+                                else Costs(expenses, dutyPeople(), me().orEmpty(), { named(it) }) { what, amount, by ->
+                                    if (what.isBlank() || amount == null) { toast = missing; return@Costs false }
+                                    // Not retried: adding is not idempotent.
+                                    (attempt { supabase.addExpense(c.id, r.id, what, amount, by, today) } != null).also { ok ->
+                                        if (ok) expenses = retrying { supabase.expenses(c.id) } else toast = noConnection
+                                    }
+                                }
                                 RecordsScreen(
-                                    meds, given, checkIns, today, { id -> rotaPeople()[id]?.name },
+                                    meds, given, checkIns, costs, today, { id -> rotaPeople()[id]?.name },
                                     onToggle = { m ->
                                         val on = m.id in given
                                         markDoses(listOf(m), !on)
