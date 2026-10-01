@@ -31,6 +31,7 @@ import id.kinfolk.ui.appointment.hm
 import id.kinfolk.ui.appointment.shortDate
 import id.kinfolk.ui.dashed
 import id.kinfolk.ui.home.Person
+import id.kinfolk.ui.SvgPath
 import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
@@ -40,6 +41,7 @@ import kinfolk.shared.generated.resources.kind_document
 import kinfolk.shared.generated.resources.kind_medicine
 import kinfolk.shared.generated.resources.kind_rota
 import kinfolk.shared.generated.resources.kind_visit
+import kinfolk.shared.generated.resources.notes_title
 import kinfolk.shared.generated.resources.same_history
 import kinfolk.shared.generated.resources.tab_timeline
 import kinfolk.shared.generated.resources.timeline_empty
@@ -90,15 +92,26 @@ private val EmptyLine = Color(0x3322261F) // rgba(34,38,31,.2)
 
 /**
  * `timeline` (docs/screen-map.md): every kind, filtered by [filter] (null = Semua). The `empty` screen's dashed box
- * while there's nothing yet. ponytail: no "Catatan" pill until Notes (#27).
+ * while there's nothing yet. The "Catatan" pill opens `notes` (#27).
  */
 @Composable
-fun TimelineScreen(rows: List<TimelineRow>, filter: EntryType?, onFilter: (EntryType?) -> Unit) {
+fun TimelineScreen(rows: List<TimelineRow>, filter: EntryType?, onFilter: (EntryType?) -> Unit, onNotes: () -> Unit) {
     // design: padding:4px 20px; gap:18px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(Res.string.same_history), fontSize = 13.sp, color = Kf.Muted)
-            Text(stringResource(Res.string.tab_timeline), style = serifStyle(30f, 1.1f))
+        // design: space-between, align-items:flex-end, gap 10
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(Res.string.same_history), fontSize = 13.sp, color = Kf.Muted)
+                Text(stringResource(Res.string.tab_timeline), style = serifStyle(30f, 1.1f))
+            }
+            // design: #FBF8F2, r999, h40, padding 0 14, 14px 500, gap 6, pencil 16
+            Row(
+                Modifier.height(40.dp).background(Kf.Card, CircleShape).tap(onNotes).padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SvgPath("M4 20h4L19 9l-4-4L4 16zM14 6l4 4", 16.dp, Kf.Ink)
+                Text(stringResource(Res.string.notes_title), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
         }
         if (rows.isEmpty()) EmptyBox(stringResource(Res.string.timeline_empty))
         // design: display:flex; gap:6px; overflow-x:auto

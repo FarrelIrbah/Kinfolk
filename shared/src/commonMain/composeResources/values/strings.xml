@@ -344,4 +344,12 @@
     <string name="tasks_row_late">%1$d terlambat · %2$s</string>
     <string name="tasks_row_owner">(%1$s)</string>
     <string name="tasks_row_ok">Tidak ada yang terlambat</string>
+    <string name="notes_title">Catatan</string>
+    <string name="notes_sub">Catatan bersama dan pribadi</string>
+    <string name="notes_shared">Bersama</string>
+    <string name="notes_only_me">Hanya saya</string>
+    <string name="note_hint">Tulis catatan…</string>
+    <string name="notes_private_hint">Catatan pribadi tidak pernah ditampilkan ke siapa pun, termasuk %1$s.</string>
+    <string name="note_saved_private">Tersimpan. Hanya Anda yang bisa melihat.</string>
+    <string name="note_saved_shared">Tersimpan dan dibagikan ke lingkaran.</string>
 </resources>

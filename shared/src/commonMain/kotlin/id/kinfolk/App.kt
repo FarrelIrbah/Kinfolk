@@ -98,6 +98,12 @@ import id.kinfolk.data.markTaskDone
 import id.kinfolk.data.remindTask
 import id.kinfolk.data.tasks as taskList
 import id.kinfolk.ui.tasks.TaskFormScreen
+import id.kinfolk.data.Note
+import id.kinfolk.data.addNote
+import id.kinfolk.data.notes as noteList
+import id.kinfolk.ui.notes.NotesScreen
+import kinfolk.shared.generated.resources.note_saved_private
+import kinfolk.shared.generated.resources.note_saved_shared
 import id.kinfolk.ui.tasks.TasksScreen
 import id.kinfolk.ui.tasks.overdue
 import kinfolk.shared.generated.resources.reminded_toast
@@ -291,7 +297,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -331,6 +337,7 @@ fun App() {
         var checkingIn by rememberSaveable { mutableStateOf<String?>(null) } // "2026-10-01 19:00": `checkin`'s day and Duty time, fixed when opened
         var tasks by remember { mutableStateOf(emptyList<Task>()) }
         var editingTask by remember { mutableStateOf<Task?>(null) }
+        var notes by remember { mutableStateOf(emptyList<Note>()) }
         var contacts by remember { mutableStateOf(emptyList<CareContact>()) }
         var editingContact by remember { mutableStateOf<CareContact?>(null) }
         var invitation by remember { mutableStateOf<InvitationToMe?>(null) }
@@ -394,11 +401,12 @@ fun App() {
             return Person(if (m.leftAt != null) former.replace("%1\$s", name) else name, colorOf(id))
         }
         // On the Timeline yourself too by name, in Sri's green (#8, like the prototype).
-        fun author(e: TimelineEntry): Person {
-            val m = members.firstOrNull { it.userId == e.by }
-            val name = m?.name ?: e.byName.orEmpty()
-            return Person(if (m?.leftAt != null) former.replace("%1\$s", name) else name, colorOf(e.by))
+        fun named(id: String, fallback: String? = null): Person {
+            val m = members.firstOrNull { it.userId == id }
+            val name = m?.name ?: fallback.orEmpty()
+            return Person(if (m?.leftAt != null) former.replace("%1\$s", name) else name, colorOf(id))
         }
+        fun author(e: TimelineEntry) = named(e.by, e.byName)
         fun visit() = opened ?: next?.let { Visit(it, questions, note) }
         // The Care Recipient while they are a Member: they set restrictions, else the admins (ADR 0004).
         fun owner() = recipient?.memberId?.takeIf { id -> members.any { it.userId == id && it.leftAt == null } }
@@ -413,6 +421,7 @@ fun App() {
         fun back() { nav = Nav.Back; screen = stack.lastOrNull() ?: Screen.Home; stack = stack.dropLast(1) }
         fun reset(to: Screen, how: Nav = Nav.Tab) { nav = how; stack = emptyList(); screen = to }
         fun pick(t: Tab) { reset(Screen.Home); tab = t }
+        fun openNotes() { go(Screen.Notes); scope.launch { circle?.let { c -> notes = retrying { supabase.noteList(c.id) } } } }
         val today = now.toLocalDateTime(tz).date
         val week = weekOf(today)
         val given = doses.filter { it.day == today }.map { it.medicationId }.toSet()
@@ -707,8 +716,8 @@ fun App() {
                             }
                             Tab.Timeline -> TimelineScreen(
                                 timeline.map { e -> TimelineRow(author(e), type(e.kind), ago(e.at, now, tz), text(e, tz)) { openFromTimeline(e) } },
-                                timelineFilter,
-                            ) { timelineFilter = it }
+                                timelineFilter, { timelineFilter = it }, ::openNotes,
+                            )
                             Tab.Records -> {
                                 val marked = meds.associate { m ->
                                     m.id to stringResource(Res.string.dose_marked, m.name, members.firstOrNull { it.userId == me() }?.name.orEmpty())
@@ -725,7 +734,8 @@ fun App() {
                             Tab.Circle -> CircleScreen(
                                 circle?.name.orEmpty(), recipient?.name.orEmpty(), circleMembers(), onSos = { openEmergency() },
                                 onMember = { viewing = it.id; memberError = null; go(Screen.Member) },
-                            ) { scope.launch { loadContacts(); go(Screen.Contacts) } }
+                                onContacts = { scope.launch { loadContacts(); go(Screen.Contacts) } }, onNotes = ::openNotes,
+                            )
                         }
                         Screen.Appt -> visit()?.let { v ->
                             val a = v.appointment
@@ -850,6 +860,17 @@ fun App() {
                                 // Before leaving, so the form stays busy and can't add twice; also the Visit Note a Next Step's edit changed.
                                 loadHome()
                             }.also { if (it != null) back() } != null
+                        }
+                        Screen.Notes -> {
+                            val savedPrivate = stringResource(Res.string.note_saved_private)
+                            val savedShared = stringResource(Res.string.note_saved_shared)
+                            NotesScreen(notes, recipient?.name.orEmpty(), now, tz, { named(it) }, onBack = ::back) { text, private ->
+                                val c = circle ?: return@NotesScreen false
+                                (attempt { supabase.addNote(c.id, text, private) } != null).also { ok ->
+                                    toast = if (!ok) noConnection else if (private) savedPrivate else savedShared
+                                    if (ok) notes = retrying { supabase.noteList(c.id) }
+                                }
+                            }
                         }
                         Screen.Contacts -> ContactsScreen(contacts, onBack = ::back) { editingContact = it; go(Screen.ContactForm) }
                         Screen.ContactForm -> ContactFormScreen(
