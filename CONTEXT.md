@@ -26,6 +26,10 @@ _Avoid_: pending member, invite link
 Orang yang pernah menjadi Member lalu keluar atau dikeluarkan. Tidak punya akses lagi, tapi namanya tetap tercatat pada yang pernah ditulisnya. UI: "Mantan anggota".
 _Avoid_: deleted user, inactive member
 
+**Access Change**:
+Satu perubahan pembatasan Data Category: siapa mengubah, kapan, atas nama Care Recipient atau tidak. Tampil di riwayat Member dan di Linimasa. UI: "Riwayat perubahan".
+_Avoid_: audit log, permission history
+
 **Role**:
 Posisi Member di Care Circle (admin, sibling, parent, viewer) yang menentukan akses dasar.
 _Avoid_: permission level, type

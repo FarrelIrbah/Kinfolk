@@ -51,15 +51,15 @@ import org.jetbrains.compose.resources.stringResource
 /** Entry copy approved in #8, after the prototype's "Ringkasan neurologi: fisioterapi 2x/minggu, …". */
 fun text(e: TimelineEntry, tz: TimeZone): String = when (e.kind) {
     TimelineEntry.Kind.appointment -> {
-        val at = e.startsAt.toLocalDateTime(tz)
+        val at = e.startsAt!!.toLocalDateTime(tz)
         "Menjadwalkan ${e.title} dengan ${e.provider}, ${shortDate(at.date)} · ${hm(at.time)}."
     }
     TimelineEntry.Kind.visit_note -> when {
         e.nextSteps.isNotEmpty() -> "${e.title}: ${e.nextSteps.joinToString(", ").trimEnd('.')}."
         e.notes.isNotBlank() -> "${e.title}: ${e.notes}"
-        else -> e.title
+        else -> e.title.orEmpty()
     }
-    TimelineEntry.Kind.drive_confirmed -> e.text
+    TimelineEntry.Kind.drive_confirmed, TimelineEntry.Kind.access_change -> e.text
 }
 
 /** The v3 kinds, with their uppercase label and colour (`timeline()` in the prototype). */
@@ -74,6 +74,7 @@ enum class EntryType(val label: StringResource, val color: Color) {
 fun type(kind: TimelineEntry.Kind) = when (kind) {
     TimelineEntry.Kind.appointment, TimelineEntry.Kind.visit_note -> EntryType.Visit
     TimelineEntry.Kind.drive_confirmed -> EntryType.Rota
+    TimelineEntry.Kind.access_change -> EntryType.CheckIn // #20
 }
 
 /** The filter chips: Semua (null), then a chip per kind but Rota, which only Semua shows. */

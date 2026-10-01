@@ -237,10 +237,10 @@ class WhatsAppTest {
 
         // Hidden with the Appointment's Data Category, and gone with a cancelled Appointment.
         sri.client.setHidden(tukiman, dewi.client.me(), DataCategory.appointments, hidden = true)
-        assertTrue(dewi.client.timeline(circle).isEmpty())
+        assertTrue(dewi.client.timeline(circle).all { it.kind == TimelineEntry.Kind.access_change })
         assertTrue(signedInNewcomer().timeline(circle).isEmpty())
         sri.client.cancelAppointment(appt)
-        assertTrue(sri.client.timeline(circle).isEmpty())
+        assertTrue(sri.client.timeline(circle).all { it.kind == TimelineEntry.Kind.access_change })
     }
 
     @Test

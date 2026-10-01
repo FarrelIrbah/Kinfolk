@@ -38,6 +38,17 @@ import kinfolk.shared.generated.resources.access_full
 import kinfolk.shared.generated.resources.access_part
 import kinfolk.shared.generated.resources.back_circle
 import kinfolk.shared.generated.resources.can_see
+import kinfolk.shared.generated.resources.perm_foot
+import kinfolk.shared.generated.resources.change_shown
+import kinfolk.shared.generated.resources.change_hidden
+import kinfolk.shared.generated.resources.no_changes
+import kinfolk.shared.generated.resources.change_history
+import kinfolk.shared.generated.resources.cat_money_desc
+import kinfolk.shared.generated.resources.cat_money
+import kinfolk.shared.generated.resources.cat_wishes_desc
+import kinfolk.shared.generated.resources.cat_wishes
+import kinfolk.shared.generated.resources.cat_documents_desc
+import kinfolk.shared.generated.resources.cat_documents
 import kinfolk.shared.generated.resources.cat_appointments
 import kinfolk.shared.generated.resources.cat_appointments_desc
 import kinfolk.shared.generated.resources.cat_medications
@@ -74,17 +85,26 @@ class CircleMember(
     val sees: Set<DataCategory> = DataCategory.entries.toSet(), val isRecipient: Boolean = false,
 )
 
-/** `member` rows, approved in #9: the prototype's "Janji dokter" and "Obat", and "Catatan kunjungan" for "Rekaman kunjungan". */
+/** `member` rows: v3's six (#20). */
 val DataCategory.label: StringResource get() = when (this) {
     DataCategory.appointments -> Res.string.cat_appointments
     DataCategory.visit_notes -> Res.string.cat_visit_notes
     DataCategory.medications -> Res.string.cat_medications
+    DataCategory.documents -> Res.string.cat_documents
+    DataCategory.wishes -> Res.string.cat_wishes
+    DataCategory.money -> Res.string.cat_money
 }
 private val DataCategory.desc get() = when (this) {
     DataCategory.appointments -> Res.string.cat_appointments_desc
     DataCategory.visit_notes -> Res.string.cat_visit_notes_desc
     DataCategory.medications -> Res.string.cat_medications_desc
+    DataCategory.documents -> Res.string.cat_documents_desc
+    DataCategory.wishes -> Res.string.cat_wishes_desc
+    DataCategory.money -> Res.string.cat_money_desc
 }
+
+/** A "Riwayat perubahan" line: [category] hidden or shared, over [meta] ("Baru saja · oleh Sri"). */
+class HistoryLine(val category: DataCategory, val hidden: Boolean, val meta: String)
 
 @Composable
 private fun CircleMember.roleText() = stringResource(
@@ -106,8 +126,8 @@ private fun CircleMember.sub() = when {
 
 /**
  * `circle` from design v3: header, Members, "Cara lain". Approved in #5: "Paket" and "Ulangi onboarding" are hidden.
- * Approved in #9: the intro box, without "Perubahan tercatat di linimasa.", only while the Care Recipient
- * [recipientName] is a Member (their row first, no access column); access "Penuh" or "2/3".
+ * Approved in #9: the intro box only while the Care Recipient [recipientName] is a Member (their row first, no
+ * access column); access "Penuh" or "N/6" (#20).
  */
 @Composable
 fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit) {
@@ -165,15 +185,16 @@ fun CircleScreen(circleName: String, recipientName: String, members: List<Circle
 }
 
 /**
- * `member` from design v3. Approved in #5: "Notifikasi" (#13), the change history and footnote are hidden; admins
- * get "Jadikan pengatur" and "Keluarkan dari lingkaran" on others, everyone "Keluar dari lingkaran" on themselves,
- * each a confirm sheet except promoting. Approved in #9: "Bisa melihat" for admins and the Care Recipient, hidden
- * while [onToggle] is null; a tap passes the category and whether it was on.
+ * `member` from design v3. Approved in #5: "Notifikasi" is hidden (#13); admins get "Jadikan pengatur" and
+ * "Keluarkan dari lingkaran" on others, everyone "Keluar dari lingkaran" on themselves, each a confirm sheet except
+ * promoting. Approved in #9: "Bisa melihat" for admins and the Care Recipient, hidden while [onToggle] is null; a
+ * tap passes the category and whether it was on. With it (#20), "Riwayat perubahan" ([history], newest first) and
+ * the footnote.
  */
 @Composable
 fun MemberScreen(
     m: CircleMember, iAmAdmin: Boolean, error: String?, onBack: () -> Unit, onPromote: () -> Unit, onRemove: () -> Unit, onLeave: () -> Unit,
-    onToggle: ((DataCategory, Boolean) -> Unit)?,
+    onToggle: ((DataCategory, Boolean) -> Unit)?, history: List<HistoryLine>,
 ) {
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -207,6 +228,27 @@ fun MemberScreen(
                     Hairline()
                 }
             }
+        }
+        if (onToggle != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel(stringResource(Res.string.change_history))
+                // design: rows padding 12px 16px, gap 2; text 14, meta 12 muted
+                Card {
+                    history.forEach { l ->
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(stringResource(if (l.hidden) Res.string.change_hidden else Res.string.change_shown, stringResource(l.category.label)), fontSize = 14.sp)
+                            Text(l.meta, fontSize = 12.sp, color = Kf.Muted)
+                        }
+                        Hairline()
+                    }
+                    if (history.isEmpty()) Text(
+                        stringResource(Res.string.no_changes), fontSize = 14.sp, color = Kf.Muted,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                }
+            }
+            // design: 13px/1.5 muted
+            Text(stringResource(Res.string.perm_foot), fontSize = 13.sp, lineHeight = (13 * 1.5).sp, color = Kf.Muted)
         }
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             when {

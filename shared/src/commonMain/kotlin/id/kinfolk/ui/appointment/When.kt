@@ -5,6 +5,7 @@ import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.daysUntil
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 // Date copy: "Hari ini · 14.30", "3 jam 10 mnt lagi" and "Selasa, 29 Sept" from design v3; the rest approved in #6.
@@ -62,6 +63,15 @@ fun ago(at: Instant, now: Instant, tz: TimeZone): String {
         in 1..6 -> "${shortDays[t.date.dayOfWeek.ordinal]}, ${hm(t.time)}"
         else -> dayMonth(t.date)
     }
+}
+
+/**
+ * Under a `member` "Riwayat perubahan" line (#20): "Baru saja" within the hour, else "19 Sept"; then "atas
+ * permintaan Tukiman" when the Care Recipient [recipient] made it on their own behalf, else "oleh Sri".
+ */
+fun changeMeta(at: Instant, now: Instant, tz: TimeZone, by: String, recipient: String?): String {
+    val ago = if (now - at < 1.hours) "Baru saja" else dayMonth(at.toLocalDateTime(tz).date)
+    return "$ago · " + (recipient?.let { "atas permintaan $it" } ?: "oleh $by")
 }
 
 /** How old the offline copy is: "2 jam lalu" from the prototype, with minutes and days like [countdown] (#14). */

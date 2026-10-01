@@ -92,7 +92,9 @@ import id.kinfolk.data.current
 import id.kinfolk.data.editCareContact
 import id.kinfolk.data.editMedication
 import id.kinfolk.data.medications
+import id.kinfolk.data.AccessChange
 import id.kinfolk.data.DataCategory
+import id.kinfolk.data.accessChanges
 import id.kinfolk.data.Hidden
 import id.kinfolk.data.emergencyMedications
 import id.kinfolk.data.hidden
@@ -153,7 +155,9 @@ import id.kinfolk.ui.appointment.withWhom
 import id.kinfolk.ui.circle.CircleMember
 import id.kinfolk.ui.circle.CircleScreen
 import id.kinfolk.ui.circle.MemberScreen
+import id.kinfolk.ui.circle.HistoryLine
 import id.kinfolk.ui.circle.label
+import id.kinfolk.ui.appointment.changeMeta
 import id.kinfolk.ui.Confirm
 import id.kinfolk.ui.ConfirmSheet
 import id.kinfolk.ui.onboarding.InviteColors
@@ -283,6 +287,7 @@ fun App() {
         var undo by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) } // "Urungkan" while its toast shows
         var members by remember { mutableStateOf(emptyList<Member>()) } // Former Members too, for their names
         var hidden by remember { mutableStateOf(emptyList<Hidden>()) }
+        var changes by remember { mutableStateOf(emptyList<AccessChange>()) } // "Riwayat perubahan", newest first
         var sosMeds by remember { mutableStateOf(emptyList<Medication>()) } // whatever is hidden (ADR 0003)
         var onboarding by rememberSaveable { mutableStateOf(false) } // onb2 goes on to onb3 right after onb1
         var viewing by rememberSaveable { mutableStateOf<String?>(null) } // on `member`
@@ -365,9 +370,10 @@ fun App() {
         }
         // Not retried: offline, the tap does nothing rather than jumping there later. The latest tap wins.
         fun openFromTimeline(e: TimelineEntry) {
+            val id = e.appointmentId ?: return // an access change opens nothing
             opening?.cancel()
             opening = scope.launch {
-                val v = attempt { listOfNotNull(supabase.appointment(e.appointmentId)).map { a -> Visit(a, supabase.questions(a.id), supabase.visitNote(a.id)) } }
+                val v = attempt { listOfNotNull(supabase.appointment(id)).map { a -> Visit(a, supabase.questions(a.id), supabase.visitNote(a.id)) } }
                     ?.firstOrNull() ?: return@launch // unreachable, or cancelled meanwhile
                 opened = v
                 go(if (e.kind == TimelineEntry.Kind.visit_note) Screen.VisitNote else Screen.Appt)
@@ -390,6 +396,7 @@ fun App() {
             opened?.appointment?.let { a -> opened = Visit(a, retrying { supabase.questions(a.id) }, retrying { supabase.visitNote(a.id) }) }
             sent = retrying { if (supabase.roleIn(k.circle.id) == Role.admin) supabase.invitations(k.circle.id) else null }
             hidden = retrying { supabase.hidden(k.circle.id) }
+            changes = retrying { supabase.accessChanges(k.circle.id) }
             loadRota()
         }
         suspend fun land(how: Nav) {
@@ -673,6 +680,8 @@ fun App() {
                                 if (attempt { supabase.setHidden(r.id, m.id, cat, hide) } == null) { toast = offline; return@launch }
                                 then()
                                 hidden = retrying { supabase.hidden(c.id) }
+                                changes = retrying { supabase.accessChanges(c.id) }
+                                timeline = retrying { supabase.timeline(c.id) }
                             }
                             fun change(cat: DataCategory, hide: Boolean) = setHidden(cat, hide) {
                                 val msg = (if (hide) nowHidden else nowShown).getValue(cat)
@@ -694,6 +703,10 @@ fun App() {
                             MemberScreen(
                                 m, iAmAdmin = sent != null, memberError, onBack = ::back,
                                 onToggle = onToggle,
+                                history = changes.filter { it.recipientId == recipient?.id && it.memberId == m.id }.map {
+                                    val by = members.firstOrNull { x -> x.userId == it.by }?.name.orEmpty()
+                                    HistoryLine(it.category, it.hidden, changeMeta(it.at, now, tz, by, recipient?.name.takeIf { _ -> it.onBehalfOf != null }))
+                                },
                                 onPromote = {
                                     memberError = null
                                     scope.launch {

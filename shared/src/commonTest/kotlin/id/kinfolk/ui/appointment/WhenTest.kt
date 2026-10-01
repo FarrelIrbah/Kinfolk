@@ -55,4 +55,11 @@ class WhenTest {
         assertEquals("2 jam lalu", updatedAgo(at(29, 9, 0), now))
         assertEquals("3 hari lalu", updatedAgo(at(26, 11, 0), now))
     }
+
+    @Test
+    fun `an access change says when, then who made it or on whose behalf`() {
+        assertEquals("Baru saja · oleh Sri", changeMeta(at(29, 10, 30), now, wib, "Sri", null))
+        assertEquals("29 Sept · oleh Sri", changeMeta(at(29, 10, 20), now, wib, "Sri", null))
+        assertEquals("19 Sept · atas permintaan Tukiman", changeMeta(at(19, 8, 0), now, wib, "Tukiman", "Tukiman"))
+    }
 }

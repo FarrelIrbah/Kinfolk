@@ -61,7 +61,7 @@ class OfflineTest {
 
         assertNull(offline.next)
         assertTrue(offline.medications.isEmpty())
-        assertTrue(offline.timeline.isEmpty())
+        assertTrue(offline.timeline.all { it.kind == TimelineEntry.Kind.access_change })
         assertEquals(listOf("Sertraline"), offline.emergencyMedications.map { it.name })
     }
 

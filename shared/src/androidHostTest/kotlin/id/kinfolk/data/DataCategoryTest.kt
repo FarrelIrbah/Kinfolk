@@ -15,6 +15,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 
 class DataCategoryTest {
     init { Providers } // start the fake providers before anything is sent
@@ -84,7 +85,7 @@ class DataCategoryTest {
         assertNull(dewi.nextAppointment(f.circle, now - 7.days))
         assertTrue(dewi.questions(f.upcoming).isEmpty())
         assertNull(dewi.visitNote(f.past))
-        assertTrue(dewi.timeline(f.circle).isEmpty())
+        assertTrue(dewi.timeline(f.circle).all { it.kind == TimelineEntry.Kind.access_change })
         assertEquals(1, dewi.medications(f.circle).size)
         assertTrue(f.sri.seesAppointments(f))
     }
@@ -211,5 +212,71 @@ class DataCategoryTest {
         f.tukimanJoins()
         assertNotNull(f.sri.careRecipients(f.circle).single().memberId)
         assertFails { f.sri.invite(f.circle, "Tukiman", newNumber(), Role.parent, recipientId = f.tukiman) }
+    }
+
+    @Test
+    fun `the three new categories hide and show per Member, by whoever owns the restrictions`() = runBlocking<Unit> {
+        val f = family()
+        val dewi = signedInSibling(f.sri, f.circle)
+        val new = listOf(DataCategory.documents, DataCategory.wishes, DataCategory.money)
+
+        new.forEach { f.sri.setHidden(f.tukiman, dewi.me(), it, hidden = true) }
+        assertEquals(new.toSet(), dewi.hidden(f.circle).map { it.category }.toSet())
+        f.sri.setHidden(f.tukiman, dewi.me(), DataCategory.wishes, hidden = false)
+        assertEquals(setOf(DataCategory.documents, DataCategory.money), dewi.hidden(f.circle).map { it.category }.toSet())
+
+        // Once he is a Member, Tukiman owns them, the admin's earlier ones included.
+        val tukiman = f.tukimanJoins()
+        tukiman.setHidden(f.tukiman, dewi.me(), DataCategory.wishes, hidden = true)
+        assertFails { f.sri.setHidden(f.tukiman, dewi.me(), DataCategory.money, hidden = false) }
+        assertEquals(new.toSet(), f.sri.hidden(f.circle).map { it.category }.toSet())
+        // The first three keep their meaning.
+        assertTrue(dewi.seesVisitNotes(f) && dewi.seesAppointments(f) && dewi.medications(f.circle).isNotEmpty())
+    }
+
+    @Test
+    fun `every change is logged with who, when and on whose behalf, and shows on the Timeline as a Check-in`() = runBlocking<Unit> {
+        val f = family()
+        val dewi = signedInSibling(f.sri, f.circle)
+        val budi = signedInSibling(f.sri, f.circle)
+        val before = Clock.System.now()
+
+        f.sri.setHidden(f.tukiman, dewi.me(), DataCategory.money, hidden = true)
+        f.sri.setHidden(f.tukiman, dewi.me(), DataCategory.money, hidden = true) // no change, nothing logged
+
+        val made = budi.accessChanges(f.circle).single()
+        assertEquals(AccessChange(f.tukiman, dewi.me(), DataCategory.money, hidden = true, by = f.sri.me(), onBehalfOf = null, at = made.at), made)
+        assertTrue(made.at >= before - 5.seconds)
+        val entry = budi.timeline(f.circle).single { it.kind == TimelineEntry.Kind.access_change }
+        assertEquals(f.sri.me(), entry.by)
+        assertEquals("Tagihan & uang disembunyikan dari Budi.", entry.text)
+        assertNull(entry.appointmentId)
+
+        // Tukiman, once a Member, changes them himself: on his own behalf.
+        val tukiman = f.tukimanJoins()
+        tukiman.setHidden(f.tukiman, dewi.me(), DataCategory.visit_notes, hidden = true)
+        tukiman.setHidden(f.tukiman, dewi.me(), DataCategory.money, hidden = false)
+        val (shown, hid) = f.sri.accessChanges(f.circle).take(2)
+        assertEquals(listOf(DataCategory.money, DataCategory.visit_notes), listOf(shown.category, hid.category))
+        assertEquals(listOf(false, true), listOf(shown.hidden, hid.hidden))
+        assertTrue(listOf(shown, hid).all { it.by == tukiman.me() && it.onBehalfOf == tukiman.me() })
+        assertEquals(
+            listOf("Tagihan & uang dibagikan ke Budi.", "Rekaman kunjungan disembunyikan dari Budi.", "Tagihan & uang disembunyikan dari Budi."),
+            dewi.timeline(f.circle).filter { it.kind == TimelineEntry.Kind.access_change }.map { it.text },
+        )
+        assertTrue(signedInNewcomer().accessChanges(f.circle).isEmpty())
+    }
+
+    @Test
+    fun `undoing a change right away erases it from the history and the Timeline`() = runBlocking<Unit> {
+        val f = family()
+        val dewi = signedInSibling(f.sri, f.circle)
+        f.sri.setHidden(f.tukiman, dewi.me(), DataCategory.documents, hidden = true)
+
+        f.sri.setHidden(f.tukiman, dewi.me(), DataCategory.wishes, hidden = true)
+        f.sri.setHidden(f.tukiman, dewi.me(), DataCategory.wishes, hidden = false)
+
+        assertEquals(listOf(DataCategory.documents), f.sri.accessChanges(f.circle).map { it.category })
+        assertEquals(1, f.sri.timeline(f.circle).count { it.kind == TimelineEntry.Kind.access_change })
     }
 }
