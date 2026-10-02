@@ -27,6 +27,9 @@ import androidx.compose.ui.unit.sp
 import id.kinfolk.ui.Avatar
 import id.kinfolk.ui.Kf
 import id.kinfolk.ui.SvgPath
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
@@ -50,6 +53,7 @@ import kinfolk.shared.generated.resources.questions_count
 import kinfolk.shared.generated.resources.see_all
 import kinfolk.shared.generated.resources.see_rota
 import kinfolk.shared.generated.resources.sos
+import kinfolk.shared.generated.resources.inbox
 import kinfolk.shared.generated.resources.this_week
 import kinfolk.shared.generated.resources.write_note
 import kinfolk.shared.generated.resources.all_given
@@ -138,6 +142,8 @@ data class HomeState(
     /** "(Budi)" after [tasksSub]: stays when the Task's text is cut short. */
     val tasksSubOwner: String = "",
     val tasksLate: Boolean = false,
+    /** v3's bell badge; 0 hides it. */
+    val inboxCount: Int = 0,
 )
 
 private val Cream = Color(0xFFF3EEE4)
@@ -161,6 +167,7 @@ fun HomeScreen(
     onCall: () -> Unit,
     onCheckIn: () -> Unit,
     onTasks: () -> Unit,
+    onInbox: () -> Unit,
 ) {
     // design: padding:4px 20px; gap:22px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -169,12 +176,23 @@ fun HomeScreen(
                 Text(stringResource(Res.string.circle_name, s.circleName, s.memberCount), fontSize = 13.sp, color = Kf.Muted)
                 Text(s.todayLabel, style = serifStyle(30f, 1.1f))
             }
-            // ponytail: inbox bell hidden until in-app notifications ship (docs/screen-map.md).
-            Box(
-                Modifier.height(44.dp).background(Kf.Sos, CircleShape).tap(onSos).padding(horizontal = 18.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(stringResource(Res.string.sos), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.em)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // design: 44px #FBF8F2 circle, 20px bell; badge 18px #9E3B1E at top 3 right 3, 11px white
+                val inbox = stringResource(Res.string.inbox)
+                Box(Modifier.size(44.dp).background(Kf.Card, CircleShape).tap(onInbox).semantics { contentDescription = inbox }) {
+                    SvgPath("M6 16v-5a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0", 20.dp, Kf.Ink, Modifier.align(Alignment.Center))
+                    if (s.inboxCount > 0) Box(
+                        Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp).height(18.dp).widthIn(min = 18.dp)
+                            .background(Kf.Sos, RoundedCornerShape(9.dp)).padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { Text(s.inboxCount.toString(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                }
+                Box(
+                    Modifier.height(44.dp).background(Kf.Sos, CircleShape).tap(onSos).padding(horizontal = 18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(stringResource(Res.string.sos), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.em)
+                }
             }
         }
         // ponytail: search bar and weekly digest row hidden until those features ship.

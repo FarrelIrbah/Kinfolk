@@ -16,6 +16,7 @@ import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlin.time.Instant
 
 // Duty API (see CONTEXT.md): the database works out who holds each Duty on each day (function duty_week).
 
@@ -63,6 +64,22 @@ suspend fun SupabaseClient.dutyWeek(circleId: String, day: LocalDate): List<Duty
 /** The holder asks [to] to take their [day]. Returns the swap's id. */
 suspend fun SupabaseClient.askSwap(dutyId: String, day: LocalDate, to: String): String =
     postgrest.rpc("ask_swap", buildJsonObject { put("duty", dutyId); put("on_day", day.toString()); put("member", to) }).decodeAs()
+
+/** A swap waiting for my answer (v3 `inbox`): [from] asks me to take [day]. */
+@Serializable
+data class SwapAsk(
+    @SerialName("swap_id") val swapId: String,
+    @SerialName("duty_id") val dutyId: String,
+    val name: String,
+    @SerialName("time_of_day") val timeOfDay: LocalTime,
+    val day: LocalDate,
+    @SerialName("from_id") val from: String,
+    @SerialName("asked_at") val askedAt: Instant,
+)
+
+/** Swaps still open that ask me to take a day from [today] on, soonest first. */
+suspend fun SupabaseClient.swapsToMe(circleId: String, today: LocalDate): List<SwapAsk> =
+    postgrest.rpc("swaps_to_me", buildJsonObject { put("circle", circleId); put("from_day", today.toString()) }).decodeList()
 
 /** Only the Member asked can answer, once; accepting makes them the holder that day. */
 suspend fun SupabaseClient.answerSwap(swapId: String, accept: Boolean) {

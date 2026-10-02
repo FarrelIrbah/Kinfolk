@@ -66,6 +66,16 @@ import id.kinfolk.data.expenses
 import id.kinfolk.ui.records.Costs
 import kinfolk.shared.generated.resources.expense_missing
 import id.kinfolk.data.DutyTurn
+import id.kinfolk.data.SwapAsk
+import id.kinfolk.data.swapsToMe
+import id.kinfolk.ui.inbox.InboxItem
+import id.kinfolk.ui.inbox.InboxRow
+import id.kinfolk.ui.inbox.InboxScreen
+import id.kinfolk.ui.inbox.inbox
+import id.kinfolk.ui.inbox.lateSub
+import id.kinfolk.ui.inbox.lateTitle
+import id.kinfolk.ui.inbox.swapSub
+import id.kinfolk.ui.inbox.swapTitle
 import id.kinfolk.data.answerSwap
 import id.kinfolk.data.appointmentsBetween
 import id.kinfolk.data.askSwap
@@ -287,6 +297,8 @@ import kinfolk.shared.generated.resources.legend_you
 import kinfolk.shared.generated.resources.away_sent
 import kinfolk.shared.generated.resources.and
 import kinfolk.shared.generated.resources.swap_declined
+import kinfolk.shared.generated.resources.inbox_asked
+import kinfolk.shared.generated.resources.inbox_taken
 import kinfolk.shared.generated.resources.swap_sent
 import kinfolk.shared.generated.resources.swap_taken
 import kinfolk.shared.generated.resources.admins_full
@@ -323,7 +335,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -388,6 +400,7 @@ fun App() {
         var turns by remember { mutableStateOf(emptyList<DutyTurn>()) } // each day this week
         var drives by remember { mutableStateOf(emptyList<Appointment>()) } // this week, with a Driver
         var swapping by remember { mutableStateOf<DutyTurn?>(null) }
+        var swapsToMe by remember { mutableStateOf(emptyList<SwapAsk>()) } // `inbox`, from today on
         var rotaMonth by rememberSaveable { mutableStateOf(false) }
         var monthLoads by remember { mutableStateOf(emptyList<MonthLoad>()) }
         var away by remember { mutableStateOf(false) } // this week
@@ -494,7 +507,11 @@ fun App() {
                 .filter { it.driverId != null }
             monthLoads = retrying { supabase.monthLoad(c.id, today) }
             away = retrying { supabase.isAway(c.id, today) }
+            swapsToMe = retrying { supabase.swapsToMe(c.id, today) }
         }
+        fun inboxItems() = inbox(swapsToMe, questions, note != null, tasks, me().orEmpty(), today)
+        // Refill Tasks come from the minute job, so the list refreshes on the way in.
+        fun openTasks() { go(Screen.Tasks); scope.launch { attempt { supabase.taskList(circle!!.id) }?.let { tasks = it } } }
         // Not retried: offline, the tap does nothing rather than jumping there later. The latest tap wins.
         fun openFromTimeline(e: TimelineEntry) {
             if (e.kind == TimelineEntry.Kind.document) { pick(Tab.Records); recTab = RecTab.Docs; return } // like v3
@@ -695,6 +712,7 @@ fun App() {
                                         tasksSubOwner = tasks.overdue(today).firstOrNull()
                                             ?.let { t -> stringResource(Res.string.tasks_row_owner, person(t.ownerId)?.name.orEmpty()) }.orEmpty(),
                                         tasksLate = tasks.overdue(today).isNotEmpty(),
+                                        inboxCount = inboxItems().size,
                                         evening = if (card != HomeCard.Evening) null else Evening(
                                             hm(tonight!!.timeOfDay), recipient?.name.orEmpty(), checkIn?.takeIf { it.day == today }?.let { it.sys to it.dia },
                                         ),
@@ -731,8 +749,8 @@ fun App() {
                                         }
                                     },
                                     onCheckIn = { checkingIn = "$today ${tonight!!.timeOfDay}"; go(Screen.CheckIn) },
-                                    // Refill Tasks come from the minute job, so the list refreshes on the way in.
-                                    onTasks = { go(Screen.Tasks); scope.launch { attempt { supabase.taskList(circle!!.id) }?.let { tasks = it } } },
+                                    onTasks = ::openTasks,
+                                    onInbox = { go(Screen.Inbox); scope.launch { loadRota(); attempt { supabase.taskList(circle!!.id) }?.let { tasks = it } } },
                                 )
                             }
                             Tab.Rota -> {
@@ -914,6 +932,40 @@ fun App() {
                                     scope.launch { if (attempt { supabase.remindTask(t.id) } == null) { swap(t, t); toast = noConnection } }
                                 },
                             ) { editingTask = it; go(Screen.TaskForm) }
+                        }
+                        Screen.Inbox -> {
+                            val taken = swapsToMe.associate { a ->
+                                a.swapId to stringResource(Res.string.inbox_taken, a.name.replaceFirstChar { it.lowercase() }, dayName(a.day), person(a.from)?.name.orEmpty())
+                            }
+                            val declined = swapsToMe.associate { a -> a.swapId to stringResource(Res.string.swap_declined, person(a.from)?.name.orEmpty()) }
+                            val askedFor = next?.provider?.name.orEmpty()
+                            val asked = questions.associate { q -> q.id to stringResource(Res.string.inbox_asked, (person(q.askedBy)?.name ?: q.askedByName).orEmpty(), askedFor) }
+                            InboxScreen(
+                                inboxItems().map { item ->
+                                    when (item) {
+                                        is InboxItem.Swap -> {
+                                            val a = item.ask
+                                            // Not retried: offline, the answer waits for another tap.
+                                            fun answer(yes: Boolean) = scope.launch {
+                                                toast = if (attempt { supabase.answerSwap(a.swapId, yes); loadRota() } != null) (if (yes) taken else declined)[a.swapId] else noConnection
+                                            }
+                                            val who = person(a.from) ?: Person("", Kf.Muted)
+                                            InboxRow(who, swapTitle(who.name, a), swapSub(a, now), onOpen = {}, onAccept = { answer(true) }, onDecline = { answer(false) })
+                                        }
+                                        is InboxItem.Asked -> {
+                                            val q = item.question
+                                            InboxRow(person(q.askedBy) ?: named(q.askedBy, q.askedByName), asked[q.id].orEmpty(), "\"${q.text}\"", onOpen = { opened = null; go(Screen.Appt) })
+                                        }
+                                        is InboxItem.Late -> {
+                                            val t = item.task
+                                            val owner = person(t.ownerId)?.name.orEmpty()
+                                            val canRemind = members.any { it.userId == t.ownerId && it.leftAt == null }
+                                            InboxRow(rotaPeople()[t.ownerId] ?: named(t.ownerId), lateTitle(t, today), lateSub(t, me().orEmpty(), owner, canRemind), onOpen = ::openTasks)
+                                        }
+                                    }
+                                },
+                                onBack = ::back,
+                            )
                         }
                         Screen.TaskForm -> TaskFormScreen(editingTask, dutyPeople(), me().orEmpty(), today + DatePeriod(days = 7), onBack = ::back) { f ->
                             // Not retried: adding is not idempotent.

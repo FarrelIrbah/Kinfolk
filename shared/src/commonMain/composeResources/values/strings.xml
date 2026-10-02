@@ -381,4 +381,11 @@
     <string name="what_ph">Untuk apa?</string>
     <string name="paid_by">Dibayar oleh</string>
     <string name="expense_missing">Isi keperluan dan jumlahnya.</string>
+    <string name="inbox">Kotak masuk</string>
+    <string name="inbox_title">Menunggu Anda</string>
+    <string name="inbox_empty">Semua sudah beres.</string>
+    <string name="inbox_accept">Terima</string>
+    <string name="inbox_decline">Tolak</string>
+    <string name="inbox_asked">%1$s menambahkan pertanyaan untuk %2$s</string>
+    <string name="inbox_taken">Anda pegang %1$s %2$s. %3$s diberi tahu via WhatsApp.</string>
 </resources>

@@ -201,4 +201,26 @@ class DutyTest {
         assertEquals(MonthLoad(sri.me(), 0, sris, 0), load[sri.me()])
         assertEquals(MonthLoad(budi.me(), 0, days.size - sris, 1), load[budi.me()])
     }
+
+    @Test
+    fun `the inbox lists open swaps asked of me, soonest first, until answered`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = signedInSibling(sri, circle)
+        val dewi = signedInSibling(sri, circle)
+        val duty = sri.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.me(), budi.me(), dewi.me()), today)
+
+        val later = sri.askSwap(duty, day(3), budi.me())
+        val first = sri.askSwap(duty, today, budi.me())
+        val asks = budi.swapsToMe(circle, today)
+        assertEquals(listOf(first, later), asks.map { it.swapId })
+        val ask = asks.first()
+        assertEquals(listOf(duty, "Telepon cek malam", sevenPm, today, sri.me()), listOf(ask.dutyId, ask.name, ask.timeOfDay, ask.day, ask.from))
+        assertTrue(dewi.swapsToMe(circle, today).isEmpty() && sri.swapsToMe(circle, today).isEmpty())
+        assertTrue(budi.swapsToMe(circle, day(4)).isEmpty()) // days gone by drop off
+
+        budi.answerSwap(first, accept = false)
+        assertEquals(listOf(later), budi.swapsToMe(circle, today).map { it.swapId })
+        dewi.takeTurn(duty, day(3)) // settled by someone else
+        assertTrue(budi.swapsToMe(circle, today).isEmpty())
+    }
 }
