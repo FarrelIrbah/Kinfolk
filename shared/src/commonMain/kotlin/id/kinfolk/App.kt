@@ -184,6 +184,15 @@ import id.kinfolk.data.visitNote
 import id.kinfolk.data.addProvider
 import id.kinfolk.data.appointment
 import id.kinfolk.data.TimelineEntry
+import id.kinfolk.data.Hit
+import id.kinfolk.data.search
+import id.kinfolk.ui.search.SearchKind
+import id.kinfolk.ui.search.SearchRow
+import id.kinfolk.ui.search.SearchScreen
+import id.kinfolk.ui.search.medSub
+import id.kinfolk.ui.search.suggestions
+import id.kinfolk.ui.tasks.dueLabel
+import kinfolk.shared.generated.resources.blood_thinner
 import id.kinfolk.data.timeline
 import id.kinfolk.data.cancelAppointment
 import id.kinfolk.data.careRecipients
@@ -335,7 +344,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -407,6 +416,8 @@ fun App() {
         var awayOpen by remember { mutableStateOf(false) }
         var editingDuty by remember { mutableStateOf<DutyTurn?>(null) }
         var offline by remember { mutableStateOf(false) } // the last read failed
+        var query by rememberSaveable { mutableStateOf("") }
+        var hits by remember { mutableStateOf<List<Hit>?>(null) } // of query, null until the first answer
         var savedAt by remember { mutableStateOf<Instant?>(null) } // of what's on screen
         val kept = rememberKept("snapshot")
         LaunchedEffect(toast) { if (toast != null) { delay(if (undo?.first == toast) 5000 else 2600); toast = null } }
@@ -751,6 +762,7 @@ fun App() {
                                     onCheckIn = { checkingIn = "$today ${tonight!!.timeOfDay}"; go(Screen.CheckIn) },
                                     onTasks = ::openTasks,
                                     onInbox = { go(Screen.Inbox); scope.launch { loadRota(); attempt { supabase.taskList(circle!!.id) }?.let { tasks = it } } },
+                                    onSearch = { query = ""; hits = null; go(Screen.Search) },
                                 )
                             }
                             Tab.Rota -> {
@@ -966,6 +978,40 @@ fun App() {
                                 },
                                 onBack = ::back,
                             )
+                        }
+                        Screen.Search -> {
+                            LaunchedEffect(query) {
+                                hits = null // never an earlier query's rows
+                                val q = query.trim()
+                                if (q.length < 2) return@LaunchedEffect
+                                delay(200) // typing on cancels this
+                                // Not retried: the next keystroke asks again.
+                                attempt { supabase.search(circle!!.id, q) }?.let { hits = it } ?: run { toast = noConnection }
+                            }
+                            val bloodThinner = stringResource(Res.string.blood_thinner)
+                            val records = stringResource(Res.string.tab_records)
+                            // ponytail: hits are drawn from what Home last read; one changed since then is left out.
+                            val rows = hits?.mapNotNull { h ->
+                                when (h.kind) {
+                                    Hit.Kind.medication -> meds.firstOrNull { it.id == h.id }?.let { m ->
+                                        SearchRow(SearchKind.Medicine, "${m.name} ${m.dose}".trim(), medSub(m, bloodThinner)) { pick(Tab.Records); recTab = RecTab.Meds }
+                                    }
+                                    Hit.Kind.document -> documents.firstOrNull { it.id == h.id }?.let { d ->
+                                        SearchRow(SearchKind.Document, d.name, records) { pick(Tab.Records); recTab = RecTab.Docs }
+                                    }
+                                    Hit.Kind.timeline -> timeline.firstOrNull { it.kind == h.entry && it.appointmentId == h.id && it.at == h.at && it.text == h.text }?.let { e ->
+                                        SearchRow(SearchKind.Timeline, text(e, tz), "${author(e).name} · ${ago(e.at, now, tz)}") { pick(Tab.Timeline) }
+                                    }
+                                    Hit.Kind.contact -> contacts.firstOrNull { it.id == h.id }?.let { c ->
+                                        SearchRow(SearchKind.Contact, c.name, c.relationship) { go(Screen.Contacts) }
+                                    }
+                                    Hit.Kind.task -> tasks.firstOrNull { it.id == h.id }?.let { t ->
+                                        SearchRow(SearchKind.Task, t.text, "${named(t.ownerId).name} · ${dueLabel(t.due, today)}", ::openTasks)
+                                    }
+                                }
+                            }
+                            val others = circleMembers().filterNot { it.isMe }.map { it.name }
+                            SearchScreen(query, { query = it }, suggestions(meds, documents.latest(), others, contacts), rows, onCancel = ::back)
                         }
                         Screen.TaskForm -> TaskFormScreen(editingTask, dutyPeople(), me().orEmpty(), today + DatePeriod(days = 7), onBack = ::back) { f ->
                             // Not retried: adding is not idempotent.

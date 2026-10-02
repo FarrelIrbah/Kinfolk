@@ -32,6 +32,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
+import id.kinfolk.ui.search.Magnifier
+import kinfolk.shared.generated.resources.search_ph
 import kinfolk.shared.generated.resources.Res
 import kinfolk.shared.generated.resources.add_appt
 import kinfolk.shared.generated.resources.add_appt_sub
@@ -168,6 +170,7 @@ fun HomeScreen(
     onCheckIn: () -> Unit,
     onTasks: () -> Unit,
     onInbox: () -> Unit,
+    onSearch: () -> Unit,
 ) {
     // design: padding:4px 20px; gap:22px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -195,7 +198,16 @@ fun HomeScreen(
                 }
             }
         }
-        // ponytail: search bar and weekly digest row hidden until those features ship.
+        // design: h46, 1px rgba(34,38,31,.1), r14, #FBF8F2, padding 0 14, gap 10; 18px magnifier; 15px muted
+        Row(
+            Modifier.fillMaxWidth().height(46.dp).background(Kf.Card, RoundedCornerShape(14.dp))
+                .border(1.dp, Kf.Border, RoundedCornerShape(14.dp)).tap(onSearch).padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SvgPath(Magnifier, 18.dp, Kf.Muted)
+            Text(stringResource(Res.string.search_ph), fontSize = 15.sp, color = Kf.Muted)
+        }
+        // ponytail: weekly digest row hidden until that feature ships.
 
         // ponytail: the after-visit card falls back to these until its ticket lands.
         if (s.evening != null) EveningCard(s.evening, onCall, onCheckIn)
