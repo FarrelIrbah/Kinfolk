@@ -244,6 +244,26 @@
     <string name="swap_declined">Ditolak. %1$s akan bertanya ke yang lain.</string>
     <string name="take_it">Saya ambil</string>
     <string name="not_this_week">Minggu ini tidak</string>
+    <!-- month view and away (#30) -->
+    <string name="month_range">%1$s · semua jenis tugas</string>
+    <string name="month_detail">%1$d antar · %2$d telepon · %3$d lainnya</string>
+    <string name="lg_drive">Antar</string>
+    <string name="lg_calls">Telepon malam</string>
+    <string name="lg_other">Obat, dokumen, biaya</string>
+    <string name="month_note">Dihitung dari giliran, catatan obat, dan biaya. Ditampilkan di sini agar tidak ada yang perlu menghitung di grup chat.</string>
+    <string name="cant_week">Saya tidak bisa minggu ini</string>
+    <string name="away_banner">Anda ditandai berhalangan sampai %1$s. Tugas Anda sudah ditawarkan ke yang lain.</string>
+    <string name="away_title">Serahkan tugas minggu ini</string>
+    <string name="away_sub">Kinfolk menyarankan yang tugasnya paling sedikit minggu ini. Tiap orang menerima WhatsApp dan boleh menolak.</string>
+    <string name="away_reason">Alasan (hanya saudara yang melihat)</string>
+    <string name="reason_sick">Sakit</string>
+    <string name="reason_travelling">Bepergian</string>
+    <string name="reason_work">Pekerjaan</string>
+    <string name="reason_other">Lainnya</string>
+    <string name="away_send">Kirim %1$d permintaan</string>
+    <string name="away_none">Tidak ada yang perlu diserahkan</string>
+    <string name="away_sent">WhatsApp dikirim ke %1$s. Balasan lewat WhatsApp.</string>
+    <string name="and">dan</string>
     <string name="add_duty">+ Tambah giliran</string>
     <string name="duty_form_head">Giliran</string>
     <string name="duty_order">Urutan</string>

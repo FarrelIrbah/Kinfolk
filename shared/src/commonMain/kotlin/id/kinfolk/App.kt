@@ -69,6 +69,10 @@ import id.kinfolk.data.DutyTurn
 import id.kinfolk.data.answerSwap
 import id.kinfolk.data.appointmentsBetween
 import id.kinfolk.data.askSwap
+import id.kinfolk.data.goAway
+import id.kinfolk.data.isAway
+import id.kinfolk.data.monthLoad
+import id.kinfolk.data.MonthLoad
 import id.kinfolk.data.deleteDuty
 import id.kinfolk.data.dutyWeek
 import id.kinfolk.data.saveDuty
@@ -78,10 +82,13 @@ import id.kinfolk.ui.Sheet
 import id.kinfolk.ui.appointment.dayName
 import id.kinfolk.ui.appointment.shortDay
 import id.kinfolk.ui.home.DutyDay
+import id.kinfolk.ui.rota.AwaySheet
 import id.kinfolk.ui.rota.DutyFormScreen
 import id.kinfolk.ui.rota.RotaScreen
 import id.kinfolk.ui.rota.SwapSheet
 import id.kinfolk.ui.rota.inSentence
+import id.kinfolk.ui.rota.handOff
+import id.kinfolk.ui.rota.listing
 import id.kinfolk.ui.rota.load
 import id.kinfolk.data.AppointmentDraft
 import id.kinfolk.data.CareCircle
@@ -277,6 +284,8 @@ import kinfolk.shared.generated.resources.remove_confirm
 import kinfolk.shared.generated.resources.remove_title
 import kinfolk.shared.generated.resources.legend_other
 import kinfolk.shared.generated.resources.legend_you
+import kinfolk.shared.generated.resources.away_sent
+import kinfolk.shared.generated.resources.and
 import kinfolk.shared.generated.resources.swap_declined
 import kinfolk.shared.generated.resources.swap_sent
 import kinfolk.shared.generated.resources.swap_taken
@@ -379,6 +388,10 @@ fun App() {
         var turns by remember { mutableStateOf(emptyList<DutyTurn>()) } // each day this week
         var drives by remember { mutableStateOf(emptyList<Appointment>()) } // this week, with a Driver
         var swapping by remember { mutableStateOf<DutyTurn?>(null) }
+        var rotaMonth by rememberSaveable { mutableStateOf(false) }
+        var monthLoads by remember { mutableStateOf(emptyList<MonthLoad>()) }
+        var away by remember { mutableStateOf(false) } // this week
+        var awayOpen by remember { mutableStateOf(false) }
         var editingDuty by remember { mutableStateOf<DutyTurn?>(null) }
         var offline by remember { mutableStateOf(false) } // the last read failed
         var savedAt by remember { mutableStateOf<Instant?>(null) } // of what's on screen
@@ -479,6 +492,8 @@ fun App() {
             turns = retrying { supabase.dutyWeek(c.id, week) }
             drives = retrying { supabase.appointmentsBetween(c.id, week.atStartOfDayIn(tz), (week + DatePeriod(days = 7)).atStartOfDayIn(tz)) }
                 .filter { it.driverId != null }
+            monthLoads = retrying { supabase.monthLoad(c.id, today) }
+            away = retrying { supabase.isAway(c.id, today) }
         }
         // Not retried: offline, the tap does nothing rather than jumping there later. The latest tap wins.
         fun openFromTimeline(e: TimelineEntry) {
@@ -738,6 +753,7 @@ fun App() {
                                     },
                                     onAdd = { editingDuty = null; go(Screen.DutyForm) },
                                     onEdit = { editingDuty = it; go(Screen.DutyForm) },
+                                    rotaMonth, { rotaMonth = it }, monthLoads, away, onAway = { awayOpen = true }.takeIf { me() in dutyPeople() },
                                 )
                             }
                             Tab.Timeline -> TimelineScreen(
@@ -1065,6 +1081,20 @@ fun App() {
                 action = stringResource(Res.string.undo).takeIf { toast != null && undo?.first == toast },
                 onAction = { undo?.second?.invoke(); undo = null; toast = null },
             )
+            if (awayOpen) {
+                val offline = stringResource(Res.string.no_connection)
+                val others = dutyPeople().filterKeys { it != me() }
+                val asks = handOff(turns, me().orEmpty(), today, others.keys.toList()) { load(it, turns, drives) }
+                // v3's toast, "SMS" → "WhatsApp": WhatsApp dikirim ke Budi dan Dewi. Balasan lewat WhatsApp.
+                val sent = stringResource(Res.string.away_sent, listing(asks.map { others[it.second]?.name.orEmpty() }.distinct(), stringResource(Res.string.and)))
+                Sheet("away", { awayOpen = false }) {
+                    AwaySheet(asks, others) { why ->
+                        awayOpen = false
+                        // Approved in #30: with nothing to hand off, only the banner, no toast.
+                        scope.launch { toast = if (attempt { supabase.goAway(circle!!.id, today, why, asks); loadRota() } == null) offline else sent.takeIf { asks.isNotEmpty() } }
+                    }
+                }
+            }
             swapping?.let { t ->
                 val offline = stringResource(Res.string.no_connection)
                 val others = dutyPeople().filterKeys { it != me() }

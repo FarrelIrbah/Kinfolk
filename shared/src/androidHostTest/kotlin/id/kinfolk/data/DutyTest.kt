@@ -1,15 +1,19 @@
 package id.kinfolk.data
 
+import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
+import kotlinx.datetime.minus
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
+import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -147,5 +151,54 @@ class DutyTest {
         rina.takeTurn(duty, day(2))
         assertEquals(listOf(sri.me(), budi.me(), rina.me()), budi.holders(circle, 0..2))
         assertNull(sri.turn(circle, day(2)).swapId) // Dewi's ask is settled
+    }
+
+    @Test
+    fun `going away asks someone for each day given, all or none, and marks me Away until the week ends`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = signedInSibling(sri, circle)
+        val dewi = signedInSibling(sri, circle)
+        val phone = newNumber()
+        Providers.to(phone)
+        sri.invite(circle, "Tukiman", phone, Role.parent, recipientId = sri.careRecipients(circle).single().id)
+        val tukiman = signedInAs(phone).apply { acceptInvitation(myInvitations().single().id) }
+        sri.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.me(), budi.me()), today)
+        val mine = sri.turn(circle, today)
+        val budis = sri.turn(circle, day(1))
+
+        assertFails { sri.goAway(circle, today, AwayReason.travelling, listOf(mine to dewi.me(), budis to dewi.me())) } // not Sri's day
+        assertNull(sri.turn(circle, today).swapTo)
+        assertFalse(sri.isAway(circle, today))
+
+        sri.goAway(circle, today, AwayReason.travelling, listOf(mine to dewi.me()))
+        assertEquals(sri.me() to dewi.me(), sri.turn(circle, today).let { it.holder to it.swapTo })
+        assertTrue(sri.isAway(circle, today))
+        assertFalse(budi.isAway(circle, today))
+        assertFalse(sri.isAway(circle, today + DatePeriod(days = 7)))
+        assertFalse(sri.isAway(circle, today - DatePeriod(days = 7)))
+
+        assertFails { tukiman.goAway(circle, today, AwayReason.sick, emptyList()) } // the Care Recipient takes no Duty days
+
+        // "Alasan (hanya saudara yang melihat)"
+        assertEquals(1, budi.from("aways").select().decodeList<JsonObject>().size)
+        assertTrue(tukiman.from("aways").select().decodeList<JsonObject>().isEmpty())
+    }
+
+    @Test
+    fun `the month counts each Member's Duty days, drives and other things done`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = signedInSibling(sri, circle)
+        val tukiman = sri.careRecipients(circle).single().id
+        val first = LocalDate(today.year, today.month, 1)
+        sri.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.me(), budi.me()), first)
+        budi.addExpense(circle, tukiman, "Kursi mandi", 96_000, paidBy = budi.me(), day = today)
+        budi.addExpense(circle, tukiman, "Bulan lalu", 10_000, paidBy = budi.me(), day = first - DatePeriod(days = 1))
+
+        // Counted from the day the Duty was made (today), though its rotation started on the 1st.
+        val days = (0..40).map { first + DatePeriod(days = it) }.filter { it.month == first.month && it >= today }
+        val sris = days.count { (it.day - 1) % 2 == 0 }
+        val load = sri.monthLoad(circle, today).associateBy { it.memberId }
+        assertEquals(MonthLoad(sri.me(), 0, sris, 0), load[sri.me()])
+        assertEquals(MonthLoad(budi.me(), 0, days.size - sris, 1), load[budi.me()])
     }
 }

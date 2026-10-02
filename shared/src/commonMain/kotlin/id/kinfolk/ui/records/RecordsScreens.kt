@@ -157,8 +157,11 @@ fun parseRupiah(typed: String): Long? = typed.filter { it.isDigit() }.takeIf { i
 
 private val monthNames = listOf("Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember")
 
+/** "September" */
+fun monthName(d: LocalDate) = monthNames[d.month.ordinal]
+
 /** v3's "September sejauh ini", for [today]'s month. */
-fun soFar(today: LocalDate) = "${monthNames[today.month.ordinal]} sejauh ini"
+fun soFar(today: LocalDate) = "${monthName(today)} sejauh ini"
 
 private val Gold = Color(0xFF9A7A2F)
 private val GivenBorder = Color(0x3322261F) // rgba(34,38,31,.2)

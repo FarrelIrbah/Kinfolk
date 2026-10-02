@@ -1,6 +1,8 @@
 package id.kinfolk.data
 
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
@@ -8,7 +10,9 @@ import kotlinx.datetime.LocalTime
 import kotlinx.datetime.minus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -69,3 +73,33 @@ suspend fun SupabaseClient.answerSwap(swapId: String, accept: Boolean) {
 suspend fun SupabaseClient.takeTurn(dutyId: String, day: LocalDate) {
     postgrest.rpc("take_turn", buildJsonObject { put("duty", dutyId); put("on_day", day.toString()) })
 }
+
+/** v3 away reasons: Sakit, Bepergian, Pekerjaan, Lainnya. */
+enum class AwayReason { sick, travelling, work, other }
+
+/**
+ * "Kirim N permintaan": marks me Away for the week of [today] and asks each Member for the day paired with them
+ * (each gets a WhatsApp YA/TIDAK), all or none.
+ */
+suspend fun SupabaseClient.goAway(circleId: String, today: LocalDate, reason: AwayReason, asks: List<Pair<DutyTurn, String>>) {
+    postgrest.rpc("go_away", buildJsonObject {
+        put("circle", circleId)
+        put("on_week", weekOf(today).toString())
+        put("why", reason.name)
+        putJsonArray("asks") { asks.forEach { (t, to) -> addJsonObject { put("duty", t.dutyId); put("day", t.day.toString()); put("member", to) } } }
+    })
+}
+
+/** Whether I am Away the week of [day] (v3's yellow banner). */
+suspend fun SupabaseClient.isAway(circleId: String, day: LocalDate): Boolean =
+    from("aways").select {
+        filter { eq("circle_id", circleId); eq("user_id", auth.currentUserOrNull()!!.id); eq("week", weekOf(day).toString()) }
+    }.decodeList<JsonObject>().isNotEmpty()
+
+/** One Member's month in v3's month view: drives, Duty days ("telepon") and doses, Documents and Expenses ("lainnya"). */
+@Serializable
+data class MonthLoad(@SerialName("member_id") val memberId: String, val drives: Int, val calls: Int, val other: Int)
+
+/** Every current Member's load in the month of [day], as far as I may see. */
+suspend fun SupabaseClient.monthLoad(circleId: String, day: LocalDate): List<MonthLoad> =
+    postgrest.rpc("month_load", buildJsonObject { put("circle", circleId); put("on_day", day.toString()) }).decodeList()

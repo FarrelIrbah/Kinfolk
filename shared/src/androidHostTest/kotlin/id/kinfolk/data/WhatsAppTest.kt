@@ -5,9 +5,11 @@ import id.kinfolk.ui.appointment.dayMonth
 import id.kinfolk.ui.appointment.dayName
 import io.github.jan.supabase.SupabaseClient
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
@@ -339,5 +341,26 @@ class WhatsAppTest {
             HttpResponse.BodyHandlers.ofString(),
         )
         assertEquals(200 to "42", check.statusCode() to check.body())
+    }
+
+    @Test
+    fun `going away asks each Member on WhatsApp for their day, and each can say YA`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = joins(sri, circle, "Budi")
+        val dewi = joins(sri, circle, "Dewi")
+        sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me()), today)
+        val tomorrow = today + DatePeriod(days = 1)
+        val week = sri.client.dutyWeek(circle, today) + sri.client.dutyWeek(circle, tomorrow)
+        fun turn(d: kotlinx.datetime.LocalDate) = week.first { it.day == d }
+        sri.client.goAway(circle, today, AwayReason.sick, listOf(turn(today) to budi.client.me(), turn(tomorrow) to dewi.client.me()))
+        deliver()
+
+        assertEquals(listOf("Sri", "telepon cek malam Tukiman", "$day, 19.00"), budi.last("kinfolk_swap_ask").params)
+        assertEquals("${dayName(tomorrow)} ${dayMonth(tomorrow)}, 19.00", dewi.last("kinfolk_swap_ask").params[2])
+
+        reply(dewi, "YA")
+        deliver()
+        assertEquals(dewi.client.me(), sri.client.dutyWeek(circle, tomorrow).single { it.day == tomorrow }.holder)
+        assertEquals(sri.client.me(), sri.client.dutyWeek(circle, today).single { it.day == today }.holder) // Budi hasn't answered
     }
 }
