@@ -16,8 +16,11 @@ class Kept(val read: () -> String?, val write: (String?) -> Unit)
 @Composable
 expect fun rememberKept(key: String): Kept
 
-/** A file the Member picked: its name without the extension (blank for a photo), "PDF", "JPG" or "PNG", and its bytes. */
-class PickedFile(val name: String, val ext: String, val bytes: ByteArray)
+/**
+ * A file the Member picked: its name without the extension (blank for a photo), "PDF", "JPG" or "PNG", its bytes, and
+ * its page count (1 for a photo).
+ */
+class PickedFile(val name: String, val ext: String, val bytes: ByteArray, val pages: Int = 1)
 
 /** Opens the system picker for a PDF, JPG or PNG, with the camera offered too; [onPicked] gets what was chosen. */
 @Composable

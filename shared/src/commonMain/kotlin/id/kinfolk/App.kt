@@ -136,6 +136,19 @@ import id.kinfolk.data.Note
 import id.kinfolk.data.addNote
 import id.kinfolk.data.notes as noteList
 import id.kinfolk.ui.notes.NotesScreen
+import id.kinfolk.ui.export.ExportScreen
+import id.kinfolk.ui.export.DocsPicker
+import id.kinfolk.ui.export.exportDate
+import id.kinfolk.ui.export.inSentence
+import id.kinfolk.data.ExportContent
+import id.kinfolk.data.ExportSection
+import id.kinfolk.data.export
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import kinfolk.shared.generated.resources.export_done
+import kinfolk.shared.generated.resources.export_for_line
+import kinfolk.shared.generated.resources.export_none
+import kinfolk.shared.generated.resources.trends_attached
 import kinfolk.shared.generated.resources.note_saved_private
 import kinfolk.shared.generated.resources.note_saved_shared
 import id.kinfolk.ui.tasks.TasksScreen
@@ -344,7 +357,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -486,6 +499,24 @@ fun App() {
         val progress = meds.current().progress(doses.filter { it.day == today })
         val noConnection = stringResource(Res.string.no_connection)
         val uri = LocalUriHandler.current
+        @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current // ponytail: LocalClipboard needs a ClipEntry per platform
+        val forLine = stringResource(Res.string.export_for_line) // "Disiapkan untuk %1$s · %2$s"
+        fun exportLine(forWhom: String) = forLine.replace("%1\$s", forWhom).replace("%2\$s", exportDate(today))
+        var exporting by remember { mutableStateOf(false) }
+        var exportDocs by rememberSaveable { mutableStateOf(emptyList<String>()) } // picked on `export`
+        var pickingDocs by remember { mutableStateOf(false) }
+        // Not retried: every export is logged. The link goes to the clipboard, as the toast says.
+        suspend fun exportPdf(preparedFor: String, line: String, sections: Set<ExportSection>, ids: List<String>, done: String) {
+            val r = recipient ?: return
+            if (exporting) return
+            exporting = true
+            // Reset even when the screen that asked is left mid-way.
+            val url = try { attempt { supabase.export(r.id, preparedFor, line, sections, ids) } } finally { exporting = false }
+            if (url == null) { toast = noConnection; return }
+            clipboard.setText(AnnotatedString(url))
+            toast = done
+            timeline = retrying { supabase.timeline(r.circleId) }
+        }
         val pickFile = rememberFilePicker { f -> uploading = f; go(Screen.DocForm) }
         val viewFile = rememberFileViewer()
         // The Duty I hold tonight: its time heads the evening card and `checkin`.
@@ -525,7 +556,7 @@ fun App() {
         fun openTasks() { go(Screen.Tasks); scope.launch { attempt { supabase.taskList(circle!!.id) }?.let { tasks = it } } }
         // Not retried: offline, the tap does nothing rather than jumping there later. The latest tap wins.
         fun openFromTimeline(e: TimelineEntry) {
-            if (e.kind == TimelineEntry.Kind.document) { pick(Tab.Records); recTab = RecTab.Docs; return } // like v3
+            if (e.kind == TimelineEntry.Kind.document || e.kind == TimelineEntry.Kind.export) { pick(Tab.Records); recTab = RecTab.Docs; return } // like v3
             val id = e.appointmentId ?: return // an access change opens nothing
             opening?.cancel()
             opening = scope.launch {
@@ -576,6 +607,7 @@ fun App() {
         suspend fun loadContacts() {
             contacts = circle?.let { c -> retrying { supabase.careContacts(c.id) } }.orEmpty()
         }
+        fun openExport() { exportDocs = emptyList(); go(Screen.Export); scope.launch { loadContacts() } } // emergency contacts for its count
         // SOS opens at once, even offline, with what Home already loaded; contacts and the card follow when reachable.
         fun openEmergency() {
             go(Screen.Emergency)
@@ -812,10 +844,18 @@ fun App() {
                                 else Docs(
                                     documents.latest(), { seenBy(circleMembers(), it) }, { named(it) }, { it.toLocalDateTime(tz).date },
                                     open = { d -> scope.launch { attempt { supabase.documentFile(d) }?.let { viewFile(d.name, d.ext, it) } ?: run { toast = noConnection } } },
-                                    upload = pickFile,
+                                    upload = pickFile, export = ::openExport,
                                 )
+                                // Approved in #33: a 1-page trends export for the next Appointment's Provider.
+                                val attached = next?.let { a -> stringResource(Res.string.trends_attached, inSentence(a.title), a.provider.name) }
+                                val bring = next?.takeIf { checkIns.isNotEmpty() && r != null }?.let { a ->
+                                    a.provider.name to {
+                                        scope.launch { exportPdf(a.provider.name, exportLine(a.provider.name), setOf(ExportSection.trends), emptyList(), attached!!) }
+                                        Unit
+                                    }
+                                }
                                 RecordsScreen(
-                                    meds, given, checkIns, docs, costs, today, recTab, { recTab = it }, { id -> rotaPeople()[id]?.name },
+                                    meds, given, checkIns, docs, costs, today, recTab, { recTab = it }, { id -> rotaPeople()[id]?.name }, bring,
                                     onToggle = { m ->
                                         val on = m.id in given
                                         markDoses(listOf(m), !on)
@@ -826,7 +866,7 @@ fun App() {
                             Tab.Circle -> CircleScreen(
                                 circle?.name.orEmpty(), recipient?.name.orEmpty(), circleMembers(), onSos = { openEmergency() },
                                 onMember = { viewing = it.id; memberError = null; go(Screen.Member) },
-                                onContacts = { scope.launch { loadContacts(); go(Screen.Contacts) } }, onNotes = ::openNotes,
+                                onContacts = { scope.launch { loadContacts(); go(Screen.Contacts) } }, onNotes = ::openNotes, onExport = ::openExport,
                             )
                         }
                         Screen.Appt -> visit()?.let { v ->
@@ -1032,6 +1072,17 @@ fun App() {
                                 }
                             }
                         }
+                        Screen.Export -> recipient?.let { r ->
+                            val none = stringResource(Res.string.export_none)
+                            val done = stringResource(Res.string.export_done)
+                            val content = ExportContent(
+                                r.conditions, r.allergies, contacts.count { it.emergency }, meds.size, checkIns.size,
+                                timeline.count { it.kind == TimelineEntry.Kind.visit_note }, emptyList(),
+                            )
+                            ExportScreen(r.name, content, documents.latest().filterNot { it.legal }, today, exportDocs, { pickingDocs = true }, onBack = ::back) { preparedFor, line, sections, ids ->
+                                if (sections.isEmpty()) toast = none else exportPdf(preparedFor, line, sections, ids, done)
+                            }
+                        }
                         Screen.DocForm -> uploading?.let { f ->
                             val mine = circleMembers().firstOrNull { it.isMe }?.sees.orEmpty()
                             DocFormScreen(
@@ -1040,7 +1091,7 @@ fun App() {
                                 val c = circle ?: return@DocFormScreen false
                                 val r = recipient ?: return@DocFormScreen false
                                 // Not retried: adding is not idempotent. Reloads apart, so a failed one can't invite a second upload.
-                                (attempt { supabase.uploadDocument(c.id, r.id, form.name, f.ext, f.bytes, form.legal) } != null).also { ok ->
+                                (attempt { supabase.uploadDocument(c.id, r.id, form.name, f.ext, f.bytes, form.legal, f.pages) } != null).also { ok ->
                                     if (ok) { back(); documents = retrying { supabase.documents(c.id) }; timeline = retrying { supabase.timeline(c.id) } }
                                 }
                             }
@@ -1172,6 +1223,9 @@ fun App() {
                 }
             }
             ConfirmSheet(confirm, stringResource(Res.string.cancel)) { confirm = null }
+            if (pickingDocs && screen == Screen.Export) Sheet("docs", { pickingDocs = false }) {
+                DocsPicker(documents.latest().filterNot { it.legal }, exportDocs) { exportDocs = it }
+            }
             if (offline && screen != null) OfflineBanner(stringResource(Res.string.offline), Modifier.align(Alignment.TopCenter))
             if (screen == Screen.Home) TabBar(tab, ::pick, Modifier.align(Alignment.BottomCenter))
             Toast(

@@ -26,6 +26,7 @@ data class Document(
     val path: String,
     val by: String,
     val at: Instant,
+    val pages: Int = 1, // for Export
 ) {
     val category get() = if (legal) DataCategory.wishes else DataCategory.documents
 }
@@ -42,7 +43,7 @@ fun List<Document>.latest(): List<Document> = sortedByDescending { it.at }.disti
 
 /** "Simpan" after picking a file: the next version when [name] is taken (ignoring case), else version 1. */
 @OptIn(ExperimentalUuidApi::class)
-suspend fun SupabaseClient.uploadDocument(circleId: String, recipientId: String, name: String, ext: String, bytes: ByteArray, legal: Boolean) {
+suspend fun SupabaseClient.uploadDocument(circleId: String, recipientId: String, name: String, ext: String, bytes: ByteArray, legal: Boolean, pages: Int = 1) {
     val id = Uuid.random().toString()
     storage.from("documents").upload("$circleId/$id.${ext.lowercase()}", bytes) {
         upsert = false
@@ -50,7 +51,7 @@ suspend fun SupabaseClient.uploadDocument(circleId: String, recipientId: String,
     }
     from("documents").insert(buildJsonObject {
         put("id", id); put("circle_id", circleId); put("recipient_id", recipientId)
-        put("name", name.trim()); put("ext", ext); put("legal", legal)
+        put("name", name.trim()); put("ext", ext); put("legal", legal); put("pages", pages)
     })
 }
 

@@ -5,6 +5,8 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -66,7 +68,7 @@ actual fun rememberFilePicker(onPicked: (PickedFile) -> Unit): () -> Unit {
             ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }.orEmpty().substringBeforeLast('.')
         // ponytail: read on the main thread; the bucket takes 20 MB at most.
         val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@rememberLauncherForActivityResult
-        picked(PickedFile(name, ext, bytes))
+        picked(PickedFile(name, ext, bytes, if (ext == "PDF") pdfPages(context, bytes) else 1))
     }
     return remember(context) {
         {
@@ -81,6 +83,12 @@ actual fun rememberFilePicker(onPicked: (PickedFile) -> Unit): () -> Unit {
         }
     }
 }
+
+/** Pages in a PDF, for Export's count; 1 when it can't be read (a password, a broken file). */
+private fun pdfPages(context: Context, bytes: ByteArray): Int = try {
+    val file = File(context.cacheDir, "count.pdf").apply { writeBytes(bytes) }
+    ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { PdfRenderer(it).use { r -> r.pageCount } }.coerceAtLeast(1)
+} catch (_: Exception) { 1 }
 
 @Composable
 actual fun rememberFileViewer(): (name: String, ext: String, bytes: ByteArray) -> Unit {

@@ -66,6 +66,8 @@ import kinfolk.shared.generated.resources.member_joined
 import kinfolk.shared.generated.resources.member_you
 import kinfolk.shared.generated.resources.more_ways
 import kinfolk.shared.generated.resources.notes_sub
+import kinfolk.shared.generated.resources.export_title
+import kinfolk.shared.generated.resources.export_short
 import kinfolk.shared.generated.resources.notes_title
 import kinfolk.shared.generated.resources.remove_member
 import kinfolk.shared.generated.resources.role_admin
@@ -132,7 +134,7 @@ private fun CircleMember.sub() = when {
  * access column); access "Penuh" or "N/6" (#20).
  */
 @Composable
-fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit) {
+fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit, onExport: () -> Unit) {
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -173,7 +175,7 @@ fun CircleScreen(circleName: String, recipientName: String, members: List<Circle
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel(stringResource(Res.string.more_ways))
             Card {
-                listOf(Triple(Res.string.contacts, Res.string.contacts_sub, onContacts), Triple(Res.string.notes_title, Res.string.notes_sub, onNotes)).forEach { (title, sub, open) ->
+                listOf(Triple(Res.string.contacts, Res.string.contacts_sub, onContacts), Triple(Res.string.notes_title, Res.string.notes_sub, onNotes), Triple(Res.string.export_title, Res.string.export_short, onExport)).forEach { (title, sub, open) ->
                     Row(Modifier.fillMaxWidth().tap(open).padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(stringResource(title), fontSize = 15.sp, fontWeight = FontWeight.Medium)

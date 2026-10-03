@@ -392,4 +392,22 @@
     <string name="search_try">Coba</string>
     <string name="no_results">Tidak ditemukan.</string>
     <string name="result_count">%1$d hasil</string>
+    <!-- export (#33) -->
+    <string name="export_title">Ekspor untuk dokter baru</string>
+    <string name="export_sub">Satu PDF untuk rujukan, dokter spesialis baru, atau IGD. Hanya berisi yang Anda centang.</string>
+    <string name="export_short">Satu PDF untuk rujukan atau IGD</string>
+    <string name="export_for">Disiapkan untuk</string>
+    <string name="export_for_line">Disiapkan untuk %1$s · %2$s</string>
+    <string name="export_note">Tautan berbagi kedaluwarsa setelah 7 hari. Setiap ekspor tercatat di linimasa.</string>
+    <string name="export_cta">Buat PDF · %1$d halaman</string>
+    <string name="export_pages">%1$d hlm</string>
+    <string name="export_done">PDF siap. Tautan disalin, berlaku 7 hari.</string>
+    <string name="export_none">Centang minimal satu bagian.</string>
+    <string name="sec_history">Riwayat medis &amp; kondisi</string>
+    <string name="sec_meds">Obat + perubahan terbaru</string>
+    <string name="sec_trends">Tren tensi &amp; cek malam 30 hari</string>
+    <string name="sec_visits">Ringkasan 3 kunjungan terakhir</string>
+    <string name="sec_allergies">Alergi &amp; info darurat</string>
+    <string name="bring_to_dr">Lampirkan ke kunjungan %1$s (PDF)</string>
+    <string name="trends_attached">Tren 30 hari dilampirkan ke kunjungan %1$s. %2$s menerimanya sebagai PDF.</string>
 </resources>

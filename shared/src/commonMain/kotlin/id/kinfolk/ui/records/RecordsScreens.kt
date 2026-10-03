@@ -15,6 +15,8 @@ import id.kinfolk.data.Document
 import id.kinfolk.ui.circle.CircleMember
 import kinfolk.shared.generated.resources.cat_wishes
 import kinfolk.shared.generated.resources.docs_note
+import kinfolk.shared.generated.resources.export_title
+import kinfolk.shared.generated.resources.bring_to_dr
 import kinfolk.shared.generated.resources.upload_doc
 import kinfolk.shared.generated.resources.vis_all
 import kinfolk.shared.generated.resources.vis_n
@@ -174,8 +176,8 @@ enum class RecTab(val label: StringResource) {
  * `records` (docs/screen-map.md): v3's four tabs; Obat marks today's doses ("Tandai" / "Diberikan ✓", [given] =
  * Medication ids). Approved deviation (#11): "+ Tambah obat", a "Tidak diminum lagi" group, tap a card to edit.
  * Kondisi (#25) charts [checkIns], the last 30 oldest first. Biaya (#28) shows [costs], gone while Tagihan & uang
- * is hidden from me (null).
- * ponytail: Dokumen stays empty until its ticket.
+ * is hidden from me (null). [bring]: Kondisi's "Lampirkan ke kunjungan Dr. Rao (PDF)" with the next Appointment's
+ * Provider, null without one (owner-approved in #33).
  */
 @Composable
 fun RecordsScreen(
@@ -188,6 +190,7 @@ fun RecordsScreen(
     picked: RecTab,
     onPick: (RecTab) -> Unit,
     nameOf: (String) -> String?,
+    bring: Pair<String, () -> Unit>?,
     onToggle: (Medication) -> Unit,
     onOpen: (Medication?) -> Unit,
 ) {
@@ -221,7 +224,7 @@ fun RecordsScreen(
         }
         if (tab == RecTab.Docs && docs != null) Docs(docs, today)
         if (tab == RecTab.Costs && costs != null) Costs(costs, today)
-        if (tab == RecTab.Health) Trends(checkIns)
+        if (tab == RecTab.Health) Trends(checkIns, bring)
     }
 }
 
@@ -236,6 +239,7 @@ class Docs(
     val day: (Instant) -> LocalDate,
     val open: (Document) -> Unit,
     val upload: () -> Unit,
+    val export: () -> Unit,
 )
 
 /** v3's pill: null ("Semua") when every Member but the Care Recipient sees [category], else how many do. */
@@ -253,7 +257,7 @@ private val PillSome = Color(0xFFE9E2D4)
 private val PillLegal = Color(0xFFF0DDD3)
 private val TileBorder = Color(0x1A22261F) // rgba(34,38,31,.1)
 
-/** v3's Dokumen: the note, the list, "+ Unggah dokumen". "Ekspor untuk dokter baru" waits for Export (#33). */
+/** v3's Dokumen: the note, the list, "+ Unggah dokumen", "Ekspor untuk dokter baru". */
 @Composable
 private fun Docs(d: Docs, today: LocalDate) {
     // design: gap 10
@@ -284,6 +288,10 @@ private fun Docs(d: Docs, today: LocalDate) {
             }
         }
         DashedButton(stringResource(Res.string.upload_doc), d.upload)
+        // design: h50, r16, #22261F, #F3EEE4, 15px 600
+        Box(Modifier.fillMaxWidth().height(50.dp).background(Kf.Ink, RoundedCornerShape(16.dp)).tap(d.export), contentAlignment = Alignment.Center) {
+            Text(stringResource(Res.string.export_title), color = Kf.Paper, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
@@ -459,7 +467,7 @@ private val Rust = Color(0xFFC4471F)
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Trends(checkIns: List<CheckIn>) {
+private fun Trends(checkIns: List<CheckIn>, bring: Pair<String, () -> Unit>?) {
     // design: gap 12
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(Res.string.trends_note), fontSize = 13.sp, color = Kf.Muted)
@@ -494,6 +502,12 @@ private fun Trends(checkIns: List<CheckIn>) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(dayMonth(checkIns.first().day), fontSize = 11.sp, color = Kf.Muted)
                 Text(stringResource(Res.string.today), fontSize = 11.sp, color = Kf.Muted)
+            }
+        }
+        // design: h50, 1px rgba(34,38,31,.18), r16, transparent, 15px 600
+        bring?.let { (provider, attach) ->
+            Box(Modifier.fillMaxWidth().height(50.dp).border(1.dp, Kf.InputBorder, RoundedCornerShape(16.dp)).tap(attach), contentAlignment = Alignment.Center) {
+                Text(stringResource(Res.string.bring_to_dr, provider), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }

@@ -104,6 +104,10 @@ _Avoid_: bill, payment, reimbursement
 Berkas tentang Care Recipient (laporan, asuransi, identitas, surat hukum) yang disimpan terenkripsi per Care Circle; setiap unggahan ulang menjadi versi baru. UI: "Dokumen".
 _Avoid_: file, attachment
 
+**Export**:
+Satu PDF tentang Care Recipient untuk dokter baru, rujukan, atau IGD, berisi bagian yang dicentang Member dari yang boleh ia lihat; tautannya bisa dibuka tanpa login selama 7 hari, dan setiap Export tercatat di Linimasa. UI: "Ekspor untuk dokter baru".
+_Avoid_: report, share link
+
 **Note**:
 Tulisan bebas seorang Member, dibagikan ke Care Circle atau hanya untuk penulisnya. UI: "Catatan".
 _Avoid_: memo, Visit Note

@@ -424,6 +424,11 @@ verify_jwt = false
 [functions.emergency]
 verify_jwt = false
 
+# The PDF link is opened by doctors without login; building one checks the Member's token in the database.
+[functions.export]
+verify_jwt = false
+static_files = ["./functions/export/*.ttf"]
+
 [analytics]
 enabled = true
 port = 54327
