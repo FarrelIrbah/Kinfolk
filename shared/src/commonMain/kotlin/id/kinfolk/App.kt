@@ -1110,7 +1110,7 @@ fun App() {
                             editingContact, onBack = ::back,
                             save = { f ->
                                 attempt {
-                                    val draft = CareContactDraft(circle!!.id, f.name, f.relationship, f.phone, f.group, f.emergency)
+                                    val draft = CareContactDraft(circle!!.id, f.name, f.relationship, f.phone, f.group, f.emergency, f.note)
                                     editingContact?.let { supabase.editCareContact(it.id, draft) } ?: supabase.addCareContact(draft)
                                     loadHome() // before leaving, so the form stays busy and can't add twice
                                 }.also { if (it != null) back() } != null

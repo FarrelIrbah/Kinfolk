@@ -51,11 +51,13 @@ class MedicationContactTest {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet())
         val rao = sri.addCareContact(CareContactDraft(circle, "Dr. Anand Rao", "Dokter saraf", "+6281234567890", ContactGroup.Medical, emergency = true))
-        val siti = sri.addCareContact(CareContactDraft(circle, "Bu Siti", "Tetangga, sebelah kanan", "+6281200001111", ContactGroup.Home))
+        val siti = sri.addCareContact(CareContactDraft(circle, "Bu Siti", "Tetangga, sebelah kanan", "+6281200001111", ContactGroup.Home, note = "Memegang kunci cadangan rumah"))
         sri.addCareContact(CareContactDraft(circle, "IGD RS Kariadi", "Rumah sakit pilihan", "+62248413476", ContactGroup.Emergency))
 
         assertEquals(listOf("Dr. Anand Rao"), sri.careContacts(circle).filter { it.emergency }.map { it.name })
         assertEquals(ContactGroup.Home, sri.careContacts(circle).single { it.id == siti.id }.group)
+        assertEquals("Memegang kunci cadangan rumah", sri.careContacts(circle).single { it.id == siti.id }.note)
+        assertEquals("", rao.note)
 
         sri.editCareContact(siti.id, siti.draft().copy(emergency = true, phone = "+6281200002222"))
         sri.removeCareContact(rao.id)

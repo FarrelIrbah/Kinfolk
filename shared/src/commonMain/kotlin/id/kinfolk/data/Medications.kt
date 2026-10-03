@@ -118,6 +118,7 @@ data class CareContactDraft(
     val phone: String, // E.164
     @SerialName("grp") val group: ContactGroup,
     val emergency: Boolean = false,
+    val note: String = "", // "Memegang kunci cadangan rumah"
 )
 
 @Serializable
@@ -129,8 +130,9 @@ data class CareContact(
     val phone: String,
     @SerialName("grp") val group: ContactGroup,
     val emergency: Boolean,
+    val note: String = "",
 ) {
-    fun draft() = CareContactDraft(circleId, name, relationship, phone, group, emergency)
+    fun draft() = CareContactDraft(circleId, name, relationship, phone, group, emergency, note)
 }
 
 suspend fun SupabaseClient.addCareContact(draft: CareContactDraft): CareContact =

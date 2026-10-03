@@ -95,10 +95,10 @@ begin
     (circle, tukiman, 'Alarm jatuh (DP)', 45000, dewi, today - 1),
     (circle, tukiman, 'Biaya fisioterapi ×4', 160000, budi, today - 2);
 
-  insert into public.care_contacts (circle_id, name, relationship, phone, grp, emergency) values
-    (circle, 'Dr. Anand Rao', 'Dokter saraf', '+62215550100', 'medical', true),
-    (circle, 'Apotek Kimia Farma', 'Apotek', '+62215550142', 'medical', false),
-    (circle, 'Bu Ratna', 'Tetangga', '+6281255500119', 'home', false);
+  insert into public.care_contacts (circle_id, name, relationship, phone, grp, emergency, note) values
+    (circle, 'Dr. Anand Rao', 'Dokter saraf', '+62215550100', 'medical', true, 'Minta tolong Maria di resepsionis'),
+    (circle, 'Apotek Kimia Farma', 'Apotek', '+62215550142', 'medical', false, ''),
+    (circle, 'Bu Ratna', 'Tetangga', '+6281255500119', 'home', false, 'Memegang kunci cadangan rumah');
 
   insert into public.notes (circle_id, by, text, private) values
     (circle, sri, 'Bapak lebih tenang kalau ditelepon sebelum makan malam.', false);
