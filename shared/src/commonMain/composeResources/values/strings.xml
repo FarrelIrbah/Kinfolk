@@ -420,4 +420,18 @@
     <string name="sec_allergies">Alergi &amp; info darurat</string>
     <string name="bring_to_dr">Lampirkan ke kunjungan %1$s (PDF)</string>
     <string name="trends_attached">Tren 30 hari dilampirkan ke kunjungan %1$s. %2$s menerimanya sebagai PDF.</string>
+
+    <string name="bp_mode">Mode %1$s</string>
+    <string name="bp_mode_sub">Tombol besar, dan %1$s menentukan siapa melihat apa</string>
+    <string name="bp_exit">Keluar</string>
+    <string name="bp_today">Hari ini</string>
+    <string name="bp_no_appt">Tidak ada janji hari ini.</string>
+    <string name="bp_fine">Saya baik</string>
+    <string name="bp_help">Butuh bantuan</string>
+    <string name="bp_call">Telepon %1$s</string>
+    <string name="bp_calling">Menelepon %1$s…</string>
+    <string name="bp_fine_sent">Terkirim ke %1$d anak: "%2$s baik-baik saja."</string>
+    <string name="bp_who">Siapa melihat apa</string>
+    <string name="bp_sees_all">Melihat semuanya</string>
+    <string name="bp_sees_part">Melihat %1$d dari %2$d · ketuk untuk ubah</string>
 </resources>

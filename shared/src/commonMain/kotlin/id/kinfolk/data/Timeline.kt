@@ -29,7 +29,7 @@ data class TimelineEntry(
     /** An event's text, fixed when it happened. */
     val text: String = "",
 ) {
-    @Suppress("EnumEntryName") enum class Kind { appointment, visit_note, drive_confirmed, access_change, dose_given, check_in, document, export }
+    @Suppress("EnumEntryName") enum class Kind { appointment, visit_note, drive_confirmed, access_change, dose_given, check_in, document, export, recipient_press }
 }
 
 // ponytail: the whole history in one read; page it when a Care Circle's gets long.

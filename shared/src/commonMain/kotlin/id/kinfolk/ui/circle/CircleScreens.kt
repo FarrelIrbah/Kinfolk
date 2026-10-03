@@ -74,6 +74,8 @@ import kinfolk.shared.generated.resources.recipient_sub
 import kinfolk.shared.generated.resources.channel_app
 import kinfolk.shared.generated.resources.channel_whatsapp
 import kinfolk.shared.generated.resources.replay_onb
+import kinfolk.shared.generated.resources.bp_mode
+import kinfolk.shared.generated.resources.bp_mode_sub
 import kinfolk.shared.generated.resources.circle_name
 import kinfolk.shared.generated.resources.contacts
 import kinfolk.shared.generated.resources.contacts_sub
@@ -149,11 +151,11 @@ private fun CircleMember.sub() = when {
 /**
  * `circle` from design v3: header, Members, "Cara lain". Approved in #5: "Paket" is hidden. Approved in #9: the intro
  * box only while the Care Recipient [recipientName] is a Member; access "Penuh" or "N/6" (#20). #36: the Care
- * Recipient's row always first, no access column (not a Member: nothing to open, v1 has no Mode Bapak);
- * "Ulangi onboarding" while [onReplay] is set (admins).
+ * Recipient's row always first, no access column; "Ulangi onboarding" while [onReplay] is set (admins). #37: the Care
+ * Recipient's row and "Cara lain"'s first row open Mode Bapak ([onBapak]), as in v3.
  */
 @Composable
-fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit, onExport: () -> Unit, onReplay: (() -> Unit)?) {
+fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit, onExport: () -> Unit, onReplay: (() -> Unit)?, onBapak: () -> Unit) {
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -187,7 +189,7 @@ fun CircleScreen(circleName: String, recipientName: String, members: List<Circle
                 }
                 Hairline()
             }
-            if (members.none { it.isRecipient }) row(recipientName, Kf.Ink, stringResource(Res.string.recipient_sub), "") {}
+            if (members.none { it.isRecipient }) row(recipientName, Kf.Ink, stringResource(Res.string.recipient_sub), "", onBapak)
             members.forEach { m ->
                 row(
                     m.name, m.color, m.sub(),
@@ -196,17 +198,22 @@ fun CircleScreen(circleName: String, recipientName: String, members: List<Circle
                         m.sees.size == DataCategory.entries.size -> stringResource(Res.string.access_full)
                         else -> stringResource(Res.string.access_part, m.sees.size, DataCategory.entries.size)
                     },
-                ) { onMember(m) }
+                ) { if (m.isRecipient) onBapak() else onMember(m) }
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel(stringResource(Res.string.more_ways))
             Card {
-                listOf(Triple(Res.string.contacts, Res.string.contacts_sub, onContacts), Triple(Res.string.notes_title, Res.string.notes_sub, onNotes), Triple(Res.string.export_title, Res.string.export_short, onExport)).forEach { (title, sub, open) ->
+                listOf(
+                    Triple(stringResource(Res.string.bp_mode, recipientName), stringResource(Res.string.bp_mode_sub, recipientName), onBapak),
+                    Triple(stringResource(Res.string.contacts), stringResource(Res.string.contacts_sub), onContacts),
+                    Triple(stringResource(Res.string.notes_title), stringResource(Res.string.notes_sub), onNotes),
+                    Triple(stringResource(Res.string.export_title), stringResource(Res.string.export_short), onExport),
+                ).forEach { (title, sub, open) ->
                     Row(Modifier.fillMaxWidth().tap(open).padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(stringResource(title), fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                            Text(stringResource(sub), fontSize = 12.sp, color = Kf.Muted)
+                            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                            Text(sub, fontSize = 12.sp, color = Kf.Muted)
                         }
                         Text("›", color = Kf.Muted, fontSize = 18.sp)
                     }

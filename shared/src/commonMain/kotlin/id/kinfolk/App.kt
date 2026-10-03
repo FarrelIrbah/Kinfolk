@@ -129,6 +129,9 @@ import id.kinfolk.data.DoseLog
 import id.kinfolk.data.CheckIn
 import id.kinfolk.data.checkIn
 import id.kinfolk.data.recipientPhone
+import id.kinfolk.data.sayFine
+import id.kinfolk.data.askHelp
+import id.kinfolk.data.organizerPhone
 import id.kinfolk.data.recentCheckIns
 import id.kinfolk.data.saveCheckIn
 import id.kinfolk.ui.checkin.CheckInScreen
@@ -161,6 +164,12 @@ import kinfolk.shared.generated.resources.note_saved_shared
 import id.kinfolk.ui.tasks.TasksScreen
 import id.kinfolk.ui.tasks.overdue
 import kinfolk.shared.generated.resources.reminded_toast
+import kinfolk.shared.generated.resources.bp_sees_all
+import kinfolk.shared.generated.resources.bp_sees_part
+import kinfolk.shared.generated.resources.bp_calling
+import kinfolk.shared.generated.resources.bp_fine_sent
+import kinfolk.shared.generated.resources.bp_no_appt
+import kinfolk.shared.generated.resources.bp_call
 import kinfolk.shared.generated.resources.task_done_toast
 import kinfolk.shared.generated.resources.tasks_row
 import kinfolk.shared.generated.resources.tasks_row_late
@@ -252,6 +261,11 @@ import id.kinfolk.ui.appointment.hm
 import id.kinfolk.ui.appointment.longDate
 import id.kinfolk.ui.appointment.whenLabel
 import id.kinfolk.ui.appointment.withWhom
+import id.kinfolk.ui.bapak.BapakScreen
+import id.kinfolk.ui.bapak.Kid
+import id.kinfolk.ui.bapak.greeting
+import id.kinfolk.ui.bapak.helpLine
+import id.kinfolk.ui.bapak.todayPlan
 import id.kinfolk.ui.circle.CircleMember
 import id.kinfolk.ui.circle.CircleScreen
 import id.kinfolk.ui.circle.MemberScreen
@@ -364,7 +378,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -425,6 +439,9 @@ fun App() {
         var onboarding by rememberSaveable { mutableStateOf(false) } // onb2 goes on to onb3 right after onb1
         var viewing by rememberSaveable { mutableStateOf<String?>(null) } // on `member`
         var memberError by remember { mutableStateOf<String?>(null) }
+        var bapakMsg by remember { mutableStateOf<String?>(null) } // Mode Bapak's green box after a press
+        var organizerPhone by remember { mutableStateOf("") } // "Telepon Sri", read when Mode Bapak opens
+        var pressing by remember { mutableStateOf(false) } // a press on its way: a second tap sends nothing
         var confirm by remember { mutableStateOf<Confirm?>(null) }
         var turns by remember { mutableStateOf(emptyList<DutyTurn>()) } // each day this week
         var drives by remember { mutableStateOf(emptyList<Appointment>()) } // this week, with a Driver
@@ -487,7 +504,8 @@ fun App() {
             val name = m?.name ?: fallback.orEmpty()
             return Person(if (m?.leftAt != null) former.replace("%1\$s", name) else name, colorOf(id))
         }
-        fun author(e: TimelineEntry) = named(e.by, e.byName)
+        // Mode Bapak presses show the Care Recipient, in v3's `col('pak')` (#37).
+        fun author(e: TimelineEntry) = if (e.kind == TimelineEntry.Kind.recipient_press) Person(e.byName.orEmpty(), Kf.Ink) else named(e.by, e.byName)
         fun visit() = opened ?: next?.let { Visit(it, questions, note) }
         // The Care Recipient while they are a Member: they set restrictions, else the admins (ADR 0004).
         fun owner() = recipient?.memberId?.takeIf { id -> members.any { it.userId == id && it.leftAt == null } }
@@ -878,6 +896,12 @@ fun App() {
                                 onMember = { viewing = it.id; memberError = null; go(Screen.Member) },
                                 onContacts = { scope.launch { loadContacts(); go(Screen.Contacts) } }, onNotes = ::openNotes, onExport = ::openExport,
                                 onReplay = { onboarding = true; tab = Tab.Home; reset(Screen.Onb2, Nav.Push) }.takeIf { circleMembers().any { it.isMe && it.role == Role.admin } },
+                                onBapak = {
+                                    bapakMsg = null
+                                    organizerPhone = ""
+                                    go(Screen.Bapak)
+                                    scope.launch { recipient?.let { r -> attempt { supabase.organizerPhone(r.id).orEmpty() } }?.let { organizerPhone = it } }
+                                },
                             )
                         }
                         Screen.Appt -> visit()?.let { v ->
@@ -1208,6 +1232,57 @@ fun App() {
                                         }
                                     }
                                 },
+                            )
+                        }
+                        Screen.Bapak -> recipient?.let { r ->
+                            val kids = circleMembers().filter { !it.isRecipient }
+                            // The organizer: the first admin to join (as organizer() on the server).
+                            val organizer = members.firstOrNull { it.leftAt == null && it.role == Role.admin && it.userId != r.memberId }?.name.orEmpty()
+                            val seesAll = stringResource(Res.string.bp_sees_all)
+                            val seesPart = kids.associate { k -> k.id to stringResource(Res.string.bp_sees_part, k.sees.size, DataCategory.entries.size) }
+                            val calling = stringResource(Res.string.bp_calling, organizer)
+                            val fineSent = stringResource(Res.string.bp_fine_sent) // "Terkirim ke %1$d anak: "%2$s baik-baik saja.""
+                            // Read now if the read on opening hasn't landed yet.
+                            fun dial() = scope.launch {
+                                if (organizerPhone.isEmpty()) attempt { supabase.organizerPhone(r.id).orEmpty() }?.let { organizerPhone = it }
+                                runCatching { uri.openUri("tel:$organizerPhone") }
+                            }
+                            fun press(block: suspend () -> Unit) {
+                                if (pressing) return
+                                pressing = true
+                                scope.launch { try { block() } finally { pressing = false } }
+                            }
+                            val appt = next?.takeIf { it.startsAt.toLocalDateTime(tz).date == today }
+                            BapakScreen(
+                                r.name, greeting(now.toLocalDateTime(tz).hour, r.relation, r.name),
+                                appt?.let { a ->
+                                    todayPlan(a.provider.name, a.startsAt.toLocalDateTime(tz).time, a.driverId?.let { person(it)?.name },
+                                        a.departsAt?.toLocalDateTime(tz)?.time)
+                                } ?: stringResource(Res.string.bp_no_appt),
+                                bapakMsg, stringResource(Res.string.bp_call, organizer),
+                                kids.map { k -> Kid(k.id, k.name, k.color, if (k.sees.size == DataCategory.entries.size) seesAll else seesPart.getValue(k.id)) },
+                                onExit = ::back,
+                                onFine = {
+                                    press {
+                                        attempt { supabase.sayFine(r.id) }?.let { n ->
+                                            bapakMsg = fineSent.replace("%1\$d", "$n").replace("%2\$s", r.name)
+                                            timeline = retrying { supabase.timeline(circle!!.id) }
+                                        } ?: run { toast = noConnection }
+                                    }
+                                },
+                                // The dialer opens at once; the alert follows when it gets through.
+                                onHelp = {
+                                    if (!pressing) dial()
+                                    press {
+                                        attempt { supabase.askHelp(r.id) }?.let { who ->
+                                            val near = kids.firstOrNull { it.emergency && it.distance.isNotBlank() }?.let { it.name to it.distance }
+                                            bapakMsg = helpLine(who, near)
+                                            timeline = retrying { supabase.timeline(circle!!.id) }
+                                        } ?: run { toast = noConnection }
+                                    }
+                                },
+                                onCall = { bapakMsg = calling; dial() },
+                                onKid = { k -> viewing = k.id; memberError = null; go(Screen.Member) },
                             )
                         }
                         Screen.Emergency -> recipient?.let { r ->
