@@ -289,6 +289,9 @@
     <string name="privacy_per_body">Mulai dengan janji dokter dan obat dibagikan; atur catatan kunjungan satu per satu.</string>
     <string name="perm_intro">%1$s memilih apa yang bisa dilihat tiap orang. Perubahan tercatat di linimasa.</string>
     <string name="recipient_sub">Penerima perawatan · menentukan akses</string>
+    <string name="channel_app">App + WhatsApp</string>
+    <string name="channel_whatsapp">Hanya WhatsApp</string>
+    <string name="replay_onb">Ulangi onboarding</string>
     <string name="access_full">Penuh</string>
     <string name="access_part">%1$d/%2$d</string>
     <string name="can_see">Bisa melihat</string>

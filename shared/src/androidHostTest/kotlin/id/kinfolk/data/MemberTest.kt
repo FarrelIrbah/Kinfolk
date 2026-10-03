@@ -30,6 +30,16 @@ class MemberTest {
         assertEquals(members, sri.members(circle))
     }
 
+    // ponytail: "Hanya WhatsApp" (never signed in) can't be reached through the API; the seed's Rina shows it.
+    @Test
+    fun `everyone sees which Members have signed in to the app`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = signedInSibling(sri, circle)
+
+        assertEquals(listOf(true, true), sri.members(circle).map { it.inApp })
+        assertEquals(listOf(true, true), budi.members(circle).map { it.inApp })
+    }
+
     @Test
     fun `an admin promotes a Member to admin, a sibling can't promote or remove anyone`() = runBlocking {
         val (sri, circle) = sriWithCircle()

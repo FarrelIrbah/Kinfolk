@@ -470,7 +470,8 @@ fun App() {
             return when {
                 id == me() -> Kf.Green
                 m?.leftAt != null -> Kf.Muted
-                else -> InviteColors[members.filter { it.userId != me() && it.leftAt == null }.indexOf(m).coerceAtLeast(0) % 4]
+                id == recipient?.memberId -> Kf.Ink // v3 `col('pak')`
+                else -> InviteColors[members.filter { it.userId != me() && it.userId != recipient?.memberId && it.leftAt == null }.indexOf(m).coerceAtLeast(0) % 4]
             }
         }
         fun person(id: String?): Person? {
@@ -494,7 +495,7 @@ fun App() {
             if (m.userId == owner() || (owner() == null && m.role == Role.admin)) DataCategory.entries.toSet()
             else DataCategory.entries.toSet() - hidden.filter { it.recipientId == recipient?.id && it.memberId == m.userId }.map { it.category }.toSet()
         fun circleMembers() = members.filter { it.leftAt == null }.sortedWith(compareBy({ it.userId != owner() }, { it.userId != me() })).map {
-            CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me(), sees(it), it.userId == owner(), it.emergency, it.distance)
+            CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me(), sees(it), it.userId == owner(), it.emergency, it.distance, it.inApp)
         }
         // Like v3: push remembers where you came from, back returns there (Home when empty), tabs clear it.
         fun go(to: Screen) { nav = Nav.Push; stack = stack + listOfNotNull(screen); screen = to }
@@ -786,7 +787,7 @@ fun App() {
                                     onWriteNote = { opened = null; go(if (note != null || next?.attendeeId == me()) Screen.VisitNote else Screen.Appt) },
                                     onRota = { pick(Tab.Rota) }, onRecords = { pick(Tab.Records) },
                                     onTimeline = { pick(Tab.Timeline) },
-                                    onInvite = { go(Screen.Onb2) },
+                                    onInvite = { onboarding = false; go(Screen.Onb2) },
                                     onFillEmergency = { go(Screen.EmergencyForm) },
                                     onMarkMorning = {
                                         markDoses(morningMeds.filter { it.id !in given }, give = true)
@@ -876,6 +877,7 @@ fun App() {
                                 circle?.name.orEmpty(), recipient?.name.orEmpty(), circleMembers(), onSos = { openEmergency() },
                                 onMember = { viewing = it.id; memberError = null; go(Screen.Member) },
                                 onContacts = { scope.launch { loadContacts(); go(Screen.Contacts) } }, onNotes = ::openNotes, onExport = ::openExport,
+                                onReplay = { onboarding = true; tab = Tab.Home; reset(Screen.Onb2, Nav.Push) }.takeIf { circleMembers().any { it.isMe && it.role == Role.admin } },
                             )
                         }
                         Screen.Appt -> visit()?.let { v ->

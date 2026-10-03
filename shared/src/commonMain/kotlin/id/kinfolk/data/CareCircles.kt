@@ -105,11 +105,13 @@ data class Member(
     /** An emergency contact on Emergency Info, set by an admin, with "Jarak dari rumah". */
     val emergency: Boolean = false,
     val distance: String = "",
+    /** Has signed in to the app: "App + WhatsApp", else "Hanya WhatsApp" on `circle`. */
+    @SerialName("in_app") val inApp: Boolean = false,
 )
 
 /** Everyone who has been a Member of [circleId], in join order; empty for anyone who isn't a Member now. */
 suspend fun SupabaseClient.members(circleId: String): List<Member> =
-    from("members").select { filter { eq("circle_id", circleId) }; order("created_at", Order.ASCENDING) }.decodeList()
+    from("members").select(Columns.raw("*,in_app")) { filter { eq("circle_id", circleId) }; order("created_at", Order.ASCENDING) }.decodeList()
 
 /** Admins only. */
 suspend fun SupabaseClient.promoteToAdmin(circleId: String, userId: String) {

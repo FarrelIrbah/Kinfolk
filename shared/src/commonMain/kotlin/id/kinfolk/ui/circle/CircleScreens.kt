@@ -71,6 +71,9 @@ import kinfolk.shared.generated.resources.cat_visit_notes
 import kinfolk.shared.generated.resources.cat_visit_notes_desc
 import kinfolk.shared.generated.resources.perm_intro
 import kinfolk.shared.generated.resources.recipient_sub
+import kinfolk.shared.generated.resources.channel_app
+import kinfolk.shared.generated.resources.channel_whatsapp
+import kinfolk.shared.generated.resources.replay_onb
 import kinfolk.shared.generated.resources.circle_name
 import kinfolk.shared.generated.resources.contacts
 import kinfolk.shared.generated.resources.contacts_sub
@@ -101,7 +104,7 @@ import org.jetbrains.compose.resources.stringResource
 class CircleMember(
     val id: String, val name: String, val color: Color, val role: Role, val joined: LocalDate, val isMe: Boolean,
     val sees: Set<DataCategory> = DataCategory.entries.toSet(), val isRecipient: Boolean = false,
-    val emergency: Boolean = false, val distance: String = "",
+    val emergency: Boolean = false, val distance: String = "", val inApp: Boolean = true,
 )
 
 /** `member` rows: v3's six (#20). */
@@ -135,21 +138,22 @@ private fun CircleMember.roleText() = stringResource(
     },
 )
 
-/** "Anda · pengatur", "Anak" (approved in #5); the Care Recipient "Penerima perawatan · menentukan akses" (#9). */
+/** "Anda · pengatur" (#5); the Care Recipient "Penerima perawatan · menentukan akses" (#9); others their channel (#36). */
 @Composable
 private fun CircleMember.sub() = when {
     isRecipient -> stringResource(Res.string.recipient_sub)
     isMe -> stringResource(Res.string.member_you, roleText())
-    else -> roleText().replaceFirstChar { it.uppercase() }
+    else -> stringResource(if (inApp) Res.string.channel_app else Res.string.channel_whatsapp)
 }
 
 /**
- * `circle` from design v3: header, Members, "Cara lain". Approved in #5: "Paket" and "Ulangi onboarding" are hidden.
- * Approved in #9: the intro box only while the Care Recipient [recipientName] is a Member (their row first, no
- * access column); access "Penuh" or "N/6" (#20).
+ * `circle` from design v3: header, Members, "Cara lain". Approved in #5: "Paket" is hidden. Approved in #9: the intro
+ * box only while the Care Recipient [recipientName] is a Member; access "Penuh" or "N/6" (#20). #36: the Care
+ * Recipient's row always first, no access column (not a Member: nothing to open, v1 has no Mode Bapak);
+ * "Ulangi onboarding" while [onReplay] is set (admins).
  */
 @Composable
-fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit, onExport: () -> Unit) {
+fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit, onExport: () -> Unit, onReplay: (() -> Unit)?) {
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -167,24 +171,32 @@ fun CircleScreen(circleName: String, recipientName: String, members: List<Circle
             modifier = Modifier.fillMaxWidth().background(Kf.CardAlt, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
         )
         if (members.isNotEmpty()) Card {
-            members.forEach { m ->
+            @Composable
+            fun row(name: String, color: Color, sub: String, access: String, open: () -> Unit) {
                 Row(
-                    Modifier.fillMaxWidth().tap { onMember(m) }.padding(horizontal = 16.dp, vertical = 14.dp),
+                    Modifier.fillMaxWidth().tap(open).padding(horizontal = 16.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(m.name.take(1), m.color, 38.dp, 14.sp)
+                    Avatar(name.take(1), color, 38.dp, 14.sp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(m.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                        Text(m.sub(), fontSize = 13.sp, color = Kf.Muted)
+                        Text(name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                        Text(sub, fontSize = 13.sp, color = Kf.Muted)
                     }
-                    if (!m.isRecipient) Text(
-                        if (m.sees.size == DataCategory.entries.size) stringResource(Res.string.access_full)
-                        else stringResource(Res.string.access_part, m.sees.size, DataCategory.entries.size),
-                        fontSize = 12.sp, color = Kf.Muted,
-                    )
+                    Text(access, fontSize = 12.sp, color = Kf.Muted)
                     Text("›", color = Kf.Muted, fontSize = 18.sp)
                 }
                 Hairline()
+            }
+            if (members.none { it.isRecipient }) row(recipientName, Kf.Ink, stringResource(Res.string.recipient_sub), "") {}
+            members.forEach { m ->
+                row(
+                    m.name, m.color, m.sub(),
+                    when {
+                        m.isRecipient -> ""
+                        m.sees.size == DataCategory.entries.size -> stringResource(Res.string.access_full)
+                        else -> stringResource(Res.string.access_part, m.sees.size, DataCategory.entries.size)
+                    },
+                ) { onMember(m) }
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -202,6 +214,11 @@ fun CircleScreen(circleName: String, recipientName: String, members: List<Circle
                 }
             }
         }
+        // design: border:none;background:none;color:#6B6A60;font-size:13px;padding:0 (centred button)
+        if (onReplay != null) Text(
+            stringResource(Res.string.replay_onb), fontSize = 13.sp, color = Kf.Muted,
+            modifier = Modifier.align(Alignment.CenterHorizontally).tap(onReplay),
+        )
     }
 }
 
