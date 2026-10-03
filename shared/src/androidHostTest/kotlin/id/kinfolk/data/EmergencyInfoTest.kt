@@ -2,7 +2,13 @@ package id.kinfolk.data
 
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.runBlocking
+import io.github.jan.supabase.auth.auth
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
+import id.kinfolk.ui.contacts.localPhone
+import kotlin.time.Clock
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.net.URI
@@ -17,6 +23,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class EmergencyInfoTest {
     init { Providers } // start the fake providers before anything is sent
@@ -31,29 +38,64 @@ class EmergencyInfoTest {
     }
 
     @Test
-    fun `a paramedic scanning the card sees allergies, active Medications, conditions and emergency contacts only`() = runBlocking {
+    fun `a paramedic scanning the card sees what the app shows, and only ADR 0003's fields`() = runBlocking {
         val (sri, circle, tukiman) = sriWithTukiman()
         val budi = signedInSibling(sri, circle)
-        budi.saveEmergencyInfo(tukiman, allergies = "Penisilin", conditions = "Stroke iskemik, April 2026. Tekanan darah tinggi.")
-        sri.addMedication(MedicationDraft(circle, tukiman, "Clopidogrel", "75 mg", "pagi, sesudah makan", LocalTime(7, 0)))
+        val dewi = signedInSibling(sri, circle)
+        budi.saveEmergencyInfo(tukiman, EmergencyDraft(LocalDate(1948, 3, 12), 64, "Penisilin", "Tindakan penuh", "Stroke iskemik, April 2026. Tekanan darah tinggi."))
+        sri.addMedication(MedicationDraft(circle, tukiman, "Clopidogrel", "75 mg", "pagi, sesudah makan", LocalTime(7, 0), bloodThinner = true))
         sri.addMedication(MedicationDraft(circle, tukiman, "Amlodipine", "5 mg", "pagi", LocalTime(7, 0)))
-        val stopped = sri.addMedication(MedicationDraft(circle, tukiman, "Simvastatin", "10 mg", "malam", LocalTime(21, 0)))
+        val stopped = sri.addMedication(MedicationDraft(circle, tukiman, "Simvastatin", "10 mg", "malam", LocalTime(21, 0), bloodThinner = true))
         sri.editMedication(stopped.id, stopped.draft().copy(active = false))
         sri.addCareContact(CareContactDraft(circle, "Dr. Anand Rao", "Dokter saraf", "+6281234567890", ContactGroup.Medical, emergency = true))
         sri.addCareContact(CareContactDraft(circle, "Bu Siti", "Tetangga", "+6281200001111", ContactGroup.Home))
+        sri.setEmergencyContact(circle, dewi.me(), true, "")
+        sri.setEmergencyContact(circle, budi.me(), true, " 10 menit ")
+        sri.setEmergencyContact(circle, dewi.me(), false, "")
+        assertFails { budi.setEmergencyContact(circle, budi.me(), false, "") } // admins only
 
-        assertEquals(CareRecipient(tukiman, circle, "Tukiman", "father", "Penisilin", "Stroke iskemik, April 2026. Tekanan darah tinggi."), sri.careRecipients(circle).single())
+        val budiPhone = "+" + budi.auth.currentUserOrNull()!!.phone
+        val info = dewi.emergencyInfo(tukiman)
+        assertEquals(
+            EmergencyInfo(
+                "Tukiman", LocalDate(1948, 3, 12), 64, "Penisilin", "Tindakan penuh", "Stroke iskemik, April 2026. Tekanan darah tinggi.",
+                listOf("Clopidogrel"), listOf("Amlodipine 5 mg", "Clopidogrel 75 mg"),
+                listOf(EmergencyContact("Budi", "Anak", "10 menit", budiPhone), EmergencyContact("Dr. Anand Rao", "Dokter saraf", "", "+6281234567890")),
+            ),
+            info,
+        )
+        assertEquals(true to "10 menit", sri.members(circle).single { it.userId == budi.me() }.let { it.emergency to it.distance })
+        val today = Clock.System.todayIn(TimeZone.of("Asia/Jakarta"))
+        assertEquals("78 · lahir 12 Mar 1948 · 64 kg", info!!.ageLine(LocalDate(2026, 10, 3)))
+        assertEquals("77 · lahir 12 Mar 1948 · 64 kg", info.ageLine(LocalDate(2026, 3, 11)))
+        assertEquals("Minum pengencer darah: Clopidogrel", info.bloodLine())
+        assertEquals("Anak · 10 menit · ${localPhone(budiPhone)}", info.contacts.first().sub())
+
         val card = sri.emergencyCard(tukiman)
         assertContains(scan(card.url, userAgent = "WhatsApp/2.24.1 A").body(), "Penisilin") // the link preview after sharing
         assertNull(sri.emergencyCard(tukiman).lastScannedAt)
 
+        // Every field the app shows, in the app's words, on the page; Budi before the doctor.
         val page = scan(card.url).body()
-        listOf(
-            "Info darurat", "Tukiman", "Alergi", "Penisilin", "Kondisi", "Stroke iskemik, April 2026. Tekanan darah tinggi.",
-            "Obat saat ini", "Amlodipine 5 mg · Clopidogrel 75 mg", "Dr. Anand Rao", "Dokter saraf · 0812 3456 7890", "tel:+6281234567890", "Telepon",
-        ).forEach { assertContains(page, it) }
-        listOf("Simvastatin", "Bu Siti", "pagi, sesudah makan", "Sri").forEach { assertFalse(it in page, "page shows $it") }
+        (listOf("Info darurat", info.name, info.ageLine(today), info.bloodLine(), "Alergi", info.allergies, "Keinginan", info.wishes, "Kondisi", info.conditions,
+            "Obat saat ini", info.medications.joinToString(" · "), "Telepon") +
+            info.contacts.flatMap { listOf(it.name, it.sub(), "tel:${it.phone}") }).forEach { assertContains(page, it) }
+        assertTrue(page.indexOf("Budi") < page.indexOf("Dr. Anand Rao"))
+        listOf("Simvastatin", "Bu Siti", "pagi, sesudah makan", "Sri", "Dewi").forEach { assertFalse(it in page, "page shows $it") }
         assertNotNull(sri.emergencyCard(tukiman).lastScannedAt)
+        Unit
+    }
+
+    @Test
+    fun `empty Emergency Info shows the name only, and outsiders can't read it`() = runBlocking {
+        val (sri, _, tukiman) = sriWithTukiman()
+        val info = sri.emergencyInfo(tukiman)!!
+        assertEquals(EmergencyInfo("Tukiman"), info)
+        assertEquals("", info.ageLine(LocalDate(2026, 10, 3)))
+        assertEquals("", info.bloodLine())
+        val page = scan(sri.emergencyCard(tukiman).url).body()
+        listOf("Alergi", "Keinginan", "Kondisi", "Obat saat ini", "Telepon", "pengencer", "lahir").forEach { assertFalse(it in page, "page shows $it") }
+        assertNull(signedInNewcomer().emergencyInfo(tukiman))
         Unit
     }
 
@@ -90,7 +132,7 @@ class EmergencyInfoTest {
         assertFails { budi.reissueEmergencyCard(tukiman) }
         assertFails { stranger.emergencyCard(tukiman) }
         assertFails { stranger.reissueEmergencyCard(tukiman) }
-        stranger.saveEmergencyInfo(tukiman, "Semua", "")
+        stranger.saveEmergencyInfo(tukiman, EmergencyDraft(null, null, "Semua", "", ""))
         assertEquals(card, sri.emergencyCard(tukiman))
         assertEquals("", sri.careRecipients(circle).single().allergies)
 

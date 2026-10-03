@@ -29,7 +29,7 @@ class OfflineTest {
         val next = budi.nextAppointment(circle, now)!!
         budi.askQuestion(circle, next.id, "Boleh menyetir lagi?")
         sri.giveDose(sri.addMedication(MedicationDraft(circle, tukiman, "Clopidogrel", "75 mg", "pagi", LocalTime(7, 0))), day)
-        sri.saveEmergencyInfo(tukiman, allergies = "Penisilin", conditions = "Stroke iskemik")
+        sri.saveEmergencyInfo(tukiman, EmergencyDraft(null, null, "Penisilin", "", "Stroke iskemik"))
         sri.addCareContact(CareContactDraft(circle, "Dr. Anand Rao", "Dokter saraf", "+6281234567890", ContactGroup.Medical, emergency = true))
 
         val kept = Json.encodeToString(budi.snapshot(since = now, today = day)!!)
@@ -41,7 +41,7 @@ class OfflineTest {
         assertEquals(listOf("Boleh menyetir lagi?"), offline.questions.map { it.text })
         assertEquals(listOf("Clopidogrel"), offline.medications.map { it.name })
         assertEquals("Penisilin", offline.recipient!!.allergies)
-        assertEquals(listOf("Clopidogrel"), offline.emergencyMedications.map { it.name })
+        assertEquals(listOf("Clopidogrel 75 mg"), offline.emergency?.medications)
         assertEquals(listOf("Dr. Anand Rao"), offline.contacts.filter { it.emergency }.map { it.name })
         assertEquals(budi.emergencyCard(tukiman).url, offline.card!!.url)
         assertEquals(listOf("Sri", "Budi"), offline.members.map { it.name })
@@ -65,7 +65,7 @@ class OfflineTest {
         assertNull(offline.next)
         assertTrue(offline.medications.isEmpty())
         assertTrue(offline.timeline.all { it.kind == TimelineEntry.Kind.access_change })
-        assertEquals(listOf("Sertraline"), offline.emergencyMedications.map { it.name })
+        assertEquals(listOf("Sertraline 50 mg"), offline.emergency?.medications)
     }
 
     @Test

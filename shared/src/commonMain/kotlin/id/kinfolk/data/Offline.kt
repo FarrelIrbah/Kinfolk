@@ -20,8 +20,6 @@ data class Snapshot(
     val medications: List<Medication>,
     val members: List<Member>,
     val timeline: List<TimelineEntry>,
-    /** Emergency Info skips Data Category (ADR 0003). */
-    val emergencyMedications: List<Medication>,
     val contacts: List<CareContact>,
     val card: EmergencyCard?,
     /** [today]'s Dose Logs: offline the ring still counts them. */
@@ -31,6 +29,8 @@ data class Snapshot(
     val checkIn: CheckIn? = null,
     /** Home's Tasks row. */
     val tasks: List<Task> = emptyList(),
+    /** Skips Data Category (ADR 0003). */
+    val emergency: EmergencyInfo? = null,
     val savedAt: Instant = Clock.System.now(),
 )
 
@@ -42,7 +42,7 @@ suspend fun SupabaseClient.snapshot(since: Instant, today: LocalDate): Snapshot?
     return Snapshot(
         circle, recipient, next, next?.let { questions(it.id) }.orEmpty(), next?.let { visitNote(it.id) },
         medications(circle.id), members(circle.id), timeline(circle.id),
-        recipient?.let { emergencyMedications(it.id) }.orEmpty(), careContacts(circle.id), recipient?.let { emergencyCard(it.id) },
-        doseLogs(circle.id, today), today, recipient?.let { checkIn(it.id, today) }, tasks(circle.id),
+        careContacts(circle.id), recipient?.let { emergencyCard(it.id) },
+        doseLogs(circle.id, today), today, recipient?.let { checkIn(it.id, today) }, tasks(circle.id), recipient?.let { emergencyInfo(it.id) },
     )
 }

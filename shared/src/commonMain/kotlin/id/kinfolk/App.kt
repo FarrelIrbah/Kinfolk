@@ -109,6 +109,13 @@ import id.kinfolk.data.EmergencyCard
 import id.kinfolk.data.emergencyCard
 import id.kinfolk.data.reissueEmergencyCard
 import id.kinfolk.data.saveEmergencyInfo
+import id.kinfolk.data.EmergencyDraft
+import id.kinfolk.data.EmergencyInfo
+import id.kinfolk.data.emergencyFallback
+import id.kinfolk.data.emergencyInfo
+import id.kinfolk.data.emergencyCardPdf
+import id.kinfolk.data.setEmergencyContact
+import id.kinfolk.ui.rememberPrinter
 import id.kinfolk.data.Invitation
 import id.kinfolk.data.InvitationToMe
 import id.kinfolk.data.Role
@@ -182,7 +189,6 @@ import id.kinfolk.data.AccessChange
 import id.kinfolk.data.DataCategory
 import id.kinfolk.data.accessChanges
 import id.kinfolk.data.Hidden
-import id.kinfolk.data.emergencyMedications
 import id.kinfolk.data.hidden
 import id.kinfolk.data.hideByDefault
 import id.kinfolk.data.setHidden
@@ -302,6 +308,7 @@ import kinfolk.shared.generated.resources.picks_up
 import kinfolk.shared.generated.resources.picks_up_no_time
 import kinfolk.shared.generated.resources.never
 import kinfolk.shared.generated.resources.qr_revoked
+import kinfolk.shared.generated.resources.qr_printed
 import kinfolk.shared.generated.resources.you
 import kinfolk.shared.generated.resources.cancel
 import kinfolk.shared.generated.resources.former_member
@@ -414,7 +421,7 @@ fun App() {
         var members by remember { mutableStateOf(emptyList<Member>()) } // Former Members too, for their names
         var hidden by remember { mutableStateOf(emptyList<Hidden>()) }
         var changes by remember { mutableStateOf(emptyList<AccessChange>()) } // "Riwayat perubahan", newest first
-        var sosMeds by remember { mutableStateOf(emptyList<Medication>()) } // whatever is hidden (ADR 0003)
+        var emergency by remember { mutableStateOf<EmergencyInfo?>(null) } // skips Data Category (ADR 0003)
         var onboarding by rememberSaveable { mutableStateOf(false) } // onb2 goes on to onb3 right after onb1
         var viewing by rememberSaveable { mutableStateOf<String?>(null) } // on `member`
         var memberError by remember { mutableStateOf<String?>(null) }
@@ -435,7 +442,9 @@ fun App() {
         val kept = rememberKept("snapshot")
         LaunchedEffect(toast) { if (toast != null) { delay(if (undo?.first == toast) 5000 else 2600); toast = null } }
         val share = rememberShare()
+        val printPdf = rememberPrinter()
         val revoked = stringResource(Res.string.qr_revoked)
+        val printed = stringResource(Res.string.qr_printed)
         val tz = remember { TimeZone.currentSystemDefault() }
         val now by produceState(Clock.System.now()) { while (true) { delay(30_000); value = Clock.System.now() } }
         // "Anda" in Budi's avatar color from the prototype, since Sri's green vanishes on the green Home card.
@@ -485,7 +494,7 @@ fun App() {
             if (m.userId == owner() || (owner() == null && m.role == Role.admin)) DataCategory.entries.toSet()
             else DataCategory.entries.toSet() - hidden.filter { it.recipientId == recipient?.id && it.memberId == m.userId }.map { it.category }.toSet()
         fun circleMembers() = members.filter { it.leftAt == null }.sortedWith(compareBy({ it.userId != owner() }, { it.userId != me() })).map {
-            CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me(), sees(it), it.userId == owner())
+            CircleMember(it.userId, it.name.orEmpty(), colorOf(it.userId), it.role, it.joinedAt.toLocalDateTime(tz).date, it.userId == me(), sees(it), it.userId == owner(), it.emergency, it.distance)
         }
         // Like v3: push remembers where you came from, back returns there (Home when empty), tabs clear it.
         fun go(to: Screen) { nav = Nav.Push; stack = stack + listOfNotNull(screen); screen = to }
@@ -569,7 +578,7 @@ fun App() {
         // What stays readable offline (#14); the rest (Invitations, restrictions, rota) waits for a connection.
         fun restore(k: Snapshot) {
             circle = k.circle; recipient = k.recipient; next = k.next; questions = k.questions; note = k.note
-            meds = k.medications; members = k.members; timeline = k.timeline; sosMeds = k.emergencyMedications
+            meds = k.medications; members = k.members; timeline = k.timeline; emergency = k.emergency
             contacts = k.contacts; card = k.card; savedAt = k.savedAt; doses = k.doses; checkIn = k.checkIn; tasks = k.tasks
         }
         suspend fun loadHome() {
@@ -608,12 +617,12 @@ fun App() {
             contacts = circle?.let { c -> retrying { supabase.careContacts(c.id) } }.orEmpty()
         }
         fun openExport() { exportDocs = emptyList(); go(Screen.Export); scope.launch { loadContacts() } } // emergency contacts for its count
-        // SOS opens at once, even offline, with what Home already loaded; contacts and the card follow when reachable.
+        // SOS opens at once, even offline, with what Home already loaded; the latest info and the card follow when reachable.
         fun openEmergency() {
             go(Screen.Emergency)
             emergencyLoad?.cancel()
             emergencyLoad = scope.launch {
-                loadContacts()
+                recipient?.let { r -> emergency = retrying { supabase.emergencyInfo(r.id) } }
                 card = recipient?.let { r -> retrying { supabase.emergencyCard(r.id) } }
             }
         }
@@ -1154,6 +1163,12 @@ fun App() {
                             MemberScreen(
                                 m, iAmAdmin = sent != null, memberError, onBack = ::back,
                                 onToggle = onToggle,
+                                onEmergency = if (sent == null || m.isRecipient) null else { on, distance ->
+                                    scope.launch {
+                                        if (attempt { supabase.setEmergencyContact(c.id, m.id, on, distance) } == null) toast = offline
+                                        members = retrying { supabase.members(c.id) }
+                                    }
+                                },
                                 history = changes.filter { it.recipientId == recipient?.id && it.memberId == m.id }.map {
                                     val by = members.firstOrNull { x -> x.userId == it.by }?.name.orEmpty()
                                     HistoryLine(it.category, it.hidden, changeMeta(it.at, now, tz, by, recipient?.name.takeIf { _ -> it.onBehalfOf != null }))
@@ -1195,7 +1210,7 @@ fun App() {
                         }
                         Screen.Emergency -> recipient?.let { r ->
                             EmergencyScreen(
-                                r.name, r.allergies, r.conditions, sosMeds, contacts, card, savedAt?.let { updatedAgo(it, now) },
+                                emergency ?: r.emergencyFallback(), today, card, savedAt?.let { updatedAgo(it, now) },
                                 onClose = ::back, onEdit = { go(Screen.EmergencyForm) },
                                 // Refreshes "terakhir dipindai" when reachable; the card on screen already works.
                                 onQr = { go(Screen.Qr); scope.launch { attempt { supabase.emergencyCard(r.id) }?.let { card = it } } },
@@ -1204,18 +1219,20 @@ fun App() {
                         Screen.Qr -> recipient?.let { r ->
                             card?.let { c ->
                                 QrScreen(
-                                    r.name, r.allergies, c, c.lastScannedAt?.let { whenLabel(it, now, tz) } ?: stringResource(Res.string.never),
-                                    admin = sent != null, onBack = ::back, onShare = { share(c.url) },
+                                    emergency ?: r.emergencyFallback(), today, c, c.lastScannedAt?.let { whenLabel(it, now, tz) } ?: stringResource(Res.string.never),
+                                    admin = sent != null, onBack = ::back,
+                                    print = { attempt { supabase.emergencyCardPdf(r.id, c.url) }?.also { printPdf("Info darurat ${r.name}", it) { toast = printed } } != null },
                                     revoke = { attempt { card = supabase.reissueEmergencyCard(r.id); toast = revoked; scope.launch { loadHome() } } != null },
                                 )
                             }
                         }
                         Screen.EmergencyForm -> recipient?.let { r ->
-                            EmergencyFormScreen(r.allergies, r.conditions, onBack = ::back) { allergies, conditions ->
+                            EmergencyFormScreen(EmergencyDraft(r.bornOn, r.weightKg, r.allergies, r.wishes, r.conditions), onBack = ::back) { d ->
                                 attempt {
-                                    supabase.saveEmergencyInfo(r.id, allergies, conditions)
-                                    recipient = r.copy(allergies = allergies, conditions = conditions)
-                                    scope.launch { loadHome() } // keeps the offline copy current without holding the form
+                                    supabase.saveEmergencyInfo(r.id, d)
+                                    recipient = r.copy(bornOn = d.bornOn, weightKg = d.weightKg, allergies = d.allergies, wishes = d.wishes, conditions = d.conditions)
+                                    emergency = emergency?.copy(bornOn = d.bornOn, weightKg = d.weightKg, allergies = d.allergies, wishes = d.wishes, conditions = d.conditions)
+                                    scope.launch { loadHome() } // keeps the offline copy and Emergency Info current without holding the form
                                 }.also { if (it != null) back() } != null
                             }
                         }

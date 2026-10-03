@@ -13,6 +13,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.add
 import io.github.jan.supabase.exceptions.RestException
+import kotlinx.datetime.LocalDate
 import kotlin.time.Instant
 
 // Care Circle API used by the app and by the seam tests (see CONTEXT.md for the terms).
@@ -36,6 +37,9 @@ data class CareRecipient(
     val relation: String? = null,
     val allergies: String = "", // Emergency Info: "Penisilin"
     val conditions: String = "", // Emergency Info: "Stroke iskemik, April 2026. …"
+    @SerialName("born_on") val bornOn: LocalDate? = null, // Emergency Info
+    @SerialName("weight_kg") val weightKg: Int? = null, // Emergency Info: 64
+    val wishes: String = "", // Emergency Info: "Tindakan penuh"
     /** The Member who is this Care Recipient (Role parent); they own its Data Category restrictions (ADR 0004). */
     @SerialName("member_id") val memberId: String? = null,
 )
@@ -98,6 +102,9 @@ data class Member(
     val name: String? = null,
     @SerialName("created_at") val joinedAt: Instant,
     @SerialName("left_at") val leftAt: Instant? = null,
+    /** An emergency contact on Emergency Info, set by an admin, with "Jarak dari rumah". */
+    val emergency: Boolean = false,
+    val distance: String = "",
 )
 
 /** Everyone who has been a Member of [circleId], in join order; empty for anyone who isn't a Member now. */

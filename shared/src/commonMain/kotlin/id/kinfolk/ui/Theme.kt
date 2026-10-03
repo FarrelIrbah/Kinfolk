@@ -41,6 +41,7 @@ object Kf {
     val NightTile = Color(0x14FFF8EE) // rgba(255,248,238,.08)
     val NightPill = Color(0x1FFFF8EE) // rgba(255,248,238,.12)
     val Peach = Color(0xFFF2A27C)
+    val Rust = Color(0xFFC4471F) // the blood-thinner banner, Kondisi's "tidak"
 }
 
 /** The prototype's `ease` for transitions: cubic-bezier(.2,.8,.2,1). */

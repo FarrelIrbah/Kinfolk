@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -179,11 +180,13 @@ fun Modifier.dashed(color: Color = DashLine, radius: Dp = 16.dp) = drawBehind {
 
 /** A bare text input showing [hint] in the muted color while empty. */
 @Composable
-fun HintedInput(value: String, onValue: (String) -> Unit, hint: String, style: TextStyle, modifier: Modifier = Modifier, singleLine: Boolean = false) =
-    BasicTextField(
-        value, onValue, modifier.fillMaxWidth(), textStyle = style, singleLine = singleLine,
-        decorationBox = { field -> Box { if (value.isEmpty()) Text(hint, style = style.copy(color = Kf.Muted)); field() } },
-    )
+fun HintedInput(
+    value: String, onValue: (String) -> Unit, hint: String, style: TextStyle, modifier: Modifier = Modifier, singleLine: Boolean = false,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+) = BasicTextField(
+    value, onValue, modifier.fillMaxWidth(), textStyle = style, singleLine = singleLine, keyboardActions = keyboardActions,
+    decorationBox = { field -> Box(Modifier.fillMaxWidth(), propagateMinConstraints = true) { if (value.isEmpty()) Text(hint, style = style.copy(color = Kf.Muted)); field() } },
+)
 
 /** `appt` "Tambah pertanyaan…" row: 44px input (white, 1px rgba(34,38,31,.14), radius 12) and a dark "Tambah" button. */
 @Composable

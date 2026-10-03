@@ -178,7 +178,7 @@ class MemberTest {
         assertEquals(0, rina.renameCareRecipient(tukiman, "Rina"))
         rina.editAppointment(appt.id, appt.draft().copy(title = "Diubah"))
         rina.cancelAppointment(appt.id)
-        rina.saveEmergencyInfo(tukiman, "Penisilin", "")
+        rina.saveEmergencyInfo(tukiman, EmergencyDraft(null, null, "Penisilin", "", ""))
         rina.removeCareContact(sri.careContacts(circle).single().id)
 
         assertEquals("Kontrol neurologi", sri.nextAppointment(circle, now)?.title)

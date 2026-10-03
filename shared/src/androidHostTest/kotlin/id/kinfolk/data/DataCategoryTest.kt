@@ -98,8 +98,8 @@ class DataCategoryTest {
         f.sri.setHidden(f.tukiman, dewi.me(), DataCategory.medications, hidden = true)
 
         assertTrue(dewi.medications(f.circle).isEmpty())
-        assertEquals(listOf("Sertraline"), dewi.emergencyMedications(f.tukiman).map { it.name })
-        assertTrue(signedInNewcomer().let { stranger -> runCatching { stranger.emergencyMedications(f.tukiman) }.getOrDefault(emptyList()) }.isEmpty())
+        assertEquals(listOf("Sertraline 50 mg"), dewi.emergencyInfo(f.tukiman)!!.medications)
+        assertEquals(null, signedInNewcomer().emergencyInfo(f.tukiman))
     }
 
     @Test

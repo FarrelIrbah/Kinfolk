@@ -30,3 +30,7 @@ actual fun rememberFilePicker(onPicked: (PickedFile) -> Unit): () -> Unit = reme
 
 @Composable
 actual fun rememberFileViewer(): (name: String, ext: String, bytes: ByteArray) -> Unit = remember { { _, _, _ -> } }
+
+// ponytail: iOS prints nothing yet; UIPrintInteractionController with the PDF's NSData when iOS ships.
+@Composable
+actual fun rememberPrinter(): (name: String, pdf: ByteArray, onSent: () -> Unit) -> Unit = remember { { _, _, _ -> } }

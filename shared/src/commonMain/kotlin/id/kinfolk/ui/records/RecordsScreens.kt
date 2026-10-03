@@ -458,7 +458,6 @@ private fun InputBox(modifier: Modifier, input: @Composable () -> Unit) = Box(
 ) { input() }
 
 private val Tan = Color(0xFFC9A77C)
-private val Rust = Color(0xFFC4471F)
 
 /**
  * v3's Kondisi: blood pressure on a 60–160 scale with the dashed 140 line, and a 30-column grid per habit filled
@@ -496,9 +495,9 @@ private fun Trends(checkIns: List<CheckIn>, bring: Pair<String, () -> Unit>?) {
         }
         // design: #FBF8F2, r18, p16, gap 14
         Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Habit(stringResource(Res.string.habit_ate), t.ate, checkIns) { when (it.ate) { Ate.yes -> Kf.Green; Ate.some -> Tan; Ate.no -> Rust } }
+            Habit(stringResource(Res.string.habit_ate), t.ate, checkIns) { when (it.ate) { Ate.yes -> Kf.Green; Ate.some -> Tan; Ate.no -> Kf.Rust } }
             Habit(stringResource(Res.string.habit_walked), t.walked, checkIns) { if (it.walked) Kf.Green else Kf.Sand }
-            Habit(stringResource(Res.string.ci_mood), t.good, checkIns) { when (it.mood) { Mood.good -> Kf.Green; Mood.okay -> Tan; Mood.low -> Rust } }
+            Habit(stringResource(Res.string.ci_mood), t.good, checkIns) { when (it.mood) { Mood.good -> Kf.Green; Mood.okay -> Tan; Mood.low -> Kf.Rust } }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(dayMonth(checkIns.first().day), fontSize = 11.sp, color = Kf.Muted)
                 Text(stringResource(Res.string.today), fontSize = 11.sp, color = Kf.Muted)

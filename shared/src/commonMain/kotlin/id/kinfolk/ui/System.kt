@@ -29,3 +29,7 @@ expect fun rememberFilePicker(onPicked: (PickedFile) -> Unit): () -> Unit
 /** Opens [bytes] in the system viewer for its type. */
 @Composable
 expect fun rememberFileViewer(): (name: String, ext: String, bytes: ByteArray) -> Unit
+
+/** Opens the system print dialog for [pdf], named [name]; [onSent] runs once it went to a printer, not when cancelled. */
+@Composable
+expect fun rememberPrinter(): (name: String, pdf: ByteArray, onSent: () -> Unit) -> Unit

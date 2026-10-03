@@ -6,7 +6,20 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.graphics.pdf.PdfRenderer
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
+import android.print.PageRange
+import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import android.print.PrintDocumentAdapter.LayoutResultCallback
+import android.print.PrintDocumentAdapter.WriteResultCallback
+import android.print.PrintDocumentInfo
+import android.print.PrintJob
+import android.print.PrintManager
+import java.io.FileOutputStream
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -101,6 +114,33 @@ actual fun rememberFileViewer(): (name: String, ext: String, bytes: ByteArray) -
             val view = Intent(Intent.ACTION_VIEW).setDataAndType(context.shared(file), types.entries.first { it.value == ext }.key)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             try { context.startActivity(view) } catch (_: ActivityNotFoundException) {} // no viewer installed: nothing opens
+        }
+    }
+}
+
+@Composable
+actual fun rememberPrinter(): (name: String, pdf: ByteArray, onSent: () -> Unit) -> Unit {
+    val context = LocalContext.current
+    return remember(context) {
+        { name, pdf, onSent ->
+            var job: PrintJob? = null
+            job = (context.getSystemService(Context.PRINT_SERVICE) as PrintManager).print(name, object : PrintDocumentAdapter() {
+                override fun onLayout(old: PrintAttributes?, new: PrintAttributes, cancel: CancellationSignal, done: LayoutResultCallback, extras: Bundle?) {
+                    if (cancel.isCanceled) done.onLayoutCancelled()
+                    else done.onLayoutFinished(PrintDocumentInfo.Builder("$name.pdf").setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build(), old != new)
+                }
+
+                override fun onWrite(pages: Array<PageRange>, out: ParcelFileDescriptor, cancel: CancellationSignal, done: WriteResultCallback) {
+                    FileOutputStream(out.fileDescriptor).use { it.write(pdf) }
+                    done.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
+                }
+
+                // Leaving the dialog cancels the job; printing (or saving as PDF) queues it, after this returns.
+                // ponytail: checked once a second later; a slow spooler that hasn't queued it by then shows no toast.
+                override fun onFinish() {
+                    Handler(Looper.getMainLooper()).postDelayed({ if (job?.let { it.isQueued || it.isStarted || it.isCompleted } == true) onSent() }, 1000)
+                }
+            }, null)
         }
     }
 }

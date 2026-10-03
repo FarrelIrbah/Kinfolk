@@ -188,11 +188,19 @@
     <string name="qr_meta">Tautan kartu v%1$d · halaman tersimpan, tetap jalan saat sinyal buruk · terakhir dipindai: %2$s</string>
     <string name="never">belum pernah</string>
     <string name="qr_revoked">Tautan kartu lama dicabut. Cetak kartu baru.</string>
+    <string name="qr_print">Cetak kartu</string>
+    <string name="qr_printed">Dikirim ke printer: 2 kartu dompet + 1 lembar kulkas.</string>
+    <string name="wishes">Keinginan</string>
+    <string name="wishes_hint">Tindakan penuh</string>
+    <string name="born_on">Tanggal lahir</string>
+    <string name="weight">Berat badan</string>
+    <string name="jarak">Jarak dari rumah</string>
+    <string name="jarak_hint">10 menit</string>
+    <string name="emergency_contact_sub">Tampil di Info darurat</string>
     <string name="fill_emergency">Isi info darurat</string>
     <string name="fill_emergency_sub">Alergi, pengencer darah, keinginan</string>
 
     <!-- Emergency Info: approved deviation (issue #12, docs/screen-map.md) -->
-    <string name="share_link">Bagikan tautan</string>
 
     <!-- Manage Care Circle and Members: approved deviation (issue #5, docs/screen-map.md) -->
     <string name="back_circle">‹ Lingkaran</string>

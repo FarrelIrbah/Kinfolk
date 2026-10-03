@@ -2,9 +2,11 @@
 // on the Timeline and answers the link's token. GET ?t=token, without login: the PDF for 7 days.
 // Pages follow ExportContent.pages() in the app (shared/…/data/Exports.kt): each section starts its own page,
 // Medications 12 a page, a page per Visit Note (the latest 3), Documents as they are, the rest 1.
+// POST {card: true} (#34): "Cetak kartu", Emergency Info's wallet cards and fridge sheet (card.ts), answered as the PDF.
 import { PDFDocument, PDFFont, PDFPage, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 import { env, rpc } from "../_shared/send.ts";
+import { cardPages } from "./card.ts";
 
 type Med = { name: string; dose: string; schedule: string; note: string; blood_thinner: boolean; active: boolean };
 type CheckIn = { day: string; sys: number; dia: number; ate: string; walked: boolean; mood: string };
@@ -127,14 +129,18 @@ function trends(p: PDFPage, f: Fonts, top: number, ks: CheckIn[]) {
   p.drawText(date(last.day), { x: W - M - f.sans.widthOfTextAtSize(date(last.day), 9), y: ly + 12, size: 9, font: f.sans, color: MUTED });
 }
 
-async function build(data: Data, sections: Set<string>, line: string): Promise<PDFDocument> {
-  const pdf = await PDFDocument.create();
+async function fonts(pdf: PDFDocument): Promise<Fonts> {
   pdf.registerFontkit(fontkit);
   // ponytail: whole fonts; fontkit's subsetting throws on these variable fonts. Adds ~350 KB to each PDF.
-  const f = {
+  return {
     sans: await pdf.embedFont(await Deno.readFile(new URL("./instrument_sans.ttf", import.meta.url)), { subset: false }),
     serif: await pdf.embedFont(await Deno.readFile(new URL("./newsreader.ttf", import.meta.url)), { subset: false }),
   };
+}
+
+async function build(data: Data, sections: Set<string>, line: string): Promise<PDFDocument> {
+  const pdf = await PDFDocument.create();
+  const f = await fonts(pdf);
   pdf.setTitle(`${data.name} · ${line}`);
   for (const s of ORDER.filter((s) => sections.has(s))) {
     const label = LABELS[s];
@@ -215,7 +221,15 @@ Deno.serve(async (req) => {
 
   const member = req.headers.get("authorization");
   if (!member) return json(401, { error: "Not signed in" });
-  const { recipient_id, prepared_for, line, sections, documents } = await req.json();
+  const { card, url, recipient_id, prepared_for, line, sections, documents } = await req.json();
+  if (card) {
+    const info = await rpc("emergency_info_of", { recipient: recipient_id }, member);
+    if (!info.ok || !info.body) return json(403, { error: info.body || "Not a member" });
+    const pdf = await PDFDocument.create();
+    cardPages(pdf, await fonts(pdf), info.body, String(url));
+    pdf.setTitle(`Info darurat · ${info.body.name}`);
+    return new Response(await pdf.save({ useObjectStreams: false }), { headers: { "content-type": "application/pdf", "cache-control": "no-store" } });
+  }
   const found = await rpc("export_data", { recipient: recipient_id, docs: documents ?? [] }, member);
   if (!found.ok || !found.body) return json(403, { error: found.body || "Not a member" });
   const data: Data = found.body;

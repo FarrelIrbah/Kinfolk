@@ -74,7 +74,3 @@ suspend fun SupabaseClient.hideByDefault(circleId: String, categories: Set<DataC
         putJsonArray("categories") { categories.forEach { add(it.name) } }
     })
 }
-
-/** Emergency Info's "Obat saat ini" for any Member: skips Data Category like the QR page (ADR 0003). */
-suspend fun SupabaseClient.emergencyMedications(recipientId: String): List<Medication> =
-    postgrest.rpc("emergency_medications", buildJsonObject { put("recipient", recipientId) }).decodeList()

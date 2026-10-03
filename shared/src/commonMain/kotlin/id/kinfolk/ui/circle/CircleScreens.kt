@@ -18,6 +18,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.style.TextAlign
+import id.kinfolk.ui.HintedInput
+import kinfolk.shared.generated.resources.emergency_contact
+import kinfolk.shared.generated.resources.emergency_contact_sub
+import kinfolk.shared.generated.resources.jarak
+import kinfolk.shared.generated.resources.jarak_hint
 import androidx.compose.ui.unit.sp
 import id.kinfolk.data.DataCategory
 import id.kinfolk.data.Role
@@ -87,6 +101,7 @@ import org.jetbrains.compose.resources.stringResource
 class CircleMember(
     val id: String, val name: String, val color: Color, val role: Role, val joined: LocalDate, val isMe: Boolean,
     val sees: Set<DataCategory> = DataCategory.entries.toSet(), val isRecipient: Boolean = false,
+    val emergency: Boolean = false, val distance: String = "",
 )
 
 /** `member` rows: v3's six (#20). */
@@ -195,12 +210,13 @@ fun CircleScreen(circleName: String, recipientName: String, members: List<Circle
  * "Keluarkan dari lingkaran" on others, everyone "Keluar dari lingkaran" on themselves, each a confirm sheet except
  * promoting. Approved in #9: "Bisa melihat" for admins and the Care Recipient, hidden while [onToggle] is null; a
  * tap passes the category and whether it was on. With it (#20), "Riwayat perubahan" ([history], newest first) and
- * the footnote.
+ * the footnote. Approved in #34: for admins ([onEmergency] set), a card under the header with "Kontak darurat" in the
+ * rows' style and, while on, "Jarak dari rumah" in the `channel` row's style; the distance saves when the field is left.
  */
 @Composable
 fun MemberScreen(
     m: CircleMember, iAmAdmin: Boolean, error: String?, onBack: () -> Unit, onPromote: () -> Unit, onRemove: () -> Unit, onLeave: () -> Unit,
-    onToggle: ((DataCategory, Boolean) -> Unit)?, history: List<HistoryLine>,
+    onToggle: ((DataCategory, Boolean) -> Unit)?, history: List<HistoryLine>, onEmergency: ((on: Boolean, distance: String) -> Unit)?,
 ) {
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -213,6 +229,35 @@ fun MemberScreen(
                     if (m.isMe) m.sub() else stringResource(Res.string.member_joined, m.roleText().replaceFirstChar { it.uppercase() }, dayMonth(m.joined)),
                     fontSize = 13.sp, color = Kf.Muted,
                 )
+            }
+        }
+        if (onEmergency != null) {
+            var distance by remember(m.id, m.distance) { mutableStateOf(m.distance) }
+            Card {
+                Row(
+                    Modifier.fillMaxWidth().tap { onEmergency(!m.emergency, distance) }.padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(stringResource(Res.string.emergency_contact), fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        Text(stringResource(Res.string.emergency_contact_sub), fontSize = 12.sp, color = Kf.Muted)
+                    }
+                    Switch(m.emergency)
+                }
+                // design (`channel` row): padding 14px 16px, 15px label, value 14/600
+                if (m.emergency) {
+                    Hairline()
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(Res.string.jarak), fontSize = 15.sp)
+                        val focus = LocalFocusManager.current
+                        HintedInput(
+                            distance, { distance = it }, stringResource(Res.string.jarak_hint),
+                            LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, color = Kf.Ink),
+                            Modifier.weight(1f).onFocusChanged { if (!it.isFocused && m.emergency && distance.trim() != m.distance) onEmergency(true, distance.trim()) },
+                            singleLine = true, keyboardActions = KeyboardActions { focus.clearFocus() },
+                        )
+                    }
+                }
             }
         }
         // design: rows padding 14px 16px, gap 12; label 15/500, desc 12 muted

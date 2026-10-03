@@ -3,6 +3,7 @@ package id.kinfolk.data
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.functions.functions
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readRawBytes
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
@@ -68,3 +69,10 @@ suspend fun SupabaseClient.export(recipientId: String, preparedFor: String, line
     })
     return "$supabaseHttpUrl/functions/v1/export?t=${Json.decodeFromString<Exported>(res.bodyAsText()).token}"
 }
+
+/**
+ * "Cetak kartu": A4 pages of Emergency Info for [recipientId] by the export renderer, 2 wallet cards then the fridge
+ * sheet, with [url] (the card's link) as their QR. For the print dialog; not stored, not on the Timeline.
+ */
+suspend fun SupabaseClient.emergencyCardPdf(recipientId: String, url: String): ByteArray =
+    functions.invoke("export", buildJsonObject { put("card", true); put("recipient_id", recipientId); put("url", url) }).readRawBytes()

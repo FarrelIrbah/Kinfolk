@@ -19,6 +19,8 @@ fun longDate(d: LocalDate) = "${days[d.dayOfWeek.ordinal]}, ${d.day} ${months[d.
 fun dayName(d: LocalDate) = days[d.dayOfWeek.ordinal]
 fun shortDay(d: LocalDate) = shortDays[d.dayOfWeek.ordinal]
 fun shortDate(d: LocalDate) = "${shortDays[d.dayOfWeek.ordinal]}, ${d.day} ${months[d.month.ordinal]}"
+/** "12 Mar 1948", Form Info darurat's date of birth (#34). */
+fun fullDate(d: LocalDate) = "${d.day} ${months[d.month.ordinal]} ${d.year}"
 fun hm(t: LocalTime) = "${t.hour.toString().padStart(2, '0')}.${t.minute.toString().padStart(2, '0')}"
 
 /** Four typed digits ("1430") as a clock time, or null. */
