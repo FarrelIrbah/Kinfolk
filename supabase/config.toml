@@ -393,10 +393,10 @@ deno_version = 2
 # `supabase secrets set`, never committed.
 [edge_runtime.secrets]
 SEND_SMS_HOOK_SECRET = "env(SEND_SMS_HOOK_SECRET)"
-WHATSAPP_API_URL = "http://host.docker.internal:54399/whatsapp"
+WHATSAPP_API_URL = "http://host.docker.internal:54340/whatsapp"
 WHATSAPP_PHONE_NUMBER_ID = "local"
 WHATSAPP_TOKEN = "local"
-TWILIO_API_URL = "http://host.docker.internal:54399/twilio"
+TWILIO_API_URL = "http://host.docker.internal:54340/twilio"
 TWILIO_ACCOUNT_SID = "local"
 TWILIO_AUTH_TOKEN = "local"
 TWILIO_FROM = "Kinfolk"

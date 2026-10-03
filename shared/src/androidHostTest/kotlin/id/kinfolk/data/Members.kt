@@ -34,7 +34,7 @@ object Providers {
     val notOnWhatsApp = mutableSetOf<String>()
 
     init {
-        HttpServer.create(InetSocketAddress(54399), 0).apply {
+        HttpServer.create(InetSocketAddress(54340), 0).apply {
             createContext("/whatsapp") { ex ->
                 val body = ex.requestBody.readBytes().decodeToString()
                 val phone = Regex(""""to":"(\d+)"""").find(body)!!.groupValues[1]
