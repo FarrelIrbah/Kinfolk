@@ -814,6 +814,7 @@ fun App() {
                                             ?.let { t -> stringResource(Res.string.tasks_row_owner, person(t.ownerId)?.name.orEmpty()) }.orEmpty(),
                                         tasksLate = tasks.overdue(today).isNotEmpty(),
                                         inboxCount = inboxItems().size,
+                                        emptyCircle = next == null && meds.isEmpty(),
                                         digestSub = digest?.let { stringResource(Res.string.digest_sub, circleMembers().count { !it.isRecipient }) },
                                         evening = if (card != HomeCard.Evening) null else Evening(
                                             hm(tonight!!.timeOfDay), recipient?.name.orEmpty(), checkIn?.takeIf { it.day == today }?.let { it.sys to it.dia },

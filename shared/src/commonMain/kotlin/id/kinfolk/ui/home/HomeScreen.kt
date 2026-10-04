@@ -31,12 +31,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import id.kinfolk.ui.serifStyle
+import id.kinfolk.ui.timeline.EmptyBox
 import id.kinfolk.ui.tap
 import id.kinfolk.ui.search.Magnifier
 import kinfolk.shared.generated.resources.search_ph
 import kinfolk.shared.generated.resources.Res
 import kinfolk.shared.generated.resources.add_appt
 import kinfolk.shared.generated.resources.add_appt_sub
+import kinfolk.shared.generated.resources.empty_sub
+import kinfolk.shared.generated.resources.empty_title
+import kinfolk.shared.generated.resources.timeline_empty
 import kinfolk.shared.generated.resources.add_meds
 import kinfolk.shared.generated.resources.add_meds_sub
 import kinfolk.shared.generated.resources.invite_siblings
@@ -149,6 +153,8 @@ data class HomeState(
     val inboxCount: Int = 0,
     /** "Dikirim ke 5 anak · lihat seperti yang Anda terima"; null (before my first digest, #40) hides the row. */
     val digestSub: String? = null,
+    /** No upcoming Appointment and no Medication: v3's full `empty` screen replaces Home (#43). */
+    val emptyCircle: Boolean = false,
 )
 
 private val Cream = Color(0xFFF3EEE4)
@@ -176,6 +182,7 @@ fun HomeScreen(
     onSearch: () -> Unit,
     onDigest: () -> Unit,
 ) {
+    if (s.emptyCircle) return EmptyCircle(s, onAddAppointment, onRecords, onInvite, onFillEmergency)
     // design: padding:4px 20px; gap:22px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
@@ -214,14 +221,7 @@ fun HomeScreen(
         // ponytail: the after-visit card falls back to these until its ticket lands.
         if (s.evening != null) EveningCard(s.evening, onCall, onCheckIn)
         else if (s.morning != null) MorningCard(s.morning, onMarkMorning)
-        else s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) } ?: Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            EmptyStep(1, stringResource(Res.string.add_appt), stringResource(Res.string.add_appt_sub), part = false, onAddAppointment)
-            EmptyStep(2, stringResource(Res.string.add_meds), stringResource(Res.string.add_meds_sub), part = false, onRecords)
-            s.invites?.let { (joined, total) ->
-                EmptyStep(3, stringResource(Res.string.invite_siblings), stringResource(Res.string.joined_of, joined, total).takeIf { total > 0 }, part = total > 0, onInvite)
-            }
-            EmptyStep(4, stringResource(Res.string.fill_emergency), stringResource(Res.string.fill_emergency_sub), part = false, onFillEmergency)
-        }
+        else s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) } ?: EmptySteps(s.invites, onAddAppointment, onRecords, onInvite, onFillEmergency)
 
         // design: #FBF8F2, radius 18, padding 14 16, gap 12; 40px #E3EBE5 icon tile, radius 12
         Row(
@@ -395,7 +395,34 @@ private fun EveningCard(e: Evening, onCall: () -> Unit, onCheckIn: () -> Unit) {
     }
 }
 
-/** Rows 1-4 of the v3 `empty` screen, shown on Home while nothing is upcoming (docs/screen-map.md). */
+/** v3's `empty` screen for a new circle (#43). */
+@Composable
+private fun EmptyCircle(s: HomeState, onAddAppointment: () -> Unit, onRecords: () -> Unit, onInvite: () -> Unit, onFillEmergency: () -> Unit) {
+    // design: padding:4px 20px; gap:18px
+    Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(Res.string.circle_name, s.circleName, s.memberCount), fontSize = 13.sp, color = Kf.Muted)
+            Text(stringResource(Res.string.empty_title, s.circleName), style = serifStyle(30f, 1.1f))
+            Text(stringResource(Res.string.empty_sub), fontSize = 15.sp, lineHeight = (15 * 1.5).sp, color = Color(0xFF44463E))
+        }
+        EmptySteps(s.invites, onAddAppointment, onRecords, onInvite, onFillEmergency)
+        EmptyBox(stringResource(Res.string.timeline_empty))
+    }
+}
+
+/** Rows 1-4 of the v3 `empty` screen, also shown on Home while nothing is upcoming (docs/screen-map.md). */
+@Composable
+private fun EmptySteps(invites: Pair<Int, Int>?, onAddAppointment: () -> Unit, onRecords: () -> Unit, onInvite: () -> Unit, onFillEmergency: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        EmptyStep(1, stringResource(Res.string.add_appt), stringResource(Res.string.add_appt_sub), part = false, onAddAppointment)
+        EmptyStep(2, stringResource(Res.string.add_meds), stringResource(Res.string.add_meds_sub), part = false, onRecords)
+        invites?.let { (joined, total) ->
+            EmptyStep(3, stringResource(Res.string.invite_siblings), stringResource(Res.string.joined_of, joined, total).takeIf { total > 0 }, part = total > 0, onInvite)
+        }
+        EmptyStep(4, stringResource(Res.string.fill_emergency), stringResource(Res.string.fill_emergency_sub), part = false, onFillEmergency)
+    }
+}
+
 @Composable
 private fun EmptyStep(num: Int, title: String, sub: String?, part: Boolean, onClick: () -> Unit) {
     Row(

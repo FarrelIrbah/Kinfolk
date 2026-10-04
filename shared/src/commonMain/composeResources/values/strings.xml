@@ -19,6 +19,9 @@
     <string name="see_all">Lihat semua</string>
     <string name="add_appt">Tambah janji dokter berikutnya</string>
     <string name="add_appt_sub">Tanggal, dokter, siapa mengantar</string>
+    <!-- empty (#43) -->
+    <string name="empty_title">Mari siapkan lingkaran %1$s</string>
+    <string name="empty_sub">Empat hal membuat Kinfolk berguna sejak hari pertama. Urutan bebas.</string>
 
     <!-- appt -->
     <string name="driver">Mengantar</string>
