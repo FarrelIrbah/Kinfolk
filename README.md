@@ -51,6 +51,7 @@ Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 - Android tests: `./gradlew :shared:testAndroidHostTest` (the Care Circle tests need the local backend running)
 - iOS tests: `./gradlew :shared:iosSimulatorArm64Test`
+- Transcription worker (no GPU needed): `python worker/test_handler.py`
 
 ---
 

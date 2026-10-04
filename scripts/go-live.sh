@@ -306,8 +306,19 @@ fi
 # ──────────────────────────────────────────────────────────────────────────
 stage "RunPod: transcription worker (ADR 0005)"
 if run; then
+  say "The worker in worker/ is a Docker image (~25 GB with weights); RunPod pulls it from your registry."
+  ask WORKER_IMAGE "Image name to push (e.g. docker.io/<you>/kinfolk-transcribe:1):"
+  write_env WORKER_IMAGE "$WORKER_IMAGE"
+  if confirm "Build and push $WORKER_IMAGE now (needs docker login to that registry)?"; then
+    docker build -t "$WORKER_IMAGE" worker && docker push "$WORKER_IMAGE"
+  fi
+  open_url "https://huggingface.co/pyannote/speaker-diarization-3.1"
+  step "Logged in to Hugging Face, accept the conditions here and on pyannote/segmentation-3.0."
+  step "Settings → Access Tokens → create a Read token → copy it for the next step."
   open_url "https://www.runpod.io/console/serverless"
-  step "Open the Kinfolk transcription endpoint (Whisper large-v3 + diarisation, open-weight LLM), region Singapore."
+  step "New Endpoint → Docker image: $WORKER_IMAGE (private registry: add its credentials)."
+  step "GPU: 48 GB (L40S or A40). Data centers: Singapore only (AP-SG-1). Workers: min 0, max 3. Execution timeout 1800 s."
+  step "Environment variables: HF_TOKEN = the Hugging Face token. Create."
   step "Copy its endpoint id: the id in https://api.runpod.ai/v2/<id>/run."
   ask RUNPOD_ENDPOINT_ID "Endpoint id:"
   write_env RUNPOD_ENDPOINT_ID "$RUNPOD_ENDPOINT_ID"
