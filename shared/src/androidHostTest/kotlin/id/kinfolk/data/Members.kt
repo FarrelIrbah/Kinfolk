@@ -32,6 +32,10 @@ object Providers {
     }
     val sent = mutableListOf<Message>()
     val notOnWhatsApp = mutableSetOf<String>()
+    /** Bodies of the jobs sent to the transcription worker. */
+    val jobs = mutableListOf<String>()
+    /** What the worker answers, as JSON; null fails the job. */
+    @Volatile var transcript: String? = null
 
     init {
         HttpServer.create(InetSocketAddress(54340), 0).apply {
@@ -49,6 +53,22 @@ object Providers {
                     .associate { it.substringBefore("=") to URLDecoder.decode(it.substringAfter("="), "UTF-8") }
                 synchronized(sent) { sent += Message("sms", form.getValue("To").removePrefix("+"), form.getValue("Body")) }
                 ex.sendResponseHeaders(201, -1); ex.close()
+            }
+            // RunPod Serverless: queues the job, then calls its webhook with [transcript] as the worker's output.
+            createContext("/runpod") { ex ->
+                val body = ex.requestBody.readBytes().decodeToString()
+                synchronized(jobs) { jobs += body }
+                val reply = """{"id":"job-${jobs.size}","status":"IN_QUEUE"}""".toByteArray()
+                ex.sendResponseHeaders(200, reply.size.toLong()); ex.responseBody.use { it.write(reply) }
+                val webhook = Regex(""""webhook":"([^"]+)"""").find(body)!!.groupValues[1]
+                val done = transcript?.let { """{"status":"COMPLETED","output":$it}""" } ?: """{"status":"FAILED","error":"CUDA out of memory"}"""
+                Thread {
+                    (java.net.URI(webhook).toURL().openConnection() as java.net.HttpURLConnection).run {
+                        requestMethod = "POST"; doOutput = true; setRequestProperty("content-type", "application/json")
+                        outputStream.use { it.write(done.toByteArray()) }
+                        responseCode
+                    }
+                }.start()
             }
             start()
         }
@@ -82,10 +102,10 @@ suspend fun signedInAs(phone: String): SupabaseClient = signedOut().apply {
 fun SupabaseClient.me(): String = auth.currentUserOrNull()!!.id
 
 /** Someone [admin] invited to [circleId] who accepted in the app, signed in. */
-suspend fun signedInSibling(admin: SupabaseClient, circleId: String, role: Role = Role.sibling): SupabaseClient {
+suspend fun signedInSibling(admin: SupabaseClient, circleId: String, role: Role = Role.sibling, name: String = "Budi"): SupabaseClient {
     val phone = newNumber()
     Providers.to(phone) // start the fake providers before the invitation is sent
-    admin.invite(circleId, "Budi", phone, role)
+    admin.invite(circleId, name, phone, role)
     return signedInAs(phone).apply { acceptInvitation(myInvitations().single().id) }
 }
 

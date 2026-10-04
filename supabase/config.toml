@@ -404,6 +404,11 @@ INVITATION_URL = "http://127.0.0.1:54321/functions/v1/invitation"
 WHATSAPP_APP_SECRET = "local"
 WHATSAPP_VERIFY_TOKEN = "local"
 NOTIFY_SECRET = "local"
+RUNPOD_API_URL = "http://host.docker.internal:54340/runpod"
+RUNPOD_ENDPOINT_ID = "local"
+RUNPOD_API_KEY = "local"
+TRANSCRIBE_WEBHOOK_URL = "http://127.0.0.1:54321/functions/v1/transcribe"
+TRANSCRIBE_SECRET = "local"
 
 [functions.send-otp]
 verify_jwt = false
@@ -428,6 +433,10 @@ verify_jwt = false
 [functions.export]
 verify_jwt = false
 static_files = ["./functions/export/*.ttf"]
+
+# Called by the Attendee (checked in the database) and by RunPod's webhook (TRANSCRIBE_SECRET).
+[functions.transcribe]
+verify_jwt = false
 
 [analytics]
 enabled = true

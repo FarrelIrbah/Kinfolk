@@ -190,7 +190,7 @@ finish() {
 
 cd "$(dirname "$0")/.."
 ENV_FILE="supabase/.env.production.local"
-TOTAL_STAGES=14
+TOTAL_STAGES=15
 
 # Enter runs the stage; n skips it (done on an earlier run).
 run() {
@@ -304,6 +304,21 @@ if run; then
 fi
 
 # ──────────────────────────────────────────────────────────────────────────
+stage "RunPod: transcription worker (ADR 0005)"
+if run; then
+  open_url "https://www.runpod.io/console/serverless"
+  step "Open the Kinfolk transcription endpoint (Whisper large-v3 + diarisation, open-weight LLM), region Singapore."
+  step "Copy its endpoint id: the id in https://api.runpod.ai/v2/<id>/run."
+  ask RUNPOD_ENDPOINT_ID "Endpoint id:"
+  write_env RUNPOD_ENDPOINT_ID "$RUNPOD_ENDPOINT_ID"
+  open_url "https://www.runpod.io/console/user/settings"
+  step "API Keys → Create API Key → Restricted, read/write on that endpoint only → copy."
+  ask_secret RUNPOD_API_KEY "API key:"
+  write_env RUNPOD_API_KEY "$RUNPOD_API_KEY"
+  write_env TRANSCRIBE_WEBHOOK_URL "$(fn_url transcribe)"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────
 stage "Custom domain for the web pages"
 say "*.supabase.co serves function HTML as text/plain, so both pages need your own domain."
 say "On your domain host (e.g. a Cloudflare Worker or a reverse proxy), forward:"
@@ -319,9 +334,9 @@ fi
 
 # ──────────────────────────────────────────────────────────────────────────
 stage "Supabase: deploy Edge Functions"
-say "send-otp, invite, invitation, whatsapp, emergency, all with --no-verify-jwt."
-if run && confirm "Deploy all five to $PROJECT_REF?"; then
-  for f in send-otp invite invitation whatsapp emergency; do
+say "send-otp, invite, invitation, whatsapp, emergency, export, transcribe, all with --no-verify-jwt."
+if run && confirm "Deploy all seven to $PROJECT_REF?"; then
+  for f in send-otp invite invitation whatsapp emergency export transcribe; do
     npx supabase functions deploy "$f" --no-verify-jwt --project-ref "$PROJECT_REF"
   done
 fi
@@ -343,12 +358,13 @@ fi
 # ──────────────────────────────────────────────────────────────────────────
 stage "Supabase: function secrets"
 if run; then
-  for k in WHATSAPP_VERIFY_TOKEN NOTIFY_SECRET; do
+  for k in WHATSAPP_VERIFY_TOKEN NOTIFY_SECRET TRANSCRIBE_SECRET; do
     [[ -n "$(_existing "$k" || true)" ]] || write_env "$k" "$(openssl rand -hex 32)"
   done
   tmp=$(mktemp)
   for k in SEND_SMS_HOOK_SECRET WHATSAPP_PHONE_NUMBER_ID WHATSAPP_TOKEN WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN \
-           NOTIFY_SECRET TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM INVITATION_URL; do
+           NOTIFY_SECRET TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM INVITATION_URL \
+           RUNPOD_ENDPOINT_ID RUNPOD_API_KEY TRANSCRIBE_WEBHOOK_URL TRANSCRIBE_SECRET; do
     v=$(_existing "$k" || true)
     if [[ -n "$v" ]]; then printf '%s=%s\n' "$k" "$v" >> "$tmp"; else warn "$k is empty; run its stage first"; fi
   done
@@ -413,6 +429,7 @@ check "An Invitation arrives on WhatsApp and the web page accepts it on a phone"
 check "An Invitation to a number not on WhatsApp arrives by SMS"
 check "A swap request arrives on WhatsApp and a YA reply updates the app"
 check "The Emergency Info QR opens the page on a phone"
+check "A recorded visit comes back transcribed (Attendee only until shared)"
 note "Function logs: $(dash functions)"
 
 finish
