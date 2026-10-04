@@ -1,6 +1,13 @@
 package id.kinfolk
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.Density
+import id.kinfolk.ui.highContrast
+import id.kinfolk.ui.LocalReduceMotion
+import id.kinfolk.ui.display.Display
+import id.kinfolk.ui.display.DisplayScreen
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -381,7 +388,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest, Display }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -461,6 +468,8 @@ fun App() {
         var hits by remember { mutableStateOf<List<Hit>?>(null) } // of query, null until the first answer
         var savedAt by remember { mutableStateOf<Instant?>(null) } // of what's on screen
         val kept = rememberKept("snapshot")
+        val keptDisplay = rememberKept("display")
+        var display by remember { mutableStateOf(keptDisplay.read()?.let { runCatching { Json.decodeFromString<Display>(it) }.getOrNull() } ?: Display()) }
         LaunchedEffect(toast) { if (toast != null) { delay(if (undo?.first == toast) 5000 else 2600); toast = null } }
         val share = rememberShare()
         val printPdf = rememberPrinter()
@@ -670,10 +679,12 @@ fun App() {
 
         val slide = with(LocalDensity.current) { 36.dp.roundToPx() }
         val rise = with(LocalDensity.current) { 8.dp.roundToPx() }
-        Box(Modifier.fillMaxSize().background(Kf.Paper)) {
+        // "Kontras tinggi" filters everything, like the prototype's frame (#41).
+        CompositionLocalProvider(LocalReduceMotion provides display.reduceMotion) { Box(Modifier.fillMaxSize().background(Kf.Paper).highContrast(display.highContrast)) {
             AnimatedContent(
                 screen to tab,
                 transitionSpec = {
+                    if (display.reduceMotion) return@AnimatedContent EnterTransition.None togetherWith ExitTransition.None
                     val spec = tween<IntOffset>(300, easing = KfEase)
                     val move = when (nav) {
                         Nav.Push -> slideInHorizontally(spec) { slide }
@@ -688,6 +699,10 @@ fun App() {
                     Modifier.fillMaxSize().background(when (s) { Screen.Emergency -> Kf.Night; Screen.Digest -> Color.White; else -> Kf.Paper }).verticalScroll(rememberScrollState()).statusBarsPadding().imePadding()
                         .padding(bottom = if (s == Screen.Home) 96.dp else 30.dp),
                 ) {
+                    // The prototype zooms the scrolled content, all but `emergency` (#41).
+                    val density = LocalDensity.current
+                    val zoom = if (s == Screen.Emergency) 1f else display.zoom
+                    CompositionLocalProvider(LocalDensity provides Density(density.density * zoom, density.fontScale)) {
                     when (s) {
                         null -> {}
                         Screen.Onb0 -> Onb0(
@@ -910,6 +925,7 @@ fun App() {
                                     scope.launch { recipient?.let { r -> attempt { supabase.organizerPhone(r.id).orEmpty() } }?.let { organizerPhone = it } }
                                 },
                                 onDigest = { go(Screen.Digest) }.takeIf { digest != null },
+                                onDisplay = { go(Screen.Display) },
                             )
                         }
                         Screen.Appt -> visit()?.let { v ->
@@ -1294,6 +1310,10 @@ fun App() {
                             )
                         }
                         Screen.Digest -> digest?.let { DigestScreen(it, ::back) }
+                        Screen.Display -> DisplayScreen(display, recipient?.name.orEmpty(), ::back) {
+                            display = it
+                            keptDisplay.write(Json.encodeToString(it))
+                        }
                         Screen.Emergency -> recipient?.let { r ->
                             EmergencyScreen(
                                 emergency ?: r.emergencyFallback(), today, card, savedAt?.let { updatedAgo(it, now) },
@@ -1322,6 +1342,7 @@ fun App() {
                                 }.also { if (it != null) back() } != null
                             }
                         }
+                    }
                     }
                 }
             }
@@ -1363,7 +1384,7 @@ fun App() {
                 }
             }
         }
-    }
+    }}
 }
 
 

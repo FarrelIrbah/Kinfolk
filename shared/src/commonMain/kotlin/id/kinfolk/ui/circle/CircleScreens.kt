@@ -84,6 +84,8 @@ import kinfolk.shared.generated.resources.make_admin
 import kinfolk.shared.generated.resources.member_joined
 import kinfolk.shared.generated.resources.member_you
 import kinfolk.shared.generated.resources.more_ways
+import kinfolk.shared.generated.resources.a11y_sub
+import kinfolk.shared.generated.resources.a11y_title
 import kinfolk.shared.generated.resources.notes_sub
 import kinfolk.shared.generated.resources.export_title
 import kinfolk.shared.generated.resources.export_short
@@ -155,10 +157,10 @@ private fun CircleMember.sub() = when {
  * box only while the Care Recipient [recipientName] is a Member; access "Penuh" or "N/6" (#20). #36: the Care
  * Recipient's row always first, no access column; "Ulangi onboarding" while [onReplay] is set (admins). #37: the Care
  * Recipient's row and "Cara lain"'s first row open Mode Bapak ([onBapak]), as in v3. #40: "Tampilan WhatsApp Anda" after
- * the export row while [onDigest] is set (after my first weekly digest).
+ * the export row while [onDigest] is set (after my first weekly digest). #41: "Tampilan & aksesibilitas" last, as in v3.
  */
 @Composable
-fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit, onExport: () -> Unit, onReplay: (() -> Unit)?, onBapak: () -> Unit, onDigest: (() -> Unit)?) {
+fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit, onExport: () -> Unit, onReplay: (() -> Unit)?, onBapak: () -> Unit, onDigest: (() -> Unit)?, onDisplay: () -> Unit) {
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -213,6 +215,7 @@ fun CircleScreen(circleName: String, recipientName: String, members: List<Circle
                     Triple(stringResource(Res.string.notes_title), stringResource(Res.string.notes_sub), onNotes),
                     Triple(stringResource(Res.string.export_title), stringResource(Res.string.export_short), onExport),
                     onDigest?.let { Triple(stringResource(Res.string.digest_tool), stringResource(Res.string.digest_tool_sub), it) },
+                    Triple(stringResource(Res.string.a11y_title), stringResource(Res.string.a11y_sub), onDisplay),
                 ).forEach { (title, sub, open) ->
                     Row(Modifier.fillMaxWidth().tap(open).padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

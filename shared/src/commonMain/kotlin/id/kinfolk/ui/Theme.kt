@@ -4,7 +4,16 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
@@ -46,6 +55,28 @@ object Kf {
 
 /** The prototype's `ease` for transitions: cubic-bezier(.2,.8,.2,1). */
 val KfEase = CubicBezierEasing(.2f, .8f, .2f, 1f)
+
+/** "Kurangi animasi" (#41): screens, sheets and toasts appear without animating. */
+val LocalReduceMotion = staticCompositionLocalOf { false }
+
+/**
+ * "Kontras tinggi" (#41): the prototype's `filter: contrast(1.22) saturate(1.08)`. Saturation keeps grey, so it
+ * scales contrast's slope and leaves its offset; offsets are in 0..255 like Android's.
+ */
+val HighContrast = ColorMatrix().apply {
+    setToSaturation(1.08f)
+    for (row in 0..2) {
+        for (col in 0..2) this[row, col] = this[row, col] * 1.22f
+        this[row, 4] = 127.5f * (1 - 1.22f)
+    }
+}
+
+private val highContrastLayer by lazy { Paint().apply { colorFilter = ColorFilter.colorMatrix(HighContrast) } }
+
+/** Draws everything inside through [HighContrast] while [on]. */
+fun Modifier.highContrast(on: Boolean) = if (!on) this else drawWithContent {
+    drawIntoCanvas { it.saveLayer(Rect(Offset.Zero, size), highContrastLayer); drawContent(); it.restore() }
+}
 
 @Composable
 fun sans(): FontFamily = FontFamily(

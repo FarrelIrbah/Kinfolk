@@ -441,4 +441,16 @@
     <string name="digest_tool_sub">Cara saudara tanpa app ikut serta</string>
     <string name="digest_phone">Ponsel Anda</string>
     <string name="digest_day">Minggu 18.00</string>
+    <string name="a11y_title">Tampilan &amp; aksesibilitas</string>
+    <string name="a11y_sub">Ukuran teks, kontras, animasi</string>
+    <string name="text_size">Ukuran teks</string>
+    <string name="size_default">Standar</string>
+    <string name="size_large">Besar</string>
+    <string name="size_largest">Terbesar</string>
+    <string name="high_contrast">Kontras tinggi</string>
+    <string name="high_contrast_sub">Teks lebih gelap dan warna lebih tegas</string>
+    <string name="reduce_motion">Kurangi animasi</string>
+    <string name="reduce_motion_sub">Mematikan animasi perpindahan layar</string>
+    <string name="a11y_preview">Kontrol neurologi, hari ini 14.30. Budi mengantar.</string>
+    <string name="a11y_note">Berlaku di seluruh app di ponsel ini. Mode %1$s selalu ekstra besar.</string>
 </resources>

@@ -1,6 +1,7 @@
 package id.kinfolk.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -238,7 +239,8 @@ fun Toast(text: String?, modifier: Modifier = Modifier, overTabs: Boolean = fals
     val rise = with(LocalDensity.current) { 16.dp.roundToPx() }
     AnimatedVisibility(
         shown, (if (overTabs) modifier.navigationBarsPadding().padding(bottom = 74.dp) else modifier.padding(bottom = 40.dp)).padding(horizontal = 20.dp),
-        enter = fadeIn(tween(280, easing = KfEase)) + scaleIn(tween(280, easing = KfEase), initialScale = .97f) + slideInVertically(tween(280, easing = KfEase)) { rise },
+        enter = if (LocalReduceMotion.current) EnterTransition.None
+        else fadeIn(tween(280, easing = KfEase)) + scaleIn(tween(280, easing = KfEase), initialScale = .97f) + slideInVertically(tween(280, easing = KfEase)) { rise },
         exit = ExitTransition.None,
     ) {
         Row(
@@ -285,7 +287,7 @@ fun Sheet(key: Any, onDismiss: () -> Unit, content: @Composable ColumnScope.() -
         Box(Modifier.fillMaxSize().background(Color(0x5915130F)).tap(onDismiss))
         AnimatedVisibility(
             remember(key) { MutableTransitionState(false) }.apply { targetState = true }, Modifier.align(Alignment.BottomCenter),
-            enter = slideInVertically(tween(340, easing = KfEase)) { it }, exit = ExitTransition.None,
+            enter = if (LocalReduceMotion.current) EnterTransition.None else slideInVertically(tween(340, easing = KfEase)) { it }, exit = ExitTransition.None,
         ) {
             Column(
                 Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)).tap {}
