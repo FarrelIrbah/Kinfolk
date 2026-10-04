@@ -48,6 +48,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -680,9 +688,11 @@ fun App() {
         val slide = with(LocalDensity.current) { 36.dp.roundToPx() }
         val rise = with(LocalDensity.current) { 8.dp.roundToPx() }
         // "Kontras tinggi" filters everything, like the prototype's frame (#41).
+        val backdrop = rememberGraphicsLayer() // what the tab bar blurs
         CompositionLocalProvider(LocalReduceMotion provides display.reduceMotion) { Box(Modifier.fillMaxSize().background(Kf.Paper).highContrast(display.highContrast)) {
             AnimatedContent(
                 screen to tab,
+                Modifier.drawWithContent { backdrop.record { this@drawWithContent.drawContent() }; drawLayer(backdrop) },
                 transitionSpec = {
                     if (display.reduceMotion) return@AnimatedContent EnterTransition.None togetherWith ExitTransition.None
                     val spec = tween<IntOffset>(300, easing = KfEase)
@@ -1351,7 +1361,7 @@ fun App() {
                 DocsPicker(documents.latest().filterNot { it.legal }, exportDocs) { exportDocs = it }
             }
             if (offline && screen != null) OfflineBanner(stringResource(Res.string.offline), Modifier.align(Alignment.TopCenter))
-            if (screen == Screen.Home) TabBar(tab, ::pick, Modifier.align(Alignment.BottomCenter))
+            if (screen == Screen.Home) TabBar(tab, ::pick, backdrop, Modifier.align(Alignment.BottomCenter))
             Toast(
                 toast, Modifier.align(Alignment.BottomCenter), overTabs = screen == Screen.Home,
                 action = stringResource(Res.string.undo).takeIf { toast != null && undo?.first == toast },
@@ -1407,29 +1417,37 @@ private fun OfflineBanner(text: String, modifier: Modifier) {
 }
 
 @Composable
-private fun TabBar(active: Tab, onPick: (Tab) -> Unit, modifier: Modifier) {
-    // ponytail: backdrop-filter blur(14px) skipped; Compose has no backdrop blur and the bar is 94% opaque.
-    Column(modifier.fillMaxWidth().background(Color(0xF0FBF8F2))) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Kf.TabBorder))
-        Row(Modifier.navigationBarsPadding().padding(8.dp)) {
-            Tab.entries.forEach { t ->
-                val on = t == active
-                val fg = if (on) Kf.Green else Kf.Muted
-                val source = remember { MutableInteractionSource() }
-                val pressed by source.collectIsPressedAsState()
-                Column(
-                    Modifier.weight(1f).heightIn(min = 44.dp).scale(if (pressed) .94f else 1f)
-                        .clickable(source, indication = null) { onPick(t) }.padding(vertical = 2.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    Box(
-                        Modifier.width(56.dp).height(30.dp).background(if (on) Kf.GreenTint else Color.Transparent, CircleShape),
-                        contentAlignment = Alignment.Center,
+private fun TabBar(active: Tab, onPick: (Tab) -> Unit, backdrop: GraphicsLayer, modifier: Modifier) {
+    // v3's backdrop-filter: blur(14px): the screen's layer, redrawn blurred under the 94% opaque bar.
+    // BlurEffect is a no-op before Android 12, leaving the plain 94% bar (docs/screen-map.md).
+    // Radius 23dp: Skia's sigma = 0.57735·r + 0.5 ≈ CSS's 14px standard deviation.
+    Box(modifier.fillMaxWidth()) {
+        Box(
+            Modifier.matchParentSize().graphicsLayer { renderEffect = BlurEffect(23.dp.toPx(), 23.dp.toPx()); clip = true }
+                .drawBehind { translate(top = size.height - backdrop.size.height) { drawLayer(backdrop) } },
+        )
+        Column(Modifier.fillMaxWidth().background(Color(0xF0FBF8F2))) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Kf.TabBorder))
+            Row(Modifier.navigationBarsPadding().padding(8.dp)) {
+                Tab.entries.forEach { t ->
+                    val on = t == active
+                    val fg = if (on) Kf.Green else Kf.Muted
+                    val source = remember { MutableInteractionSource() }
+                    val pressed by source.collectIsPressedAsState()
+                    Column(
+                        Modifier.weight(1f).heightIn(min = 44.dp).scale(if (pressed) .94f else 1f)
+                            .clickable(source, indication = null) { onPick(t) }.padding(vertical = 2.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
-                        SvgPath(t.icon, 22.dp, fg, fill = if (on && t.fillsWhenActive) Color(0x2E2F5D4A) else null)
+                        Box(
+                            Modifier.width(56.dp).height(30.dp).background(if (on) Kf.GreenTint else Color.Transparent, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            SvgPath(t.icon, 22.dp, fg, fill = if (on && t.fillsWhenActive) Color(0x2E2F5D4A) else null)
+                        }
+                        Text(stringResource(t.label), color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     }
-                    Text(stringResource(t.label), color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
