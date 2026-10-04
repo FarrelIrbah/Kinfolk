@@ -132,6 +132,7 @@ import id.kinfolk.data.recipientPhone
 import id.kinfolk.data.sayFine
 import id.kinfolk.data.askHelp
 import id.kinfolk.data.organizerPhone
+import id.kinfolk.data.lastDigest
 import id.kinfolk.data.recentCheckIns
 import id.kinfolk.data.saveCheckIn
 import id.kinfolk.ui.checkin.CheckInScreen
@@ -170,6 +171,7 @@ import kinfolk.shared.generated.resources.bp_calling
 import kinfolk.shared.generated.resources.bp_fine_sent
 import kinfolk.shared.generated.resources.bp_no_appt
 import kinfolk.shared.generated.resources.bp_call
+import kinfolk.shared.generated.resources.digest_sub
 import kinfolk.shared.generated.resources.task_done_toast
 import kinfolk.shared.generated.resources.tasks_row
 import kinfolk.shared.generated.resources.tasks_row_late
@@ -262,6 +264,7 @@ import id.kinfolk.ui.appointment.longDate
 import id.kinfolk.ui.appointment.whenLabel
 import id.kinfolk.ui.appointment.withWhom
 import id.kinfolk.ui.bapak.BapakScreen
+import id.kinfolk.ui.home.DigestScreen
 import id.kinfolk.ui.bapak.Kid
 import id.kinfolk.ui.bapak.greeting
 import id.kinfolk.ui.bapak.helpLine
@@ -378,7 +381,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -440,6 +443,7 @@ fun App() {
         var viewing by rememberSaveable { mutableStateOf<String?>(null) } // on `member`
         var memberError by remember { mutableStateOf<String?>(null) }
         var bapakMsg by remember { mutableStateOf<String?>(null) } // Mode Bapak's green box after a press
+        var digest by remember { mutableStateOf<String?>(null) } // my last weekly digest (#40), null before the first
         var organizerPhone by remember { mutableStateOf("") } // "Telepon Sri", read when Mode Bapak opens
         var pressing by remember { mutableStateOf(false) } // a press on its way: a second tap sends nothing
         var confirm by remember { mutableStateOf<Confirm?>(null) }
@@ -615,6 +619,7 @@ fun App() {
             checkIns = k.recipient?.let { r -> retrying { supabase.recentCheckIns(r.id) } }.orEmpty()
             expenses = retrying { supabase.expenses(k.circle.id) }
             documents = retrying { supabase.documents(k.circle.id) }
+            digest = retrying { supabase.lastDigest(k.circle.id) }
             loadRota()
         }
         suspend fun land(how: Nav) {
@@ -680,7 +685,7 @@ fun App() {
             ) { (s, t) ->
                 // design: scroll container padding 60px top (under iOS status bar), 96px bottom when tab bar shows, else 30px
                 Column(
-                    Modifier.fillMaxSize().background(if (s == Screen.Emergency) Kf.Night else Kf.Paper).verticalScroll(rememberScrollState()).statusBarsPadding().imePadding()
+                    Modifier.fillMaxSize().background(when (s) { Screen.Emergency -> Kf.Night; Screen.Digest -> Color.White; else -> Kf.Paper }).verticalScroll(rememberScrollState()).statusBarsPadding().imePadding()
                         .padding(bottom = if (s == Screen.Home) 96.dp else 30.dp),
                 ) {
                     when (s) {
@@ -784,6 +789,7 @@ fun App() {
                                             ?.let { t -> stringResource(Res.string.tasks_row_owner, person(t.ownerId)?.name.orEmpty()) }.orEmpty(),
                                         tasksLate = tasks.overdue(today).isNotEmpty(),
                                         inboxCount = inboxItems().size,
+                                        digestSub = digest?.let { stringResource(Res.string.digest_sub, circleMembers().count { !it.isRecipient }) },
                                         evening = if (card != HomeCard.Evening) null else Evening(
                                             hm(tonight!!.timeOfDay), recipient?.name.orEmpty(), checkIn?.takeIf { it.day == today }?.let { it.sys to it.dia },
                                         ),
@@ -823,6 +829,7 @@ fun App() {
                                     onTasks = ::openTasks,
                                     onInbox = { go(Screen.Inbox); scope.launch { loadRota(); attempt { supabase.taskList(circle!!.id) }?.let { tasks = it } } },
                                     onSearch = { query = ""; hits = null; go(Screen.Search) },
+                                    onDigest = { go(Screen.Digest) },
                                 )
                             }
                             Tab.Rota -> {
@@ -902,6 +909,7 @@ fun App() {
                                     go(Screen.Bapak)
                                     scope.launch { recipient?.let { r -> attempt { supabase.organizerPhone(r.id).orEmpty() } }?.let { organizerPhone = it } }
                                 },
+                                onDigest = { go(Screen.Digest) }.takeIf { digest != null },
                             )
                         }
                         Screen.Appt -> visit()?.let { v ->
@@ -1285,6 +1293,7 @@ fun App() {
                                 onKid = { k -> viewing = k.id; memberError = null; go(Screen.Member) },
                             )
                         }
+                        Screen.Digest -> digest?.let { DigestScreen(it, ::back) }
                         Screen.Emergency -> recipient?.let { r ->
                             EmergencyScreen(
                                 emergency ?: r.emergencyFallback(), today, card, savedAt?.let { updatedAgo(it, now) },

@@ -57,7 +57,9 @@ Deno.serve(async (req) => {
       for (const m of (await rpc("whatsapp_failed", { wa_id: s.id })).body ?? []) if (m.phone) await viaSms(m.phone, m.body);
     }
   } else if (req.headers.get("authorization") === `Bearer ${env("NOTIFY_SECRET")}`) {
-    await rpc("queue_reminders", { at: JSON.parse(raw || "{}").at ?? new Date().toISOString() });
+    const at = JSON.parse(raw || "{}").at ?? new Date().toISOString();
+    await rpc("queue_reminders", { at });
+    await rpc("queue_digests", { at });
   } else return reply(401);
   await deliver();
   return reply(200, "ok");

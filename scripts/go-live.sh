@@ -285,6 +285,7 @@ if run; then
   submit kinfolk_recipient_ok UTILITY "[$(body '{{1}} baik-baik saja. Dikirim dari Mode {{1}}.' '["Tukiman"]')]"
   submit kinfolk_recipient_help UTILITY "[$(body '{{1}} butuh bantuan. {{2}} sedang dihubungi.' '["Tukiman","Sri dan Budi"]')]"
   submit kinfolk_dose_reminder UTILITY "[$(body '{{1}}: {{2}} jam {{3}}. Balas 1 jika sudah diberikan.' '["Malam ini","atorvastatin","21.00"]')]"
+  submit kinfolk_digest UTILITY "[$(body 'Kinfolk · Minggu {{1}}, {{2}}\n• {{3}}\n• {{4}}\n• {{5}}\n• {{6}}\nBerikutnya: {{7}}.\nKosong: {{8}}.' '["Tukiman","21–27 Sept","7 dari 7 telepon malam selesai","Rata-rata tensi 131/83","27 dari 28 dosis tercatat","Kontrol neurologi: fisioterapi 2x/minggu","Kontrol neurologi Sel 14.30, Budi mengantar","telepon cek malam Minggu 4 Okt"]')]"
   pause "Press Enter when you've read the results"
 fi
 

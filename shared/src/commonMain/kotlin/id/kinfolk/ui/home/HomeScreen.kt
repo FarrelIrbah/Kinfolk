@@ -58,6 +58,7 @@ import kinfolk.shared.generated.resources.sos
 import kinfolk.shared.generated.resources.inbox
 import kinfolk.shared.generated.resources.this_week
 import kinfolk.shared.generated.resources.write_note
+import kinfolk.shared.generated.resources.digest_row
 import kinfolk.shared.generated.resources.all_given
 import kinfolk.shared.generated.resources.dose_due
 import kinfolk.shared.generated.resources.given
@@ -146,6 +147,8 @@ data class HomeState(
     val tasksLate: Boolean = false,
     /** v3's bell badge; 0 hides it. */
     val inboxCount: Int = 0,
+    /** "Dikirim ke 5 anak · lihat seperti yang Anda terima"; null (before my first digest, #40) hides the row. */
+    val digestSub: String? = null,
 )
 
 private val Cream = Color(0xFFF3EEE4)
@@ -171,6 +174,7 @@ fun HomeScreen(
     onTasks: () -> Unit,
     onInbox: () -> Unit,
     onSearch: () -> Unit,
+    onDigest: () -> Unit,
 ) {
     // design: padding:4px 20px; gap:22px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -207,8 +211,6 @@ fun HomeScreen(
             SvgPath(Magnifier, 18.dp, Kf.Muted)
             Text(stringResource(Res.string.search_ph), fontSize = 15.sp, color = Kf.Muted)
         }
-        // ponytail: weekly digest row hidden until that feature ships.
-
         // ponytail: the after-visit card falls back to these until its ticket lands.
         if (s.evening != null) EveningCard(s.evening, onCall, onCheckIn)
         else if (s.morning != null) MorningCard(s.morning, onMarkMorning)
@@ -237,6 +239,18 @@ fun HomeScreen(
                     Text(s.tasksSub, Modifier.weight(1f, fill = false), fontSize = 13.sp, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (s.tasksSubOwner.isNotEmpty()) Text(" " + s.tasksSubOwner, fontSize = 13.sp, color = color, maxLines = 1)
                 }
+            }
+            Text("›", color = Kf.Muted, fontSize = 18.sp)
+        }
+        // design: #E9E2D4, radius 18, padding 14 16; 15px semibold over 13px muted
+        if (s.digestSub != null) Row(
+            Modifier.fillMaxWidth().background(Kf.CardAlt, RoundedCornerShape(18.dp)).tap(onDigest).padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(Res.string.digest_row), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(s.digestSub, fontSize = 13.sp, color = Kf.Muted)
             }
             Text("›", color = Kf.Muted, fontSize = 18.sp)
         }

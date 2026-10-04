@@ -6,6 +6,7 @@ import id.kinfolk.ui.appointment.dayName
 import io.github.jan.supabase.SupabaseClient
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
@@ -439,5 +440,71 @@ class WhatsAppTest {
         deliver()
         assertEquals(dewi.client.me(), sri.client.dutyWeek(circle, tomorrow).single { it.day == tomorrow }.holder)
         assertEquals(sri.client.me(), sri.client.dutyWeek(circle, today).single { it.day == today }.holder) // Budi hasn't answered
+    }
+
+    private val sunday = today + DatePeriod(days = 7 - today.dayOfWeek.isoDayNumber)
+    private val monday = sunday + DatePeriod(days = -6)
+    private val sixPm = LocalDateTime(sunday, LocalTime(18, 0)).toInstant(wib)
+    private val range = if (monday.month == sunday.month) "${monday.day}–${dayMonth(sunday)}" else "${dayMonth(monday)}–${dayMonth(sunday)}"
+
+    @Test
+    fun `Sunday 18 00 every Member but the Care Recipient gets the week's digest, once`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = joins(sri, circle, "Budi")
+        val dewi = joins(sri, circle, "Dewi", Role.viewer)
+        val tukiman = sri.client.careRecipients(circle).single()
+        sri.client.setHidden(tukiman.id, dewi.client.me(), DataCategory.medications, hidden = true)
+        sri.client.saveCheckIn(tukiman, monday, CheckInDraft(128, 80, Ate.yes, walked = true, Mood.good, ""))
+        sri.client.saveCheckIn(tukiman, monday + DatePeriod(days = 1), CheckInDraft(134, 86, Ate.yes, walked = true, Mood.good, ""))
+        val atorva = sri.client.addMedication(MedicationDraft(circle, tukiman.id, "Atorvastatin", "20 mg", "malam", LocalTime(21, 0)))
+        sri.client.giveDose(atorva, monday)
+        sri.client.giveDose(atorva, monday + DatePeriod(days = 1))
+        val rao = sri.client.addProvider(circle, "Dr. Anand Rao").id
+        val visit = sri.client.scheduleAppointment(AppointmentDraft(circle, tukiman.id, rao, "Kontrol neurologi", null, LocalDateTime(monday, LocalTime(9, 0)).toInstant(wib), attendeeId = sri.client.me())).id
+        sri.client.saveVisitNote(visit, emptyMap(), sri.client.steps("fisioterapi 2x/minggu", "MRI ulang 3 bulan lagi."), "")
+        val tuesday = sunday + DatePeriod(days = 2)
+        sri.client.scheduleAppointment(AppointmentDraft(circle, tukiman.id, rao, "Kontrol jantung", null, LocalDateTime(tuesday, LocalTime(14, 30)).toInstant(wib), driverId = budi.client.me()))
+        val duty = sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(sri.client.me()), today)
+        val wednesday = sunday + DatePeriod(days = 3)
+        sri.client.askSwap(duty, wednesday, budi.client.me())
+
+        deliver(sixPm - 1.minutes)
+        assertTrue(budi.inbox().none { it.template == "kinfolk_digest" })
+        deliver(sixPm)
+        deliver(sixPm + 30.minutes)
+
+        val header = listOf("Tukiman", range, "2 dari 7 telepon malam selesai", "Rata-rata tensi 131/83")
+        val footer = listOf(
+            "Kontrol neurologi: fisioterapi 2x/minggu, MRI ulang 3 bulan lagi", "Kontrol jantung Sel 14.30, Budi mengantar",
+            "telepon cek malam ${dayName(wednesday)} ${dayMonth(wednesday)}",
+        )
+        assertEquals(listOf(header + "2 dari 7 dosis tercatat" + footer), budi.inbox().filter { it.template == "kinfolk_digest" }.map { it.params })
+        assertEquals(header + "Belum ada dosis tercatat" + footer, dewi.last("kinfolk_digest").params)
+        assertEquals("Rata-rata tensi 131/83", sri.last("kinfolk_digest").params[3])
+        assertEquals(
+            "Kinfolk · Minggu Tukiman, $range\n• 2 dari 7 telepon malam selesai\n• Rata-rata tensi 131/83\n• 2 dari 7 dosis tercatat\n" +
+                "• Kontrol neurologi: fisioterapi 2x/minggu, MRI ulang 3 bulan lagi\nBerikutnya: Kontrol jantung Sel 14.30, Budi mengantar.\n" +
+                "Kosong: telepon cek malam ${dayName(wednesday)} ${dayMonth(wednesday)}.",
+            budi.client.lastDigest(circle),
+        )
+    }
+
+    @Test
+    fun `a quiet week sends no digest, and missing lines say so`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = joins(sri, circle, "Budi")
+        assertNull(budi.client.lastDigest(circle))
+        deliver(sixPm)
+        assertTrue(budi.inbox().none { it.template == "kinfolk_digest" })
+
+        val tukiman = sri.client.careRecipients(circle).single().id
+        val atorva = sri.client.addMedication(MedicationDraft(circle, tukiman, "Atorvastatin", "20 mg", "malam", LocalTime(21, 0)))
+        sri.client.giveDose(atorva, monday)
+        deliver(sixPm + 1.minutes)
+        assertEquals(
+            listOf("Tukiman", range, "0 dari 7 telepon malam selesai", "Belum ada tensi minggu ini", "1 dari 7 dosis tercatat",
+                "Belum ada catatan kunjungan", "belum ada janji", "semua giliran terisi"),
+            budi.last("kinfolk_digest").params,
+        )
     }
 }

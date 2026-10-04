@@ -434,4 +434,11 @@
     <string name="bp_who">Siapa melihat apa</string>
     <string name="bp_sees_all">Melihat semuanya</string>
     <string name="bp_sees_part">Melihat %1$d dari %2$d · ketuk untuk ubah</string>
+
+    <string name="digest_row">Ringkasan hari Minggu</string>
+    <string name="digest_sub">Dikirim ke %1$d anak · lihat seperti yang Anda terima</string>
+    <string name="digest_tool">Tampilan WhatsApp Anda</string>
+    <string name="digest_tool_sub">Cara saudara tanpa app ikut serta</string>
+    <string name="digest_phone">Ponsel Anda</string>
+    <string name="digest_day">Minggu 18.00</string>
 </resources>
