@@ -69,6 +69,7 @@ Kategori UTILITY, bahasa `id`, disetujui pemilik di #13 (bentuk pesan `swap`, `y
 - Antar TIDAK: `Tidak apa-apa. Sri akan bertanya ke yang lain.`
 - Lewat 24 jam, sudah dijawab, atau tidak berlaku lagi: `Permintaan ini sudah tidak berlaku.`
 - Pengingat obat, balas `1`: Dose Log hari itu tercatat atas nama pembalas, untuk pengingat obat terbaru yang masih terbuka (24 jam), dan pengingat yang sama ke pemegang lain ikut tertutup: `Tercatat: atorvastatin diberikan, 21.02. Lingkaran bisa melihatnya.` (v3 sms `oneR`). Sudah ditandai (di app atau oleh pemegang lain): `Permintaan ini sudah tidak berlaku.`
+- `T: …` (huruf besar/kecil sama): teksnya jadi Question atas nama pengirim di Appointment berikutnya yang boleh ia tambah (bukan Viewer, boleh melihat "Janji dokter", yang paling dekat di semua Care Circle-nya): `Ditambahkan ke pertanyaan untuk kunjungan Tukiman berikutnya dengan Dr. Anand Rao.` (v3 sms `qR`). Tanpa Appointment ke depan: tidak dibalas.
 - Teks lain: tidak dibalas. Balasan SMS tidak diproses.
 
 Notifikasi tidak dikirim kalau penerima tidak boleh melihat Data Category-nya: permintaan dan pengingat antar butuh "Janji dokter", catatan kunjungan butuh "Janji dokter" dan "Catatan kunjungan".

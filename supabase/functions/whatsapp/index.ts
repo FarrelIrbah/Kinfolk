@@ -1,5 +1,5 @@
 // WhatsApp both ways (ADR 0002). Meta calls this webhook with replies: a YA or TIDAK, typed or tapped on a quick-reply
-// button, answers the ask it was sent for (a swap or a drive); a typed 1 marks the dose reminded given. The minute job (cron, docs/whatsapp-templates.md) calls
+// button, answers the ask it was sent for (a swap or a drive); a typed 1 marks the dose reminded given; "T: …" adds a Question to the next Appointment. The minute job (cron, docs/whatsapp-templates.md) calls
 // it with NOTIFY_SECRET to queue due reminders. Either way it then sends everything waiting in the database, over
 // WhatsApp, or SMS when WhatsApp refuses it.
 import { env, rpc, viaSms, viaWhatsApp, viaWhatsAppText } from "../_shared/send.ts";
@@ -14,13 +14,17 @@ async function signedByMeta(body: string, header: string | null) {
   return crypto.subtle.verify("HMAC", key, new Uint8Array(hex.match(/../g)!.map((b) => parseInt(b, 16))), new TextEncoder().encode(body));
 }
 
-// ponytail: Meta may deliver a reply twice; the second one is answered "Permintaan ini sudah tidak berlaku.".
+// ponytail: Meta may deliver a reply twice; the second one is answered "Permintaan ini sudah tidak berlaku.", or for a
+// "T:" adds the Question twice (dedupe on Meta's message id if that shows up).
 async function answer(message: { from: string; type: string; button?: { payload?: string }; text?: { body?: string } }) {
   const [word, id] = message.type === "button" ? (message.button?.payload ?? "").split(":") : [message.text?.body ?? "", null];
   const yes = { ya: true, tidak: false }[word.trim().toLowerCase()];
   const given = message.type === "text" && word.trim() === "1"; // a dose reminder's "Balas 1"
-  if (yes === undefined && !given) return;
-  const { ok, body } = given ? await rpc("whatsapp_given", { phone: message.from }) : await rpc("whatsapp_reply", { phone: message.from, message: id, yes });
+  const question = message.type === "text" ? word.match(/^\s*t\s*:\s*(\S[\s\S]*?)\s*$/i)?.[1] : undefined; // "T: …"
+  if (yes === undefined && !given && !question) return;
+  const { ok, body } = question ? await rpc("whatsapp_question", { phone: message.from, text: question })
+    : given ? await rpc("whatsapp_given", { phone: message.from })
+    : await rpc("whatsapp_reply", { phone: message.from, message: id, yes });
   if (ok && body) await viaWhatsAppText(message.from, body);
 }
 

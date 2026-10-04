@@ -51,10 +51,10 @@ class WhatsAppTest {
         return sri to sri.client.createCareCircle("Tukiman", Relation.Father, emptySet(), myName = "Sri")
     }
 
-    private suspend fun joins(admin: Person, circle: String, name: String): Person {
+    private suspend fun joins(admin: Person, circle: String, name: String, role: Role = Role.sibling): Person {
         val phone = newNumber()
         Providers.to(phone)
-        admin.client.invite(circle, name, phone)
+        admin.client.invite(circle, name, phone, role)
         return Person(signedInAs(phone).apply { acceptInvitation(myInvitations().single().id) }, phone)
     }
 
@@ -338,6 +338,38 @@ class WhatsAppTest {
 
         deliver(LocalDateTime(today, LocalTime(7, 20)).toInstant(wib))
         assertEquals(listOf("Pagi ini: omeprazole jam 07.00. Balas 1 jika sudah diberikan."), budi.inbox().filter { it.channel == "sms" }.map { it.text })
+    }
+
+    @Test
+    fun `T colon adds a Question to the next Appointment, asked by the replier`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = joins(sri, circle, "Budi")
+        val tukiman = sri.client.careRecipients(circle).single().id
+        val rao = sri.client.addProvider(circle, "Dr. Anand Rao").id
+        val lestari = sri.client.addProvider(circle, "Dr. Lestari").id
+        sri.client.scheduleAppointment(AppointmentDraft(circle, tukiman, lestari, "Kontrol jantung", null, now + 9.days))
+        val next = sri.client.scheduleAppointment(AppointmentDraft(circle, tukiman, rao, "Kontrol neurologi", null, now + 3.days)).id
+        sri.client.scheduleAppointment(AppointmentDraft(circle, tukiman, lestari, "Kontrol lalu", null, now - 1.days))
+
+        assertEquals(200, reply(budi, "T: Perlu vaksin flu tahun ini?"))
+        val question = sri.client.questions(next).single()
+        assertEquals("Perlu vaksin flu tahun ini?" to budi.client.me(), question.text to question.askedBy)
+        assertEquals("Ditambahkan ke pertanyaan untuk kunjungan Tukiman berikutnya dengan Dr. Anand Rao.", budi.replies().last())
+    }
+
+    @Test
+    fun `T colon from a Viewer, or with no Appointment ahead, adds nothing`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = joins(sri, circle, "Budi")
+        reply(budi, "t: Amankah Bapak sendirian di malam hari?")
+        assertTrue(budi.replies().isEmpty())
+
+        val dewi = joins(sri, circle, "Dewi", Role.viewer)
+        val tukiman = sri.client.careRecipients(circle).single().id
+        val rao = sri.client.addProvider(circle, "Dr. Anand Rao").id
+        val next = sri.client.scheduleAppointment(AppointmentDraft(circle, tukiman, rao, "Kontrol neurologi", null, now + 3.days)).id
+        reply(dewi, "T: Perlu vaksin flu tahun ini?")
+        assertTrue(sri.client.questions(next).isEmpty())
     }
 
     @Test
