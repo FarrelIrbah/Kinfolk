@@ -264,8 +264,8 @@ if run; then
 fi
 
 # ──────────────────────────────────────────────────────────────────────────
-stage "Meta: submit the 12 message templates"
-say "Copy is owner-approved (#3, #4, #13, #23, #24) and matches template_body(). Don't edit it here."
+stage "Meta: submit the 15 message templates"
+say "Copy is owner-approved (#3, #4, #13, #23, #24, #26, #37, #38) and matches template_body(). Don't edit it here."
 note "A rejection is kept for the summary; bring it back before changing any copy."
 if run; then
   WABA_ID=$(_existing WABA_ID || true); WHATSAPP_TOKEN=$(_existing WHATSAPP_TOKEN || true)
@@ -282,6 +282,9 @@ if run; then
   submit kinfolk_visit_note UTILITY "[$(body '{{1}} menulis catatan kunjungan {{2}}. {{3}}.' '["Sri","Tukiman","Kontrol neurologi: fisioterapi 2x/minggu, MRI ulang 3 bulan lagi"]')]"
   submit kinfolk_bp_high UTILITY "[$(body 'Tensi {{1}} malam ini {{2}}, 140 ke atas. Dicatat oleh {{3}}.' '["Tukiman","152/90","Sri"]')]"
   submit kinfolk_task_reminder UTILITY "[$(body '{{1}} mengingatkan: {{2}}, tenggat {{3}}.' '["Sri","Perpanjang izin parkir disabilitas","6 Okt"]')]"
+  submit kinfolk_recipient_ok UTILITY "[$(body '{{1}} baik-baik saja. Dikirim dari Mode {{1}}.' '["Tukiman"]')]"
+  submit kinfolk_recipient_help UTILITY "[$(body '{{1}} butuh bantuan. {{2}} sedang dihubungi.' '["Tukiman","Sri dan Budi"]')]"
+  submit kinfolk_dose_reminder UTILITY "[$(body '{{1}}: {{2}} jam {{3}}. Balas 1 jika sudah diberikan.' '["Malam ini","atorvastatin","21.00"]')]"
   pause "Press Enter when you've read the results"
 fi
 
@@ -395,7 +398,7 @@ fi
 # ──────────────────────────────────────────────────────────────────────────
 stage "Wait for Meta template approval"
 open_url "https://business.facebook.com/wa/manage/message-templates/"
-say "All 12 kinfolk_* templates must show Active before the real-number tests."
+say "All 15 kinfolk_* templates must show Active before the real-number tests."
 pause "Press Enter when they're approved"
 
 # ──────────────────────────────────────────────────────────────────────────

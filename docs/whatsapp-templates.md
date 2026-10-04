@@ -59,6 +59,7 @@ Kategori UTILITY, bahasa `id`, disetujui pemilik di #13 (bentuk pesan `swap`, `y
 | `kinfolk_task_reminder` | `{{1}} mengingatkan: {{2}}, tenggat {{3}}.` | Disetujui pemilik di #26. "Ingatkan" di `tasks`, ke pemilik Task, sekali per Task (yang boleh melihat Task itu). Contoh: "Sri", "Perpanjang izin parkir disabilitas", "6 Okt" |
 | `kinfolk_recipient_ok` | `{{1}} baik-baik saja. Dikirim dari Mode {{1}}.` | Disetujui pemilik di #37. "Saya baik" di Mode Bapak, ke semua Member kecuali Care Recipient. Contoh: "Tukiman" |
 | `kinfolk_recipient_help` | `{{1}} butuh bantuan. {{2}} sedang dihubungi.` | Disetujui pemilik di #37. "Butuh bantuan" di Mode Bapak, ke semua Member kecuali Care Recipient. {{2}}: pengatur lalu Kontak darurat. Contoh: "Tukiman", "Sri dan Budi" |
+| `kinfolk_dose_reminder` | `{{1}}: {{2}} jam {{3}}. Balas 1 jika sudah diberikan.` | Disetujui pemilik di #38 (v3 sms `med`). 15 menit sampai 1 jam setelah jam Medication aktif yang belum ditandai hari itu, ke setiap Member pemegang Duty hari itu yang boleh melihat Obat (bukan Viewer). {{1}} menurut jam dosis: "Pagi ini" sebelum 11, "Siang ini" sebelum 15, "Sore ini" sebelum 18, selain itu "Malam ini". Contoh: "Malam ini", "atorvastatin", "21.00" |
 
 `kinfolk_swap_ask` dan `kinfolk_drive_ask` punya dua tombol QUICK_REPLY "YA" dan "TIDAK" (payload diisi saat kirim); mengetik "ya"/"tidak" juga dihitung, untuk permintaan terbaru yang masih terbuka. Kalau Meta menerima pesan tapi kemudian melaporkan gagal kirim (status `failed` di webhook, mis. nomor tanpa WhatsApp), teksnya dikirim lewat SMS. Balasan bebas (dalam 24 jam):
 
@@ -67,6 +68,7 @@ Kategori UTILITY, bahasa `id`, disetujui pemilik di #13 (bentuk pesan `swap`, `y
 - Antar YA: `Terima kasih, Budi. Anda mengantar Tukiman Kam, 1 Okt · 09.00. Sri sudah diberi tahu.`
 - Antar TIDAK: `Tidak apa-apa. Sri akan bertanya ke yang lain.`
 - Lewat 24 jam, sudah dijawab, atau tidak berlaku lagi: `Permintaan ini sudah tidak berlaku.`
+- Pengingat obat, balas `1`: Dose Log hari itu tercatat atas nama pembalas, untuk pengingat obat terbaru yang masih terbuka (24 jam), dan pengingat yang sama ke pemegang lain ikut tertutup: `Tercatat: atorvastatin diberikan, 21.02. Lingkaran bisa melihatnya.` (v3 sms `oneR`). Sudah ditandai (di app atau oleh pemegang lain): `Permintaan ini sudah tidak berlaku.`
 - Teks lain: tidak dibalas. Balasan SMS tidak diproses.
 
 Notifikasi tidak dikirim kalau penerima tidak boleh melihat Data Category-nya: permintaan dan pengingat antar butuh "Janji dokter", catatan kunjungan butuh "Janji dokter" dan "Catatan kunjungan".

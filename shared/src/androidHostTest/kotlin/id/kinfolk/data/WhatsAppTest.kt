@@ -296,6 +296,51 @@ class WhatsAppTest {
     }
 
     @Test
+    fun `today's Duty holders are reminded of a dose 15 minutes late, and the first 1 logs it`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = joins(sri, circle, "Budi")
+        val dewi = joins(sri, circle, "Dewi")
+        val tukiman = sri.client.careRecipients(circle).single().id
+        sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(budi.client.me(), sri.client.me()), today)
+        sri.client.saveDuty(circle, "Antar makan", LocalTime(12, 0), listOf(dewi.client.me()), today)
+        val atorva = sri.client.addMedication(MedicationDraft(circle, tukiman, "Atorvastatin", "20 mg", "malam", LocalTime(21, 0)))
+        fun at(h: Int, m: Int) = LocalDateTime(today, LocalTime(h, m)).toInstant(wib)
+
+        deliver(at(21, 14))
+        assertTrue(budi.inbox().none { it.template == "kinfolk_dose_reminder" })
+        deliver(at(21, 15))
+        deliver(at(21, 40))
+        assertEquals(listOf(listOf("Malam ini", "atorvastatin", "21.00")), budi.inbox().filter { it.template == "kinfolk_dose_reminder" }.map { it.params })
+        assertEquals(listOf("Malam ini", "atorvastatin", "21.00"), dewi.last("kinfolk_dose_reminder").params)
+        assertTrue(sri.inbox().none { it.template == "kinfolk_dose_reminder" })
+
+        assertEquals(200, reply(budi, "1"))
+        val log = sri.client.doseLogs(circle, today).single { it.medicationId == atorva.id }
+        assertEquals(budi.client.me(), log.givenBy)
+        val hm = log.at.toLocalDateTime(wib).let { "%02d.%02d".format(it.hour, it.minute) }
+        assertEquals("Tercatat: atorvastatin diberikan, $hm. Lingkaran bisa melihatnya.", budi.replies().last())
+
+        reply(dewi, "1")
+        assertEquals("Permintaan ini sudah tidak berlaku.", dewi.replies().last())
+        assertEquals(budi.client.me(), sri.client.doseLogs(circle, today).single().givenBy)
+    }
+
+    @Test
+    fun `a dose marked in the app is not reminded, and a morning one says Pagi ini`() = runBlocking {
+        val (sri, circle) = sriWithCircle()
+        val budi = joins(sri, circle, "Budi")
+        Providers.notOnWhatsApp += budi.digits
+        val tukiman = sri.client.careRecipients(circle).single().id
+        sri.client.saveDuty(circle, "Telepon cek malam", sevenPm, listOf(budi.client.me()), today)
+        val clop = sri.client.addMedication(MedicationDraft(circle, tukiman, "Clopidogrel", "75 mg", "pagi", LocalTime(7, 0)))
+        sri.client.addMedication(MedicationDraft(circle, tukiman, "Omeprazole", "20 mg", "pagi", LocalTime(7, 0)))
+        sri.client.giveDose(clop, today)
+
+        deliver(LocalDateTime(today, LocalTime(7, 20)).toInstant(wib))
+        assertEquals(listOf("Pagi ini: omeprazole jam 07.00. Balas 1 jika sudah diberikan."), budi.inbox().filter { it.channel == "sms" }.map { it.text })
+    }
+
+    @Test
     fun `saving a Visit Note tells the Members who may read it, once`() = runBlocking {
         val (sri, circle) = sriWithCircle()
         val budi = joins(sri, circle, "Budi")
