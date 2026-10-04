@@ -125,7 +125,7 @@
     <string name="code_sub">Dikirim ke WhatsApp %1$s.</string>
     <string name="code_sub_sms">Dikirim lewat SMS ke %1$s.</string>
     <string name="no_connection">Tidak tersambung. Coba lagi.</string>
-    <string name="offline">Offline</string>
+    <string name="offline">Offline · dikirim saat tersambung lagi</string>
     <string name="code_label">Kode 6 angka</string>
     <string name="code_wrong">Kode salah. Coba lagi.</string>
     <string name="resend_in">Kirim ulang (%1$s)</string>

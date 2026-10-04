@@ -14,6 +14,8 @@ import kotlinx.serialization.json.addJsonObject
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.datetime.LocalDate
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 // Question, Visit Note and carry-over API (see CONTEXT.md). Carry-over itself lives in the database
 // (view appointment_questions).
@@ -55,8 +57,11 @@ data class VisitNote(
     val steps: List<NextStep> = emptyList(),
 )
 
-suspend fun SupabaseClient.askQuestion(circleId: String, appointmentId: String, text: String) {
-    from("questions").insert(buildJsonObject { put("circle_id", circleId); put("appointment_id", appointmentId); put("text", text) })
+@OptIn(ExperimentalUuidApi::class)
+suspend fun SupabaseClient.askQuestion(circleId: String, appointmentId: String, text: String, id: String = Uuid.random().toString()) {
+    from("questions").upsert(buildJsonObject { put("id", id); put("circle_id", circleId); put("appointment_id", appointmentId); put("text", text) }) {
+        ignoreDuplicates = true // asked again under the same [id]: changes nothing
+    }
 }
 
 /** The Questions on this Appointment, carried-over ones included, oldest first. */

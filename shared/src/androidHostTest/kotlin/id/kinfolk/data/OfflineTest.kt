@@ -69,6 +69,49 @@ class OfflineTest {
     }
 
     @Test
+    fun `what Budi wrote offline is sent in order once reachable, and sending it again changes nothing`() = runBlocking<Unit> {
+        val sri = signedInNewcomer()
+        val circle = sri.createCareCircle("Tukiman", Relation.Father, emptySet(), myName = "Sri")
+        val tukiman = sri.careRecipients(circle).single()
+        val budi = signedInSibling(sri, circle)
+        val rao = sri.addProvider(circle, "Dr. Anand Rao").id
+        val visit = sri.scheduleAppointment(AppointmentDraft(circle, tukiman.id, rao, "Kontrol neurologi", null, now + 2.days))
+        val clopidogrel = sri.addMedication(MedicationDraft(circle, tukiman.id, "Clopidogrel", "75 mg", "pagi", LocalTime(7, 0)))
+        val omeprazole = sri.addMedication(MedicationDraft(circle, tukiman.id, "Omeprazole", "20 mg", "pagi", LocalTime(7, 0)))
+        val task = sri.addTask(tukiman, "Perpanjang izin parkir", budi.me(), day)
+
+        // Kept on the phone, as the app keeps them, then sent twice: a retry after a reply that never arrived.
+        val pending = Json.decodeFromString<List<Write>>(Json.encodeToString(listOf(
+            Write.Doses(listOf(clopidogrel, omeprazole), day, give = true),
+            Write.Doses(listOf(omeprazole), day, give = false), // the tap undone, after it
+            Write.SaveCheckIn(tukiman, day, CheckInDraft(128, 80, Ate.yes, walked = true, Mood.good, "")),
+            Write.AddNote(circle, "Bapak minta radio lamanya.", private = false),
+            Write.TaskDone(task.id, done = true),
+            Write.Ask(circle, visit.id, "Boleh menyetir lagi?"),
+        )))
+        pending.forEach { budi.send(it) }
+        pending.forEach { budi.send(it) }
+
+        assertEquals(listOf(clopidogrel.id), budi.doseLogs(circle, day).map { it.medicationId })
+        assertEquals(128, budi.checkIn(tukiman.id, day)!!.sys)
+        assertEquals(listOf("Bapak minta radio lamanya."), budi.notes(circle).map { it.text })
+        assertTrue(budi.tasks(circle).single { it.id == task.id }.done)
+        assertEquals(listOf("Boleh menyetir lagi?"), budi.questions(visit.id).map { it.text })
+    }
+
+    @Test
+    fun `a write the server refuses is dropped rather than sent forever`() = runBlocking<Unit> {
+        val sri = signedInNewcomer()
+        val circle = sri.createCareCircle("Tukiman", Relation.Father, emptySet(), myName = "Sri")
+        val budi = signedInSibling(sri, circle)
+        sri.removeMember(circle, budi.me())
+
+        budi.send(Write.AddNote(circle, "Bapak minta radio lamanya.", private = false)) // doesn't throw, so the queue moves on
+
+        assertTrue(sri.notes(circle).isEmpty())
+    }
+
+    @Test
     fun `a Former Member has nothing left to keep`() = runBlocking<Unit> {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", Relation.Father, emptySet(), myName = "Sri")

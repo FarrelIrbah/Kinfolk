@@ -149,17 +149,14 @@ import id.kinfolk.data.askHelp
 import id.kinfolk.data.organizerPhone
 import id.kinfolk.data.lastDigest
 import id.kinfolk.data.recentCheckIns
-import id.kinfolk.data.saveCheckIn
 import id.kinfolk.ui.checkin.CheckInScreen
 import id.kinfolk.data.Task
 import id.kinfolk.data.addTask
 import id.kinfolk.data.editTask
-import id.kinfolk.data.markTaskDone
 import id.kinfolk.data.remindTask
 import id.kinfolk.data.tasks as taskList
 import id.kinfolk.ui.tasks.TaskFormScreen
 import id.kinfolk.data.Note
-import id.kinfolk.data.addNote
 import id.kinfolk.data.notes as noteList
 import id.kinfolk.ui.notes.NotesScreen
 import id.kinfolk.ui.export.ExportScreen
@@ -199,10 +196,8 @@ import kinfolk.shared.generated.resources.ci_saved
 import kinfolk.shared.generated.resources.ci_saved_high
 import androidx.compose.ui.platform.LocalUriHandler
 import id.kinfolk.data.Medication
-import id.kinfolk.data.giveDoses
 import id.kinfolk.data.morning
 import id.kinfolk.data.progress
-import id.kinfolk.data.takeBackDose
 import id.kinfolk.data.MedicationDraft
 import id.kinfolk.data.addCareContact
 import id.kinfolk.data.addMedication
@@ -222,7 +217,6 @@ import id.kinfolk.data.removeCareContact
 import id.kinfolk.data.Provider
 import id.kinfolk.data.Question
 import id.kinfolk.data.VisitNote
-import id.kinfolk.data.askQuestion
 import id.kinfolk.data.questions
 import id.kinfolk.data.saveVisitNote
 import id.kinfolk.data.visitNote
@@ -248,6 +242,10 @@ import id.kinfolk.data.scheduleAppointment
 import id.kinfolk.data.createCareCircle
 import id.kinfolk.data.kinfolkClient
 import id.kinfolk.data.Snapshot
+import id.kinfolk.data.Write
+import id.kinfolk.data.send
+import id.kinfolk.data.shown
+import id.kinfolk.data.with
 import id.kinfolk.data.snapshot
 import id.kinfolk.ui.rememberKept
 import id.kinfolk.ui.appointment.updatedAgo
@@ -429,8 +427,10 @@ fun App() {
         var meds by remember { mutableStateOf(emptyList<Medication>()) }
         var editingMed by remember { mutableStateOf<Medication?>(null) }
         var doses by remember { mutableStateOf(emptyList<DoseLog>()) } // of the day they were read
-        val doseWrites = remember { Mutex() }
-        val taskWrites = remember { Mutex() } // a tick and its "Urungkan" land in tap order
+        // Offline write queue (#44): doses, Check-ins, Notes, Task ticks and Questions wait here and go in tap order.
+        val keptOutbox = rememberKept("outbox")
+        var outbox by remember { mutableStateOf(keptOutbox.read()?.let { runCatching { Json { ignoreUnknownKeys = true }.decodeFromString<List<Write>>(it) }.getOrNull() }.orEmpty()) }
+        val sending = remember { Mutex() }
         var markedMorning by remember { mutableStateOf<LocalDate?>(null) } // keeps "Semua diberikan ✓" up that day
         var checkIn by remember { mutableStateOf<CheckIn?>(null) } // of the day it was read
         var checkIns by remember { mutableStateOf(emptyList<CheckIn>()) } // Kondisi, the last 30
@@ -501,6 +501,20 @@ fun App() {
                     delay(3000)
                 }
             }
+        }
+        // Sends what waits on the phone, in order; unreachable, it retries with the offline pill up.
+        suspend fun sendAll() {
+            while (outbox.isNotEmpty()) {
+                retrying { supabase.send(outbox.first()) }
+                outbox = outbox.drop(1).also { keptOutbox.write(Json.encodeToString(it)) }
+            }
+        }
+        suspend fun drain() = sending.withLock { sendAll() }
+        // Shown at once by the caller; [then] refreshes from the server once everything queued is sent, under the same
+        // lock, so a slow refresh can't land after a later tap's (a tick, then its "Urungkan"). [then] mustn't drain.
+        fun queue(w: Write, then: suspend () -> Unit) {
+            outbox = (outbox + w).also { keptOutbox.write(Json.encodeToString(it)) }
+            scope.launch { sending.withLock { sendAll(); then() } }
         }
         // Approved in #5: yourself in Sri's green, the others in join order in Budi's, Dewi's, Agus's and Rina's, Former Members muted.
         fun colorOf(id: String): Color {
@@ -578,14 +592,7 @@ fun App() {
                     if (on) ms.map { DoseLog(it.id, today, me().orEmpty(), Clock.System.now()) } else emptyList()
             }
             flip(give)
-            // Not retried: offline, the tap is undone rather than sent later. One write at a time, in
-            // tap order, so a quick "Tandai" then undo lands in that order.
-            scope.launch {
-                doseWrites.withLock {
-                    val ok = attempt { if (give) supabase.giveDoses(ms, today) else supabase.takeBackDose(ms.single(), today) } != null
-                    if (ok) retrying { timeline = supabase.timeline(circle!!.id) } else { flip(!give); toast = noConnection }
-                }
-            }
+            queue(Write.Doses(ms, today, give)) { retrying { timeline = supabase.timeline(circle!!.id) } }
         }
         // The rota and "Minggu ini" show everyone by their own name, yourself first in Sri's green (like `circle`).
         fun rotaPeople() = circleMembers().associate { it.id to Person(it.name, it.color) }
@@ -622,13 +629,14 @@ fun App() {
             contacts = k.contacts; card = k.card; savedAt = k.savedAt; doses = k.doses; checkIn = k.checkIn; tasks = k.tasks
         }
         suspend fun loadHome() {
+            drain() // so what was written offline is in what's read
             // The card stays until the day ends: its "Tulis catatan" button is for after the visit.
             val day = Clock.System.now().toLocalDateTime(tz).date
             val k = retrying { supabase.snapshot(since = day.atStartOfDayIn(tz), today = day) }
             // Without a Care Circle (left, removed) nothing stays on the phone.
             kept.write(k?.let { Json.encodeToString(it) })
             if (k == null) { circle = null; return }
-            restore(k)
+            restore(k.with(outbox, me().orEmpty(), Clock.System.now())) // tapped while this was read
             opened?.appointment?.let { a -> opened = Visit(a, retrying { supabase.questions(a.id) }, retrying { supabase.visitNote(a.id) }) }
             sent = retrying { if (supabase.roleIn(k.circle.id) == Role.admin) supabase.invitations(k.circle.id) else null }
             hidden = retrying { supabase.hidden(k.circle.id) }
@@ -679,7 +687,7 @@ fun App() {
             // so whoever moved on meanwhile stays where they are unless the Care Circle is gone.
             val k = kept.read()?.let { runCatching { Json { ignoreUnknownKeys = true }.decodeFromString<Snapshot>(it) }.getOrNull() }
                 ?: return@LaunchedEffect land(Nav.Tab)
-            restore(k)
+            restore(k.with(outbox, me().orEmpty(), Clock.System.now()))
             reset(Screen.Home)
             loadHome()
             if (circle == null) land(Nav.Tab)
@@ -944,8 +952,17 @@ fun App() {
                             ApptScreen(
                                 a, v.questions, v.note != null, now, tz, ::person, ::colorOf, a.attendeeId == me(), recipient?.name.orEmpty(),
                                 onBack = ::back, onEdit = { openForm(a) },
-                                // Not retried: adding is not idempotent.
-                                ask = { text -> attempt { supabase.askQuestion(a.circleId, a.id, text); loadHome() } != null },
+                                ask = { text ->
+                                    val w = Write.Ask(a.circleId, a.id, text)
+                                    if (a.id == next?.id) questions = questions + w.shown(a, me().orEmpty())
+                                    opened?.takeIf { it.appointment.id == a.id }?.let { o -> opened = Visit(a, o.questions + w.shown(a, me().orEmpty()), o.note) }
+                                    queue(w) {
+                                        val qs = retrying { supabase.questions(a.id) }
+                                        if (a.id == next?.id) questions = qs
+                                        opened?.takeIf { it.appointment.id == a.id }?.let { o -> opened = Visit(a, qs, o.note) }
+                                    }
+                                    true
+                                },
                                 onNote = { go(Screen.VisitNote) },
                             )
                         }
@@ -1014,12 +1031,12 @@ fun App() {
                             val before = checkIn?.takeIf { it.day == day }
                             CheckInScreen(hm(at), r.name, before?.draft, onBack = ::back) { d ->
                                 if (d == null) { toast = noBp; return@CheckInScreen }
-                                // Not retried: offline, the form stays filled for another tap.
-                                if (attempt { supabase.saveCheckIn(r, day, d) } == null) { toast = noConnection; return@CheckInScreen }
+                                val w = Write.SaveCheckIn(r, day, d)
+                                checkIn = w.shown(me().orEmpty(), Clock.System.now(), alerted = before?.alerted == true)
                                 // The server tells the others once per Check-in, when it first reaches 140.
                                 toast = if (d.high && before?.alerted != true && others.isNotEmpty()) savedHigh else saved
                                 reset(Screen.Home, Nav.Back)
-                                scope.launch {
+                                queue(w) {
                                     checkIn = retrying { supabase.checkIn(r.id, day) }
                                     checkIns = retrying { supabase.recentCheckIns(r.id) }
                                     timeline = retrying { supabase.timeline(r.circleId) }
@@ -1029,16 +1046,10 @@ fun App() {
                         Screen.Tasks -> {
                             val doneToast = stringResource(Res.string.task_done_toast)
                             val remindedToast = tasks.associate { t -> t.id to stringResource(Res.string.reminded_toast, rotaPeople()[t.ownerId]?.name.orEmpty()) }
-                            // Shown at once like the prototype; put back with "Tidak tersambung. Coba lagi." if it can't be saved.
                             fun swap(t: Task, to: Task) { tasks = tasks.map { if (it.id == t.id) to else it } }
                             fun setDone(t: Task, done: Boolean) {
                                 swap(t, t.copy(done = done, doneAt = if (done) Clock.System.now() else null))
-                                scope.launch {
-                                    taskWrites.withLock {
-                                        if (attempt { supabase.markTaskDone(t.id, done) } == null) { swap(t, t); toast = noConnection }
-                                        else retrying { tasks = supabase.taskList(t.circleId) }
-                                    }
-                                }
+                                queue(Write.TaskDone(t.id, done)) { retrying { tasks = supabase.taskList(t.circleId) } }
                             }
                             TasksScreen(
                                 tasks, today, me().orEmpty(), { id -> rotaPeople()[id] ?: person(id) },
@@ -1136,10 +1147,11 @@ fun App() {
                             val savedShared = stringResource(Res.string.note_saved_shared)
                             NotesScreen(notes, recipient?.name.orEmpty(), now, tz, { named(it) }, onBack = ::back) { text, private ->
                                 val c = circle ?: return@NotesScreen false
-                                (attempt { supabase.addNote(c.id, text, private) } != null).also { ok ->
-                                    toast = if (!ok) noConnection else if (private) savedPrivate else savedShared
-                                    if (ok) notes = retrying { supabase.noteList(c.id) }
-                                }
+                                val w = Write.AddNote(c.id, text, private)
+                                notes = listOf(Note(w.id, me().orEmpty(), Clock.System.now(), text.trim(), private)) + notes
+                                toast = if (private) savedPrivate else savedShared
+                                queue(w) { notes = retrying { supabase.noteList(c.id) } }
+                                true
                             }
                         }
                         Screen.Export -> recipient?.let { r ->
@@ -1402,7 +1414,7 @@ fun App() {
 private suspend fun <T : Any> attempt(block: suspend () -> T): T? =
     try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
 
-/** Prototype offline pill: top 54px, #22261F, 12px 500, padding 7 14, gap 6, 7px amber dot; copy approved in #14. */
+/** Prototype offline pill: top 54px, #22261F, 12px 500, padding 7 14, gap 6, 7px amber dot. */
 @Composable
 private fun OfflineBanner(text: String, modifier: Modifier) {
     // ponytail: sits right under the status bar; the prototype's 54px is 6px above its 60px content inset.
