@@ -281,4 +281,43 @@ class RecordingTest {
         assertFails { budi.undoDoseChange(appt) }
         assertEquals("50 mg", sri.medications(circle).single().dose)
     }
+
+    @Test
+    fun `the handoff goes to who wasn't in the room and may read the summary, once, the dose line only to who sees Obat`() = runBlocking<Unit> {
+        val sri = signedInNewcomer()
+        val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        val tukiman = sri.careRecipients(circle).single().id
+        val budi = signedInSibling(sri, circle)
+        val dewi = signedInSibling(sri, circle, name = "Dewi")
+        val rina = signedInSibling(sri, circle, name = "Rina")
+        val agus = signedInSibling(sri, circle, name = "Agus")
+        val eka = signedInSibling(sri, circle, name = "Eka")
+        sri.setHidden(tukiman, rina.me(), DataCategory.visit_notes, hidden = true)
+        sri.setHidden(tukiman, eka.me(), DataCategory.medications, hidden = true)
+        sri.addMedication(MedicationDraft(circle, tukiman, "Clopidogrel", "75 mg", "pagi", LocalTime(7, 0)))
+        val provider = sri.addProvider(circle, "Dr. Anand Rao").id
+        val appt = sri.scheduleAppointment(
+            AppointmentDraft(circle, tukiman, provider, "Kontrol neurologi", null, Clock.System.now(), attendeeId = budi.me(), driverId = agus.me())).id
+
+        Providers.transcript = output
+        budi.transcribe(circle, appt, audio)
+        val t = budi.awaitRecording(appt).transcript!!
+        assertFails { budi.sendHandoff(appt) } // not before sharing
+        budi.shareRecording(appt, t.answersTo(budi.questions(appt)), t.drafts(budi.me(), LocalDate(2026, 10, 12)))
+
+        // Not the Attendee, the Driver, or Rina, hidden from Rekaman kunjungan.
+        assertEquals(listOf(sri.me(), dewi.me(), eka.me()), budi.handoffTo(appt))
+        assertFails { sri.sendHandoff(appt) } // the Attendee's
+        assertEquals(listOf("Sri", "Dewi", "Eka"), budi.sendHandoff(appt))
+        assertEquals(listOf("Sri", "Dewi", "Eka"), budi.recording(appt)!!.handoffTold)
+        assertFails { budi.sendHandoff(appt) } // once
+        deliver()
+
+        val said = listOf("Budi", "kontrol neurologi", "Jangan dihentikan")
+        val steps = "Budi: Antar fisioterapi Selasa, 13 Okt; Budi: MRI ulang, 12 Okt"
+        assertEquals(listOf(said + "Clopidogrel dari 75 mg ke 37,5 mg. Pengingat belum diperbarui" + steps),
+            dewi.inbox().filter { it.template == "kinfolk_handoff" }.map { it.params })
+        assertEquals(listOf(said + steps), eka.inbox().filter { it.template == "kinfolk_handoff_nomed" }.map { it.params })
+        listOf(budi, agus, rina).forEach { m -> assertTrue(m.inbox().none { it.template.orEmpty().startsWith("kinfolk_handoff") }) }
+    }
 }

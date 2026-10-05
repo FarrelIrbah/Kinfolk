@@ -529,4 +529,17 @@
     <string name="inbox_flags_sub">Sebelum ringkasan %1$s bisa dibagikan</string>
     <string name="inbox_dose">Perubahan dosis %1$s perlu diterapkan</string>
     <string name="inbox_dose_sub">Pengingat masih %1$s</string>
+    <!-- #49: handoff -->
+    <string name="handoff_btn">Tulis serah terima untuk yang tidak hadir</string>
+    <string name="ho_eyebrow">Serah terima · dari %1$s, setelah %2$s</string>
+    <string name="ho_title">Yang terlewat hari ini</string>
+    <string name="ho_happened">Yang terjadi</string>
+    <string name="ho_tasks">Siapa mengerjakan apa</string>
+    <string name="ho_sent_to">Dikirim ke</string>
+    <string name="ho_note">Dikirim sebagai satu WhatsApp pendek ke semua yang tidak di ruangan.</string>
+    <string name="ho_mc_done">%1$s dari %2$s ke %3$s. Pengingat sudah diperbarui.</string>
+    <string name="ho_mc_pending">%1$s dari %2$s ke %3$s. Pengingat belum diperbarui.</string>
+    <string name="ho_send">Kirim serah terima</string>
+    <string name="ho_sent">Terkirim ke %1$s ✓</string>
+    <string name="ho_toast">Serah terima dikirim ke %1$d saudara via WhatsApp.</string>
 </resources>

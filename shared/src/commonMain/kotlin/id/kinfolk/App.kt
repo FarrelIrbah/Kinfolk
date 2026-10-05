@@ -302,6 +302,7 @@ import kinfolk.shared.generated.resources.delete_recording_title
 import kinfolk.shared.generated.resources.delete_recording_toast
 import id.kinfolk.ui.appointment.Selection
 import id.kinfolk.ui.appointment.SummaryScreen
+import id.kinfolk.ui.appointment.HandoffScreen
 import id.kinfolk.ui.appointment.TranscriptDrawer
 import id.kinfolk.ui.rememberRecorder
 import id.kinfolk.data.Moved
@@ -315,6 +316,8 @@ import id.kinfolk.data.drafts
 import id.kinfolk.data.moveQuestion
 import id.kinfolk.data.recording
 import id.kinfolk.data.shareRecording
+import id.kinfolk.data.handoffTo as loadHandoffTo
+import id.kinfolk.data.sendHandoff
 import id.kinfolk.data.transcribe
 import kinfolk.shared.generated.resources.consent_first
 import kinfolk.shared.generated.resources.role_doctor
@@ -322,6 +325,8 @@ import kinfolk.shared.generated.resources.role_patient
 import kinfolk.shared.generated.resources.visit_meta
 import kinfolk.shared.generated.resources.shared_circle
 import kinfolk.shared.generated.resources.shared_toast
+import kinfolk.shared.generated.resources.ho_eyebrow
+import kinfolk.shared.generated.resources.ho_toast
 import kinfolk.shared.generated.resources.moved_next
 import kinfolk.shared.generated.resources.moved_toast
 import kinfolk.shared.generated.resources.moved_toast_self
@@ -453,7 +458,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest, Display, Consent, Recording, Processing, Summary, RecFail }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest, Display, Consent, Recording, Processing, Summary, RecFail, Handoff }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -481,6 +486,7 @@ fun App() {
         var note by remember { mutableStateOf<VisitNote?>(null) } // of next
         var recording by remember { mutableStateOf<Recording?>(null) } // of next, when I may read it
         var doseChanges by remember { mutableStateOf(emptyList<DoseChange>()) } // heard in Recordings I read (#47)
+        var handoffTo by remember { mutableStateOf<List<String>?>(null) } // `handoff`'s "Dikirim ke", null while loading
         var appliedDoses by remember { mutableStateOf(emptyList<AppliedDoseChange>()) } // newest first
         val recorder = rememberRecorder()
         var recordedSeconds by rememberSaveable { mutableStateOf(0) } // `processing`'s "4 menit"
@@ -1281,7 +1287,37 @@ fun App() {
                                         }
                                     }
                                 }.takeIf { r.recordedBy == me() && r.sharedAt != null && r.audioDeletedAt == null },
+                                onHandoff = {
+                                    handoffTo = null
+                                    if (r.handoffTold == null) scope.launch {
+                                        val ids = attempt { supabase.loadHandoffTo(a.id) } ?: run { toast = noConnection; null }
+                                        if (visit()?.appointment?.id == a.id) handoffTo = ids // not another visit's, opened meanwhile
+                                    }
+                                    go(Screen.Handoff)
+                                }.takeIf { r.recordedBy == me() && r.sharedAt != null },
                             )
+                        }
+                        Screen.Handoff -> visit()?.let { v ->
+                            val a = v.appointment
+                            val r = v.recording ?: return@let
+                            val who = { id: String -> rotaPeople()[id] ?: person(id) }
+                            val sentToast = stringResource(Res.string.ho_toast, "%1\$s")
+                            HandoffScreen(
+                                stringResource(Res.string.ho_eyebrow, named(r.recordedBy).name, inSentence(a.title)),
+                                points = r.transcript?.qa.orEmpty().map { it.answer }.filter { it.isNotBlank() },
+                                dose = doseChanges.firstOrNull { it.appointmentId == a.id },
+                                steps = v.note?.steps.orEmpty().map { Triple(who(it.owner), it.text, dayMonth(it.due)) },
+                                // Once sent, who was told. ponytail: by name, as `told` is stored; ids if two Members share a name.
+                                to = r.handoffTold?.mapNotNull { n -> members.firstOrNull { it.name == n }?.let { who(it.userId) } } ?: handoffTo?.mapNotNull(who),
+                                sent = r.handoffTold, onBack = ::back,
+                            ) {
+                                val told = attempt { supabase.sendHandoff(a.id) }
+                                if (told == null) { toast = noConnection; false } else {
+                                    toast = sentToast.replace("%1\$s", told.size.toString())
+                                    showRecording(a.id, r.copy(handoffTold = told))
+                                    true
+                                }
+                            }
                         }
                         Screen.VisitNote -> visit()?.let { v ->
                             val a = v.appointment

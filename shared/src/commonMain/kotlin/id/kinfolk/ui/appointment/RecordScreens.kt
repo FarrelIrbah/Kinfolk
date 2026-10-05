@@ -72,6 +72,7 @@ import id.kinfolk.ui.Pill
 import id.kinfolk.ui.Recorder
 import id.kinfolk.ui.SectionLabel
 import id.kinfolk.ui.dashed
+import id.kinfolk.ui.checkin.names
 import id.kinfolk.ui.home.Person
 import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
@@ -86,6 +87,16 @@ import kinfolk.shared.generated.resources.consent_head
 import kinfolk.shared.generated.resources.consent_note
 import kinfolk.shared.generated.resources.consent_sub
 import kinfolk.shared.generated.resources.expand
+import kinfolk.shared.generated.resources.handoff_btn
+import kinfolk.shared.generated.resources.ho_happened
+import kinfolk.shared.generated.resources.ho_mc_done
+import kinfolk.shared.generated.resources.ho_mc_pending
+import kinfolk.shared.generated.resources.ho_note
+import kinfolk.shared.generated.resources.ho_send
+import kinfolk.shared.generated.resources.ho_sent
+import kinfolk.shared.generated.resources.ho_sent_to
+import kinfolk.shared.generated.resources.ho_tasks
+import kinfolk.shared.generated.resources.ho_title
 import kinfolk.shared.generated.resources.looks_right
 import kinfolk.shared.generated.resources.mc_status_done
 import kinfolk.shared.generated.resources.mc_status_pending
@@ -299,6 +310,7 @@ class Selection {
  * ([share] gets the steps, false when unreachable; locked while a line is unchecked, [onToast] then says why).
  * After sharing [shared] is the button's "Dibagikan · …" label; others see no button. [dose]: "Perubahan obat".
  * [onDelete]: "Hapus rekaman" under the button (#48), null when there is no audio to delete or it's not mine.
+ * [onHandoff]: "Tulis serah terima untuk yang tidak hadir" (#49), for the Attendee once shared.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -323,6 +335,7 @@ fun SummaryScreen(
     check: (String) -> Unit,
     onToast: (String) -> Unit,
     onDelete: (() -> Unit)?,
+    onHandoff: (() -> Unit)?,
 ) {
     val scope = rememberCoroutineScope()
     val owned = remember(steps) { mutableStateListOf(*steps.toTypedArray()) }
@@ -455,7 +468,94 @@ fun SummaryScreen(
             }
             if (onDelete != null) Link(stringResource(Res.string.delete_recording), Kf.Sos, onDelete, Modifier.align(Alignment.CenterHorizontally))
         }
+        if (onHandoff != null) Box(
+            Modifier.fillMaxWidth().height(50.dp).border(1.dp, Kf.InputBorder, RoundedCornerShape(16.dp)).tap(onHandoff),
+            contentAlignment = Alignment.Center,
+        ) { Text(stringResource(Res.string.handoff_btn), fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.height(220.dp)) // v3 bottomPad 250 on `summary`: room under the drawer
+    }
+}
+
+/**
+ * v3 `handoff` (#49): [points] are the answers, [steps] owner, text and due. [to]: who it goes to, null while loading;
+ * none, nothing to send. [sent]: the names it went to, once sent. [send] is false when unreachable.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun HandoffScreen(
+    eyebrow: String,
+    points: List<String>,
+    dose: DoseChange?,
+    steps: List<Triple<Person?, String, String>>,
+    to: List<Person>?,
+    sent: List<String>?,
+    onBack: () -> Unit,
+    send: suspend () -> Boolean,
+) {
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    // design: padding:4px 20px; gap:16px; cards #FBF8F2 r18 p16
+    @Composable fun Section(label: String, bg: Color, gap: Int, content: @Composable () -> Unit) = Column(
+        Modifier.fillMaxWidth().background(bg, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(gap.dp),
+    ) { SectionLabel(label); content() }
+    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Pill(stringResource(Res.string.back), onBack)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(eyebrow, fontSize = 13.sp, color = Kf.Muted)
+            Text(stringResource(Res.string.ho_title), style = serifStyle(30f, 1.1f))
+        }
+        if (points.isNotEmpty()) Section(stringResource(Res.string.ho_happened), Kf.Card, 12) {
+            points.forEach { p ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.padding(top = 8.dp).size(6.dp).background(Kf.Green, CircleShape))
+                    Text(p, fontSize = 15.sp, lineHeight = (15 * 1.45).sp)
+                }
+            }
+        }
+        if (dose != null) Section(stringResource(Res.string.med_change), if (dose.applied) Kf.GreenTint else Kf.FlagBg, 6) {
+            Text(
+                stringResource(if (dose.applied) Res.string.ho_mc_done else Res.string.ho_mc_pending, dose.name, dose.fromDose, dose.toDose),
+                fontSize = 15.sp, lineHeight = (15 * 1.45).sp,
+            )
+        }
+        if (steps.isNotEmpty()) Section(stringResource(Res.string.ho_tasks), Kf.Card, 12) {
+            steps.forEach { (owner, text, due) ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Avatar(owner?.initial.orEmpty(), owner?.color ?: Kf.Muted, 26.dp, 11.sp)
+                    Text(text, Modifier.weight(1f), fontSize = 15.sp, lineHeight = (15 * 1.4).sp)
+                    Text(due, fontSize = 12.sp, color = Kf.Muted)
+                }
+            }
+        }
+        if (!to.isNullOrEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(Res.string.ho_sent_to), fontSize = 13.sp, color = Kf.Muted)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    to.forEach { p ->
+                        Row(
+                            Modifier.background(Kf.Card, CircleShape).padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Avatar(p.initial, p.color, 22.dp, 10.sp)
+                            Text(p.name, fontSize = 13.sp)
+                        }
+                    }
+                }
+                Text(stringResource(Res.string.ho_note), fontSize = 13.sp, lineHeight = (13 * 1.45).sp, color = Kf.Muted)
+            }
+            Box(
+                Modifier.fillMaxWidth().height(54.dp).background(if (sent != null) Kf.Muted else Kf.Green, RoundedCornerShape(16.dp)).tap {
+                    if (sent != null || busy) return@tap
+                    scope.launch { busy = true; send(); busy = false }
+                },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    sent?.let { stringResource(Res.string.ho_sent, names(it)) } ?: stringResource(Res.string.ho_send),
+                    color = Kf.Paper, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
 

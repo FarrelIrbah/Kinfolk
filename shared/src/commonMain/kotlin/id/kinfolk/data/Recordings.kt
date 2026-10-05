@@ -38,6 +38,8 @@ data class Recording(
     @SerialName("ready_at") val readyAt: Instant? = null,
     /** "Hapus rekaman" (#48): the audio is gone from Storage; the transcript stays. */
     @SerialName("audio_deleted_at") val audioDeletedAt: Instant? = null,
+    /** Who the handoff went to on WhatsApp (#49), in join order; null until it is sent. */
+    @SerialName("handoff_told") val handoffTold: List<String>? = null,
 ) {
     /** The lines the worker asked to check that are not confirmed yet, as in [checked]. */
     val unchecked: List<String> get() = transcript?.let { t ->
@@ -101,6 +103,14 @@ suspend fun SupabaseClient.deleteRecordingAudio(circleId: String, appointmentId:
     storage.from("recordings").delete("$circleId/$appointmentId") // silent when refused; the RPC then refuses
     postgrest.rpc("recording_audio_deleted", buildJsonObject { put("appointment", appointmentId) })
 }
+
+/** "Dikirim ke" (#49): the Members a handoff of [appointmentId] goes to, in join order. */
+suspend fun SupabaseClient.handoffTo(appointmentId: String): List<String> =
+    postgrest.rpc("handoff_to", buildJsonObject { put("appointment", appointmentId) }).decodeAs()
+
+/** "Kirim serah terima": by the Attendee, once, after sharing. Returns who was told on WhatsApp, in join order. */
+suspend fun SupabaseClient.sendHandoff(appointmentId: String): List<String> =
+    postgrest.rpc("send_handoff", buildJsonObject { put("appointment", appointmentId) }).decodeAs()
 
 /** Null until there is one the signed-in Member may read. */
 suspend fun SupabaseClient.recording(appointmentId: String): Recording? =
