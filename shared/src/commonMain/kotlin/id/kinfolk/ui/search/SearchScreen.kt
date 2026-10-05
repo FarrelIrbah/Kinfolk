@@ -90,10 +90,10 @@ fun SearchScreen(query: String, onQuery: (String) -> Unit, suggestions: List<Str
     // design: padding:4px 20px; gap:16px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            // design: h46 plus 1.5px #2F5D4A border (content-box, so 49), r14, #fff, padding 0 12, gap 8; 18px magnifier muted; input 16px
+            // design: h46 plus 1.5px #2F5D4A border, rendered 1px (content-box, so 48), r14, #fff, padding 0 12, gap 8; 18px magnifier muted; input 16px
             Row(
-                Modifier.weight(1f).height(49.dp).background(Color.White, RoundedCornerShape(14.dp))
-                    .border(1.5.dp, Kf.Green, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp),
+                Modifier.weight(1f).height(48.dp).background(Color.White, RoundedCornerShape(14.dp))
+                    .border(1.dp, Kf.Green, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
                 SvgPath(Magnifier, 18.dp, Kf.Muted)

@@ -145,7 +145,7 @@ fun VisitNoteScreen(
         val open = if (editable) emptyList() else questions.filter { it.answer?.isBlank() == true }
         if (open.isNotEmpty()) Section(stringResource(Res.string.not_answered)) {
             open.forEach { q ->
-                Column(Modifier.fillMaxWidth().dashed().padding(15.5.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.fillMaxWidth().dashed().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Avatar(q.askedByName.orEmpty().take(1), askerColor(q.askedBy), 26.dp, 11.sp)
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -199,7 +199,7 @@ private fun StepPill(text: String, bg: Color, fg: Color, onClick: (() -> Unit)?)
 private fun Section(label: String, content: @Composable () -> Unit) =
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { SectionLabel(label); content() }
 
-/** `summary` line card: #FBF8F2, radius 16, padding 14 (its 1.5px border is transparent until selected). */
+/** `summary` line card: #FBF8F2, radius 16, padding 14 inside a 1.5px border, transparent until selected, that Chrome renders 1px. */
 @Composable
 private fun NoteCard(arrangement: Arrangement.Vertical = Arrangement.Top, content: @Composable () -> Unit) =
-    Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(16.dp)).padding(15.5.dp), verticalArrangement = arrangement) { content() }
+    Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(16.dp)).padding(15.dp), verticalArrangement = arrangement) { content() }

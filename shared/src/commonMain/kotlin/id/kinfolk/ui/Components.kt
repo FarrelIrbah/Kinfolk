@@ -159,7 +159,7 @@ fun PrimaryButton(text: String, modifier: Modifier = Modifier, onClick: () -> Un
 fun SectionLabel(text: String) =
     Text(text.uppercase(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.08.em, color = Kf.Muted)
 
-/** "+ Unggah dokumen" / "+ Tambah kontak": height 50, radius 16, 1.5px dashed rgba(34,38,31,.25), 15px 500. */
+/** "+ Unggah dokumen" / "+ Tambah kontak": height 50, radius 16, 1.5px dashed rgba(34,38,31,.25) (rendered 1px), 15px 500. */
 @Composable
 fun DashedButton(text: String, onClick: () -> Unit) {
     Box(Modifier.fillMaxWidth().height(50.dp).dashed().tap(onClick), contentAlignment = Alignment.Center) {
@@ -169,14 +169,14 @@ fun DashedButton(text: String, onClick: () -> Unit) {
 
 private val DashLine = Color(0x4022261F) // rgba(34,38,31,.25)
 
-/** border:1.5px dashed rgba(34,38,31,.25); border-radius:16px, unless given. Drawn inside, so padding takes the extra 1.5 CSS adds. */
+/** border:1.5px dashed rgba(34,38,31,.25); border-radius:16px, unless given. Chrome lays out and paints the 1.5px as 1px, with 3px dashes and ~2px gaps. Drawn inside, so padding takes the extra 1 CSS adds. */
 fun Modifier.dashed(color: Color = DashLine, radius: Dp = 16.dp) = drawBehind {
-    val w = 1.5.dp.toPx()
-    // ponytail: Chrome's dash rhythm for a 1.5px border (dashes and gaps ~3x the width), matched by eye.
+    val w = 1.dp.toPx()
+    // ponytail: Chrome spreads its gaps to fit the box evenly; fixed 3/2 is within a pixel of it.
     drawRoundRect(
         color, topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w),
         cornerRadius = CornerRadius(radius.toPx() - w / 2),
-        style = Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * w, 3 * w))),
+        style = Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * w, 2 * w))),
     )
 }
 

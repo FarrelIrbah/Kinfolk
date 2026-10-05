@@ -153,12 +153,12 @@ fun TimelineScreen(rows: List<TimelineRow>, filter: EntryType?, onFilter: (Entry
     }
 }
 
-/** The `empty` screen's box: 1.5px dashed rgba(34,38,31,.2) outside padding 20, radius 18, 14px/1.5 muted, centered. */
+/** The `empty` screen's box: 1.5px dashed rgba(34,38,31,.2) (rendered 1px) outside padding 20, radius 18, 14px/1.5 muted, centered. */
 @Composable
 fun EmptyBox(text: String) {
     Text(
         text,
         fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Kf.Muted, textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().dashed(EmptyLine, 18.dp).padding(21.5.dp),
+        modifier = Modifier.fillMaxWidth().dashed(EmptyLine, 18.dp).padding(21.dp),
     )
 }

@@ -122,11 +122,11 @@ private fun TaskRow(
         Modifier.fillMaxWidth().alpha(if (t.done) .6f else 1f).background(Kf.Card, RoundedCornerShape(16.dp)).tap { onOpen(t) }.padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // design: 28x28, radius 8, 1.5px rgba(34,38,31,.3) / filled #2F5D4A with "✓", margin-top 1
+        // design: 28x28, radius 8, 1.5px (rendered 1px) rgba(34,38,31,.3) / filled #2F5D4A with "✓", margin-top 1
         Box(
             Modifier.padding(top = 1.dp).size(28.dp)
                 .background(if (t.done) Kf.Green else Color.Transparent, RoundedCornerShape(8.dp))
-                .border(1.5.dp, if (t.done) Kf.Green else Color(0x4D22261F), RoundedCornerShape(8.dp))
+                .border(1.dp, if (t.done) Kf.Green else Color(0x4D22261F), RoundedCornerShape(8.dp))
                 .tap { onToggle(t) },
             contentAlignment = Alignment.Center,
         ) { if (t.done) Text("✓", color = Color.White, fontSize = 15.sp) }

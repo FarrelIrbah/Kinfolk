@@ -611,10 +611,10 @@ private fun MedCard(m: Medication, note: Pair<String, Color>?, onOpen: (Medicati
 
 @Composable
 private fun GivenButton(on: Boolean, onClick: () -> Unit) {
-    // design: 1.5px border, r999, h40, padding 0 14px, 13px 600
+    // design: 1.5px border (rendered 1px), r999, h40, padding 0 14px, 13px 600
     Box(
         Modifier.height(40.dp).background(if (on) Kf.Green else Color.Transparent, CircleShape)
-            .border(1.5.dp, if (on) Kf.Green else GivenBorder, CircleShape).tap(onClick).padding(horizontal = 14.dp),
+            .border(1.dp, if (on) Kf.Green else GivenBorder, CircleShape).tap(onClick).padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(stringResource(if (on) Res.string.given else Res.string.mark_given), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (on) Kf.Paper else Kf.Ink)

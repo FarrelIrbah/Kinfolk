@@ -187,7 +187,7 @@ fun DocsPicker(docs: List<Document>, picked: List<String>, onPicked: (List<Strin
     }
 }
 
-/** design: padding 13px 16px, gap 12, border-bottom rgba(34,38,31,.07); box 24, r7, 1.5px, ✓ 13px; label 15px; pages 12px #6B6A60 */
+/** design: padding 13px 16px, gap 12, border-bottom rgba(34,38,31,.07); box 24, r7, 1.5px border (rendered 1px), ✓ 13px; label 15px; pages 12px #6B6A60 */
 @Composable
 private fun TickRow(label: String, pages: Int, on: Boolean, onTap: () -> Unit) {
     Row(
@@ -195,9 +195,9 @@ private fun TickRow(label: String, pages: Int, on: Boolean, onTap: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            // design: 24px box plus its 1.5px border (content-box)
-            Modifier.size(27.dp).background(if (on) Kf.Green else Color.Transparent, RoundedCornerShape(7.dp))
-                .border(1.5.dp, if (on) Kf.Green else BoxLine, RoundedCornerShape(7.dp)),
+            // design: 24px box plus its border, 1px as rendered (content-box)
+            Modifier.size(26.dp).background(if (on) Kf.Green else Color.Transparent, RoundedCornerShape(7.dp))
+                .border(1.dp, if (on) Kf.Green else BoxLine, RoundedCornerShape(7.dp)),
             contentAlignment = Alignment.Center,
         ) { if (on) Text("✓", color = Color.White, fontSize = 13.sp) }
         Text(label, Modifier.weight(1f), fontSize = 15.sp)

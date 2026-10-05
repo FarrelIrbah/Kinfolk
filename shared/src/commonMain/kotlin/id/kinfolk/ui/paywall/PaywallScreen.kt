@@ -80,10 +80,10 @@ fun PaywallScreen(offer: Offer?, onBack: () -> Unit, onStart: (transcription: Bo
             Text(stringResource(Res.string.plan_incl), fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Kf.Ink2)
             Text(stringResource(Res.string.one_price), fontSize = 13.sp, color = Kf.Green, fontWeight = FontWeight.SemiBold)
         }
-        // design: border 1.5px #2F5D4A when on, else transparent, outside padding 18; radius 20, gap 10
+        // design: border 1.5px (rendered 1px) #2F5D4A when on, else transparent, outside padding 18; radius 20, gap 10
         Column(
-            Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(20.dp)).border(1.5.dp, if (addon) Kf.Green else Color.Transparent, RoundedCornerShape(20.dp))
-                .tap { addon = !addon }.padding(19.5.dp),
+            Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(20.dp)).border(1.dp, if (addon) Kf.Green else Color.Transparent, RoundedCornerShape(20.dp))
+                .tap { addon = !addon }.padding(19.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
