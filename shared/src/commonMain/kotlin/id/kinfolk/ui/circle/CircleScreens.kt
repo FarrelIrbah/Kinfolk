@@ -73,6 +73,7 @@ import kinfolk.shared.generated.resources.perm_intro
 import kinfolk.shared.generated.resources.recipient_sub
 import kinfolk.shared.generated.resources.channel_app
 import kinfolk.shared.generated.resources.channel_whatsapp
+import kinfolk.shared.generated.resources.plan
 import kinfolk.shared.generated.resources.replay_onb
 import kinfolk.shared.generated.resources.bp_mode
 import kinfolk.shared.generated.resources.bp_mode_sub
@@ -153,14 +154,14 @@ private fun CircleMember.sub() = when {
 }
 
 /**
- * `circle` from design v3: header, Members, "Cara lain". Approved in #5: "Paket" is hidden. Approved in #9: the intro
+ * `circle` from design v3: header, Members, "Cara lain", "Paket" with [plan] as its sub (#50). Approved in #9: the intro
  * box only while the Care Recipient [recipientName] is a Member; access "Penuh" or "N/6" (#20). #36: the Care
  * Recipient's row always first, no access column; "Ulangi onboarding" while [onReplay] is set (admins). #37: the Care
  * Recipient's row and "Cara lain"'s first row open Mode Bapak ([onBapak]), as in v3. #40: "Tampilan WhatsApp Anda" after
  * the export row while [onDigest] is set (after my first weekly digest). #41: "Tampilan & aksesibilitas" last, as in v3.
  */
 @Composable
-fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit, onExport: () -> Unit, onReplay: (() -> Unit)?, onBapak: () -> Unit, onDigest: (() -> Unit)?, onDisplay: () -> Unit) {
+fun CircleScreen(circleName: String, recipientName: String, members: List<CircleMember>, onSos: () -> Unit, onMember: (CircleMember) -> Unit, onContacts: () -> Unit, onNotes: () -> Unit, onExport: () -> Unit, onReplay: (() -> Unit)?, onBapak: () -> Unit, onDigest: (() -> Unit)?, onDisplay: () -> Unit, plan: String, onPlan: () -> Unit) {
     // design: padding:4px 20px; gap:20px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -227,6 +228,17 @@ fun CircleScreen(circleName: String, recipientName: String, members: List<Circle
                     Hairline()
                 }
             }
+        }
+        // design: #FBF8F2, radius 18, padding 16; 16/600 over 13px muted, "›"
+        Row(
+            Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).tap(onPlan).padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(Res.string.plan), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(plan, fontSize = 13.sp, color = Kf.Muted)
+            }
+            Text("›", color = Kf.Muted, fontSize = 18.sp)
         }
         // design: border:none;background:none;color:#6B6A60;font-size:13px;padding:0 (centred button)
         if (onReplay != null) Text(

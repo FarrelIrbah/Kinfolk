@@ -409,6 +409,9 @@ RUNPOD_ENDPOINT_ID = "local"
 RUNPOD_API_KEY = "local"
 TRANSCRIBE_WEBHOOK_URL = "http://127.0.0.1:54321/functions/v1/transcribe"
 TRANSCRIBE_SECRET = "local"
+REVENUECAT_WEBHOOK_SECRET = "local"
+REVENUECAT_API_URL = "http://host.docker.internal:54340/revenuecat"
+REVENUECAT_API_KEY = "local"
 
 [functions.send-otp]
 verify_jwt = false
@@ -436,6 +439,10 @@ static_files = ["./functions/export/*.ttf"]
 
 # Called by the Attendee (checked in the database) and by RunPod's webhook (TRANSCRIBE_SECRET).
 [functions.transcribe]
+verify_jwt = false
+
+# Called by RevenueCat (REVENUECAT_WEBHOOK_SECRET); reads the circle back from its API (REVENUECAT_API_KEY).
+[functions.subscription]
 verify_jwt = false
 
 [analytics]

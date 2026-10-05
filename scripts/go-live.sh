@@ -190,7 +190,7 @@ finish() {
 
 cd "$(dirname "$0")/.."
 ENV_FILE="supabase/.env.production.local"
-TOTAL_STAGES=15
+TOTAL_STAGES=16
 
 # Enter runs the stage; n skips it (done on an earlier run).
 run() {
@@ -330,6 +330,30 @@ if run; then
 fi
 
 # ──────────────────────────────────────────────────────────────────────────
+stage "Store products and RevenueCat (ADR 0006)"
+if run; then
+  open_url "https://play.google.com/console"
+  step "Kinfolk app → Monetize → Subscriptions → Create subscription, twice:"
+  step "  kinfolk_family (\$15 tier) and kinfolk_family_transcription (\$15 + \$8 tier); base plan 'monthly', auto-renewing, 1 month."
+  step "  On each base plan: Add offer → free trial 14 days, eligibility 'New customer acquisition'. Activate both."
+  note "App Store (when iOS ships): same two products in one subscription group, 14-day free introductory offer."
+  open_url "https://app.revenuecat.com"
+  step "New project 'Kinfolk' → add the Play Store app (package id.kinfolk, with its service account credentials)."
+  step "Products: import both subscriptions. Entitlements: 'family' (both products) and 'transcription' (kinfolk_family_transcription only)."
+  step "Offerings → 'default' (current) → packages with custom identifiers 'family' and 'family_transcription', one product each."
+  step "API keys → copy the Google public app key (starts goog_)."
+  ask REVENUECAT_PUBLIC_KEY "Google public key:"
+  write_env REVENUECAT_PUBLIC_KEY "$REVENUECAT_PUBLIC_KEY"
+  step "API keys → + New secret key (API v1, read-only) → copy it (starts sk_)."
+  ask_secret REVENUECAT_API_KEY "Secret key:"
+  write_env REVENUECAT_API_KEY "$REVENUECAT_API_KEY"
+  [[ -n "$(_existing REVENUECAT_WEBHOOK_SECRET || true)" ]] || write_env REVENUECAT_WEBHOOK_SECRET "$(openssl rand -hex 32)"
+  step "Integrations → Webhooks → Add: URL $(fn_url subscription)"
+  step "  Authorization header: Bearer $(_existing REVENUECAT_WEBHOOK_SECRET); all events, production and sandbox."
+  pause "Press Enter when the webhook is saved"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────
 stage "Custom domain for the web pages"
 say "*.supabase.co serves function HTML as text/plain, so both pages need your own domain."
 say "On your domain host (e.g. a Cloudflare Worker or a reverse proxy), forward:"
@@ -345,9 +369,9 @@ fi
 
 # ──────────────────────────────────────────────────────────────────────────
 stage "Supabase: deploy Edge Functions"
-say "send-otp, invite, invitation, whatsapp, emergency, export, transcribe, all with --no-verify-jwt."
-if run && confirm "Deploy all seven to $PROJECT_REF?"; then
-  for f in send-otp invite invitation whatsapp emergency export transcribe; do
+say "send-otp, invite, invitation, whatsapp, emergency, export, transcribe, subscription, all with --no-verify-jwt."
+if run && confirm "Deploy all eight to $PROJECT_REF?"; then
+  for f in send-otp invite invitation whatsapp emergency export transcribe subscription; do
     npx supabase functions deploy "$f" --no-verify-jwt --project-ref "$PROJECT_REF"
   done
 fi
@@ -375,7 +399,7 @@ if run; then
   tmp=$(mktemp)
   for k in SEND_SMS_HOOK_SECRET WHATSAPP_PHONE_NUMBER_ID WHATSAPP_TOKEN WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN \
            NOTIFY_SECRET TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM INVITATION_URL \
-           RUNPOD_ENDPOINT_ID RUNPOD_API_KEY TRANSCRIBE_WEBHOOK_URL TRANSCRIBE_SECRET; do
+           RUNPOD_ENDPOINT_ID RUNPOD_API_KEY TRANSCRIBE_WEBHOOK_URL TRANSCRIBE_SECRET REVENUECAT_API_KEY REVENUECAT_WEBHOOK_SECRET; do
     v=$(_existing "$k" || true)
     if [[ -n "$v" ]]; then printf '%s=%s\n' "$k" "$v" >> "$tmp"; else warn "$k is empty; run its stage first"; fi
   done
@@ -418,6 +442,7 @@ if run; then
   ENV_FILE=local.properties write_env kinfolk.supabaseUrl "https://$PROJECT_REF.supabase.co"
   ENV_FILE=local.properties write_env kinfolk.publishableKey "$PUBLISHABLE_KEY"
   ENV_FILE=local.properties write_env kinfolk.emergencyUrl "$EMERGENCY_URL"
+  ENV_FILE=local.properties write_env kinfolk.revenuecatKey "$(_existing REVENUECAT_PUBLIC_KEY || true)"
   if confirm "Build the Android debug app now?"; then ./gradlew :androidApp:assembleDebug; fi
   note "iOS: rebuild from Xcode."
   pause
@@ -440,6 +465,8 @@ check "An Invitation arrives on WhatsApp and the web page accepts it on a phone"
 check "An Invitation to a number not on WhatsApp arrives by SMS"
 check "A swap request arrives on WhatsApp and a YA reply updates the app"
 check "The Emergency Info QR opens the page on a phone"
+check "'Rekam' without a subscription opens the paywall with Play Store prices in Rupiah (license tester account)"
+check "Starting the trial shows 'Uji coba dimulai…', then Paket reads '… uji coba, sisa 14 hari' on another Member's phone"
 check "A recorded visit comes back transcribed (Attendee only until shared)"
 note "Function logs: $(dash functions)"
 

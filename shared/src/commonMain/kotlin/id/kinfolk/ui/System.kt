@@ -77,3 +77,18 @@ fun savedAudio(parts: List<ByteArray>, stopped: Boolean): SavedAudio? {
 
 @Composable
 expect fun rememberRecorder(): Recorder
+
+/**
+ * The store's monthly prices for the paywall, formatted for the store's country: [plan] alone, [addOn] (the plan with
+ * the add-on less the plan, without the "+"), [plus] the plan with the add-on; [trial]: a free trial is offered.
+ */
+data class Offer(val plan: String, val addOn: String, val plus: String, val trial: Boolean)
+
+/**
+ * The store through RevenueCat (ADR 0006), logged in as the Care Circle. [offer]: null when the store can't say.
+ * [buy]: true once bought, false when cancelled; throws when it fails. [manage]: the store's subscriptions page.
+ */
+class Store(val offer: suspend (circleId: String) -> Offer?, val buy: suspend (circleId: String, transcription: Boolean) -> Boolean, val manage: () -> Unit)
+
+@Composable
+expect fun rememberStore(): Store

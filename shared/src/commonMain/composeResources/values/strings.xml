@@ -542,4 +542,25 @@
     <string name="ho_send">Kirim serah terima</string>
     <string name="ho_sent">Terkirim ke %1$s ✓</string>
     <string name="ho_toast">Serah terima dikirim ke %1$d saudara via WhatsApp.</string>
+    <!-- #50: paywall and Paket -->
+    <string name="not_now">Nanti saja</string>
+    <string name="pay_head">Setiap kunjungan dokter, tercatat untuk seluruh keluarga</string>
+    <string name="pay_sub">Ringkasan adalah hal yang tidak bisa dilakukan grup chat. Coba gratis 14 hari.</string>
+    <string name="pay_sub_no_trial">Ringkasan adalah hal yang tidak bisa dilakukan grup chat.</string>
+    <string name="per_month"> / bulan</string>
+    <string name="plan_incl">Lingkaran perawatan untuk seluruh keluarga, janji dokter, giliran, obat, dokumen, linimasa, halaman darurat, pengingat SMS.</string>
+    <string name="one_price">Satu harga per keluarga, bukan per orang.</string>
+    <string name="addon_name">Transkripsi &amp; ringkasan kunjungan</string>
+    <string name="addon_body">Rekam janji dokter dengan izin. Dapatkan pertanyaan, jawaban, dan langkah berikutnya, dengan transkrip asli di sampingnya.</string>
+    <string name="total_family">Total untuk keluarga</string>
+    <string name="start_trial">Mulai uji coba gratis 14 hari</string>
+    <string name="subscribe">Berlangganan</string>
+    <string name="pay_fine">Batalkan kapan saja. Siapa pun di lingkaran bisa membayar; kami tidak akan menagih yang lain.</string>
+    <string name="trial_started">Uji coba dimulai untuk seluruh lingkaran.</string>
+    <string name="sub_started">Langganan aktif untuk seluruh lingkaran.</string>
+    <string name="plan">Paket</string>
+    <string name="plan_free">Gratis · tingkatkan untuk ringkasan</string>
+    <string name="plan_family">Keluarga</string>
+    <string name="plan_family_tx">Keluarga + transkripsi</string>
+    <string name="plan_trial">%1$s · uji coba, sisa %2$d hari</string>
 </resources>

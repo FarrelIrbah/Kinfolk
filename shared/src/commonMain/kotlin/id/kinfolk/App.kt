@@ -448,6 +448,18 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import kotlin.math.ceil
+import id.kinfolk.data.Subscription
+import id.kinfolk.data.subscription
+import id.kinfolk.ui.Offer
+import id.kinfolk.ui.rememberStore
+import id.kinfolk.ui.paywall.PaywallScreen
+import kinfolk.shared.generated.resources.plan_family
+import kinfolk.shared.generated.resources.plan_family_tx
+import kinfolk.shared.generated.resources.plan_free
+import kinfolk.shared.generated.resources.plan_trial
+import kinfolk.shared.generated.resources.trial_started
+import kinfolk.shared.generated.resources.sub_started
 
 // Tab icons and fill rule copied from design v3 (tabs 1 and 2 never fill).
 enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive: Boolean) {
@@ -458,7 +470,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest, Display, Consent, Recording, Processing, Summary, RecFail, Handoff }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest, Display, Consent, Recording, Processing, Summary, RecFail, Handoff, Paywall }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -489,6 +501,11 @@ fun App() {
         var handoffTo by remember { mutableStateOf<List<String>?>(null) } // `handoff`'s "Dikirim ke", null while loading
         var appliedDoses by remember { mutableStateOf(emptyList<AppliedDoseChange>()) } // newest first
         val recorder = rememberRecorder()
+        val store = rememberStore()
+        var subscription by remember { mutableStateOf<Subscription?>(null) } // the circle's "Paket" (#50), null while free
+        var subscriptionRead by remember { mutableStateOf(false) } // offline it's unknown: "Rekam" records, the server decides on upload
+        var offer by remember { mutableStateOf<Offer?>(null) } // the store's prices, null until it says
+        var paywallRecords by remember { mutableStateOf(false) } // `paywall` came from "Rekam": bought with the add-on, on to `consent`
         var recordedSeconds by rememberSaveable { mutableStateOf(0) } // `processing`'s "4 menit"
         var recordFrom by rememberSaveable { mutableStateOf(0) } // where `recording`'s clock starts: resumed after `recfail`
         var cutOff by remember { mutableStateOf<SavedAudio?>(null) } // what `recfail` shows
@@ -749,15 +766,16 @@ fun App() {
                 awaitSummary(a)
             }
         }
-        // v3 `startRecordFlow` without the paywall (#50): consent, or where the Recording is up to; audio still on the
-        // phone goes out again, or, cut off by a lost microphone or a crash, opens `recfail` (#48).
+        fun openPaywall(records: Boolean) { paywallRecords = records; go(Screen.Paywall) }
+        // v3 `startRecordFlow`: where the Recording is up to; else `paywall` without the add-on (#50), or consent; audio
+        // still on the phone goes out again, or, cut off by a lost microphone or a crash, opens `recfail` (#48).
         fun openRecord() {
             val v = visit() ?: return
             val r = v.recording
             when (r?.status) {
                 Recording.Status.ready -> { openSummary(v.appointment); go(Screen.Summary) }
                 Recording.Status.processing -> { recordedSeconds = r.seconds; go(Screen.Processing); scope.launch { awaitSummary(v.appointment) } }
-                else -> scope.launch {
+                else -> if (subscriptionRead && subscription?.transcription != true) openPaywall(records = true) else scope.launch {
                     val saved = savedOf(v.appointment.id)
                     when {
                         saved == null -> go(Screen.Consent)
@@ -794,6 +812,9 @@ fun App() {
             digest = retrying { supabase.lastDigest(k.circle.id) }
             doseChanges = retrying { supabase.doseChanges(k.circle.id) }
             appliedDoses = retrying { supabase.appliedDoseChanges(k.circle.id) }
+            subscription = retrying { supabase.subscription(k.circle.id) }
+            subscriptionRead = true
+            if (offer == null) offer = store.offer(k.circle.id)
             loadRota()
         }
         suspend fun land(how: Nav) {
@@ -1149,6 +1170,16 @@ fun App() {
                                 },
                                 onDigest = { go(Screen.Digest) }.takeIf { digest != null },
                                 onDisplay = { go(Screen.Display) },
+                                plan = subscription.let { sub ->
+                                    val name = sub?.let { stringResource(if (it.transcription) Res.string.plan_family_tx else Res.string.plan_family) }
+                                    when {
+                                        sub == null -> stringResource(Res.string.plan_free)
+                                        sub.trial -> stringResource(Res.string.plan_trial, name!!, ceil((sub.expiresAt - Clock.System.now()) / 1.days).toInt().coerceAtLeast(1))
+                                        else -> name!!
+                                    }
+                                },
+                                // Owner-approved in #50: with the add-on there's nothing more to buy; the payer manages it in the store.
+                                onPlan = { if (subscription?.transcription == true) store.manage() else openPaywall(records = false) },
                             )
                         }
                         Screen.Appt -> visit()?.let { v ->
@@ -1222,6 +1253,22 @@ fun App() {
                             )
                         }
                         Screen.Processing -> ProcessingScreen(recordedSeconds)
+                        // v3 `subscribe`: bought for the whole circle; from "Rekam" with the add-on, on to `consent`.
+                        Screen.Paywall -> {
+                            val started = stringResource(if (offer?.trial != false) Res.string.trial_started else Res.string.sub_started)
+                            PaywallScreen(offer, onBack = ::back) { transcription ->
+                                scope.launch {
+                                    val c = circle ?: return@launch
+                                    val trial = offer?.trial != false
+                                    if (!(attempt { store.buy(c.id, transcription) } ?: run { toast = noConnection; false })) return@launch
+                                    toast = started
+                                    // ponytail: shown until RevenueCat's webhook lands, read back below; 30 days stands in for a month.
+                                    subscription = Subscription(transcription, trial, Clock.System.now() + if (trial) 14.days else 30.days)
+                                    if (screen == Screen.Paywall) { back(); if (paywallRecords && transcription) openRecord() } // `consent`, or audio saved earlier
+                                    repeat(10) { delay(1000); attempt { supabase.subscription(c.id)?.takeIf { it.transcription == transcription } ?: error("not written yet") }?.let { subscription = it; return@launch } }
+                                }
+                            }
+                        }
                         Screen.Summary -> visit()?.let { v ->
                             val a = v.appointment
                             val r = v.recording ?: return@let

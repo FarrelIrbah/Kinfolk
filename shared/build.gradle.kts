@@ -13,7 +13,7 @@ plugins {
 val hostedConfig = tasks.register("hostedConfig") {
     val local = Properties()
     rootProject.file("local.properties").takeIf { it.exists() }?.reader()?.use(local::load)
-    val values = listOf("supabaseUrl", "publishableKey", "emergencyUrl").associateWith { local.getProperty("kinfolk.$it", "").trim().trimEnd('/') }
+    val values = listOf("supabaseUrl", "publishableKey", "emergencyUrl", "revenuecatKey").associateWith { local.getProperty("kinfolk.$it", "").trim().trimEnd('/') }
     require(values.values.none { v -> v.any { it in "\"\\$" } }) { "kinfolk.* in local.properties can't contain \", \\ or $" }
     val out = layout.buildDirectory.dir("generated/hosted")
     inputs.properties(values)
@@ -66,6 +66,7 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.androidx.core.ktx)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.revenuecat)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

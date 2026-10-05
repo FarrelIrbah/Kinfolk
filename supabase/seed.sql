@@ -102,4 +102,7 @@ begin
 
   insert into public.notes (circle_id, by, text, private) values
     (circle, sri, 'Bapak lebih tenang kalau ditelepon sebelum makan malam.', false);
+
+  -- In the add-on's trial (#50), so "Rekam" opens consent; delete the row to see the paywall.
+  insert into public.subscriptions values (circle, true, true, now() + interval '14 days' - interval '1 minute');
 end $$;

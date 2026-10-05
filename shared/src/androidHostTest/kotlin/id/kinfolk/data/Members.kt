@@ -36,6 +36,8 @@ object Providers {
     val jobs = mutableListOf<String>()
     /** What the worker answers, as JSON; null fails the job. */
     @Volatile var transcript: String? = null
+    /** RevenueCat's subscriber JSON for each app user id (a Care Circle). */
+    val subscribers = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     init {
         HttpServer.create(InetSocketAddress(54340), 0).apply {
@@ -69,6 +71,10 @@ object Providers {
                         responseCode
                     }
                 }.start()
+            }
+            createContext("/revenuecat") { ex -> // GET /revenuecat/subscribers/<app user id>
+                val reply = (subscribers[ex.requestURI.path.substringAfterLast('/')] ?: """{"subscriber":{"entitlements":{},"subscriptions":{}}}""").toByteArray()
+                ex.sendResponseHeaders(200, reply.size.toLong()); ex.responseBody.use { it.write(reply) }
             }
             start()
         }
@@ -114,3 +120,25 @@ suspend fun joinedMember(admin: SupabaseClient, circleId: String): String = sign
 
 /** Next Steps with the signed-in Member as owner. */
 fun SupabaseClient.steps(vararg texts: String) = texts.map { NextStepDraft(it, me(), kotlinx.datetime.LocalDate(2026, 10, 8)) }
+
+/**
+ * A purchase in RevenueCat for [circleId] (its app user id), then its webhook as RevenueCat's dashboard sends it.
+ * [transcription]: when the plan with the add-on ("plus", in its trial when [trial]) runs out; [plan]: the plan alone.
+ * Null: not bought. Returns the webhook's HTTP status.
+ */
+fun revenueCat(
+    circleId: String,
+    transcription: kotlin.time.Instant? = kotlin.time.Clock.System.now() + kotlin.time.Duration.parse("14d"),
+    plan: kotlin.time.Instant? = null,
+    trial: Boolean = true,
+    secret: String = "local",
+): Int {
+    val bought = listOfNotNull(transcription?.let { "plus" to it }, plan?.let { "plan" to it })
+    fun ent(p: Pair<String, kotlin.time.Instant>) = """{"expires_date":"${p.second}","product_identifier":"${p.first}"}"""
+    val entitlements = listOfNotNull(bought.maxByOrNull { it.second }?.let { "\"family\":${ent(it)}" }, bought.firstOrNull { it.first == "plus" }?.let { "\"transcription\":${ent(it)}" })
+    val subscriptions = bought.map { (p, at) -> """"$p":{"expires_date":"$at","period_type":"${if (p == "plus" && trial) "trial" else "normal"}"}""" }
+    Providers.subscribers[circleId] = """{"subscriber":{"entitlements":{${entitlements.joinToString(",")}},"subscriptions":{${subscriptions.joinToString(",")}}}}"""
+    val req = java.net.http.HttpRequest.newBuilder(java.net.URI("$URL/functions/v1/subscription")).header("authorization", "Bearer $secret")
+        .POST(java.net.http.HttpRequest.BodyPublishers.ofString("""{"event":{"type":"INITIAL_PURCHASE","app_user_id":"$circleId"}}""")).build()
+    return java.net.http.HttpClient.newHttpClient().send(req, java.net.http.HttpResponse.BodyHandlers.discarding()).statusCode()
+}

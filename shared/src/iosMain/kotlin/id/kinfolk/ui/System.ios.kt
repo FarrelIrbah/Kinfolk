@@ -38,3 +38,7 @@ actual fun rememberPrinter(): (name: String, pdf: ByteArray, onSent: () -> Unit)
 // ponytail: iOS records nothing yet; AVAudioRecorder with the audio background mode when iOS ships.
 @Composable
 actual fun rememberRecorder(): Recorder = remember { Recorder({ _, it -> it(false) }, {}, {}, { 0f }, { false }, {}, { emptyList() }, { false }, {}) }
+
+// ponytail: iOS sells nothing yet; RevenueCat's iOS SDK (purchases-ios) when iOS ships.
+@Composable
+actual fun rememberStore(): Store = remember { Store({ null }, { _, _ -> error("no store on iOS yet") }, {}) }

@@ -57,6 +57,7 @@ class RecordingTest {
     fun `the Attendee alone reads the transcript until they share it, then it follows Rekaman kunjungan`() = runBlocking<Unit> {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        revenueCat(circle)
         val tukiman = sri.careRecipients(circle).single().id
         val budi = signedInSibling(sri, circle)
         val dewi = signedInSibling(sri, circle, name = "Dewi")
@@ -97,6 +98,7 @@ class RecordingTest {
     fun `sharing saves the summary as the Visit Note and tells the circle on WhatsApp, not who can't see recordings`() = runBlocking<Unit> {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        revenueCat(circle)
         val tukiman = sri.careRecipients(circle).single().id
         val budi = signedInSibling(sri, circle)
         val dewi = signedInSibling(sri, circle, name = "Dewi")
@@ -131,6 +133,7 @@ class RecordingTest {
     fun `an unanswered Question moves to the next visit with any Provider, and whoever asked is told`() = runBlocking<Unit> {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        revenueCat(circle)
         val tukiman = sri.careRecipients(circle).single().id
         val budi = signedInSibling(sri, circle)
         val rao = sri.addProvider(circle, "Dr. Anand Rao").id
@@ -163,6 +166,7 @@ class RecordingTest {
     fun `a failed job can be recorded again`() = runBlocking<Unit> {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        revenueCat(circle)
         val tukiman = sri.careRecipients(circle).single().id
         val budi = signedInSibling(sri, circle)
         val provider = sri.addProvider(circle, "Dr. Anand Rao").id
@@ -188,6 +192,7 @@ class RecordingTest {
     fun `after sharing the Attendee deletes the audio, and the transcript and summary stay`() = runBlocking<Unit> {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        revenueCat(circle)
         val tukiman = sri.careRecipients(circle).single().id
         val budi = signedInSibling(sri, circle)
         val provider = sri.addProvider(circle, "Dr. Anand Rao").id
@@ -217,6 +222,7 @@ class RecordingTest {
     fun `lines to check lock sharing until the Attendee confirms each`() = runBlocking<Unit> {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        revenueCat(circle)
         val tukiman = sri.careRecipients(circle).single().id
         val provider = sri.addProvider(circle, "Dr. Anand Rao").id
         val appt = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, provider, "Kontrol neurologi", null, Clock.System.now(), attendeeId = sri.me())).id
@@ -238,6 +244,7 @@ class RecordingTest {
     fun `applying the dose change updates the Medication, logs a Timeline entry and tells who sees Obat`() = runBlocking<Unit> {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        revenueCat(circle)
         val tukiman = sri.careRecipients(circle).single().id
         val budi = signedInSibling(sri, circle)
         val dewi = signedInSibling(sri, circle, name = "Dewi")
@@ -286,6 +293,7 @@ class RecordingTest {
     fun `the handoff goes to who wasn't in the room and may read the summary, once, the dose line only to who sees Obat`() = runBlocking<Unit> {
         val sri = signedInNewcomer()
         val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        revenueCat(circle)
         val tukiman = sri.careRecipients(circle).single().id
         val budi = signedInSibling(sri, circle)
         val dewi = signedInSibling(sri, circle, name = "Dewi")

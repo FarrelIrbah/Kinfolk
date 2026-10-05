@@ -17,6 +17,7 @@ supabase = "3.8.0"
 ktor = "3.6.0"
 kotlinx-datetime = "0.8.0"
 qrose = "1.3.0"
+revenuecat = "10.24.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -43,6 +44,7 @@ supabase-storage = { module = "io.github.jan-tennert.supabase:storage-kt", versi
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 qrose = { module = "io.github.alexzhirkevich:qrose", version.ref = "qrose" }
+revenuecat = { module = "com.revenuecat.purchases:purchases", version.ref = "revenuecat" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 
 [plugins]
