@@ -109,12 +109,12 @@ fun Labeled(label: String, content: @Composable () -> Unit) {
     }
 }
 
-/** onb1 input: height 52, radius 14, 16px side padding. [multiline] grows it downwards with the text. */
+/** onb1 input: height 52 plus its 1px border (an `<input>` is content-box), radius 14, 16px side padding. [multiline] grows it downwards with the text. */
 @Composable
 fun Field(label: String, modifier: Modifier = Modifier, multiline: Boolean = false, input: @Composable () -> Unit) = Box(modifier) {
     Labeled(label) {
         Box(
-            Modifier.fillMaxWidth().let { if (multiline) it.heightIn(min = 52.dp) else it.height(52.dp) }
+            Modifier.fillMaxWidth().let { if (multiline) it.heightIn(min = 54.dp) else it.height(54.dp) }
                 .background(Kf.Card, RoundedCornerShape(14.dp))
                 .border(1.dp, Kf.InputBorder, RoundedCornerShape(14.dp))
                 .padding(horizontal = 16.dp, vertical = if (multiline) 14.dp else 0.dp),
@@ -123,11 +123,12 @@ fun Field(label: String, modifier: Modifier = Modifier, multiline: Boolean = fal
     }
 }
 
+/** onb1 chip: padding 10px 16px inside a 1px border, which CSS adds to the size and Compose draws inside. */
 @Composable
 fun Chip(label: String, border: Color, bg: Color, fg: Color, onClick: () -> Unit) {
     Text(
         label, color = fg, fontSize = 15.sp,
-        modifier = Modifier.background(bg, CircleShape).border(1.dp, border, CircleShape).tap(onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier = Modifier.background(bg, CircleShape).border(1.dp, border, CircleShape).tap(onClick).padding(horizontal = 17.dp, vertical = 11.dp),
     )
 }
 
@@ -168,7 +169,7 @@ fun DashedButton(text: String, onClick: () -> Unit) {
 
 private val DashLine = Color(0x4022261F) // rgba(34,38,31,.25)
 
-/** border:1.5px dashed rgba(34,38,31,.25); border-radius:16px, unless given. */
+/** border:1.5px dashed rgba(34,38,31,.25); border-radius:16px, unless given. Drawn inside, so padding takes the extra 1.5 CSS adds. */
 fun Modifier.dashed(color: Color = DashLine, radius: Dp = 16.dp) = drawBehind {
     val w = 1.5.dp.toPx()
     // ponytail: Chrome's dash rhythm for a 1.5px border (dashes and gaps ~3x the width), matched by eye.
@@ -189,12 +190,12 @@ fun HintedInput(
     decorationBox = { field -> Box(Modifier.fillMaxWidth(), propagateMinConstraints = true) { if (value.isEmpty()) Text(hint, style = style.copy(color = Kf.Muted)); field() } },
 )
 
-/** `appt` "Tambah pertanyaan…" row: 44px input (white, 1px rgba(34,38,31,.14), radius 12) and a dark "Tambah" button. */
+/** `appt` "Tambah pertanyaan…" row: 44px input (white, 1px rgba(34,38,31,.14) added to its height, radius 12) and a dark 44px "Tambah" button. */
 @Composable
 fun AddRow(value: String, onValue: (String) -> Unit, hint: String, button: String, modifier: Modifier = Modifier, onAdd: () -> Unit) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(
-            Modifier.weight(1f).height(44.dp).background(Color.White, RoundedCornerShape(12.dp))
+            Modifier.weight(1f).height(46.dp).background(Color.White, RoundedCornerShape(12.dp))
                 .border(1.dp, Color(0x2422261F), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
             contentAlignment = Alignment.CenterStart,
         ) {

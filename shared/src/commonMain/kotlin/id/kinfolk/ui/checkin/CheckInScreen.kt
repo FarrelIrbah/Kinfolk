@@ -122,9 +122,9 @@ fun CheckInScreen(at: String, recipient: String, saved: CheckInDraft?, onBack: (
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(Res.string.ci_note), fontSize = 13.sp, color = Kf.Muted)
-            // design: height 50, 1px rgba(34,38,31,.14), radius 12, #FBF8F2, padding 0 12, 15px
+            // design: height 50 plus the 1px rgba(34,38,31,.14) border (`<input>` is content-box), radius 12, #FBF8F2, padding 0 12, 15px
             Box(
-                Modifier.fillMaxWidth().height(50.dp).background(Kf.Card, RoundedCornerShape(12.dp))
+                Modifier.fillMaxWidth().height(52.dp).background(Kf.Card, RoundedCornerShape(12.dp))
                     .border(1.dp, InputLine, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
@@ -142,11 +142,11 @@ fun CheckInScreen(at: String, recipient: String, saved: CheckInDraft?, onBack: (
     }
 }
 
-/** design: 84x46, 1px rgba(34,38,31,.14), radius 12, white, 22px centred. */
+/** design: 84x46 content-box, so 110x48 with padding 0 12 and the 1px rgba(34,38,31,.14) border; radius 12, white, 22px centred. */
 @Composable
 private fun BpInput(value: String, onValue: (String) -> Unit) {
     Box(
-        Modifier.width(84.dp).height(46.dp).background(Color.White, RoundedCornerShape(12.dp))
+        Modifier.width(110.dp).height(48.dp).background(Color.White, RoundedCornerShape(12.dp))
             .border(1.dp, InputLine, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {

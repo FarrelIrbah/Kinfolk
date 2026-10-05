@@ -481,7 +481,8 @@ private fun EmptyStep(num: Int, title: String, sub: String?, part: Boolean, onCl
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(32.dp).background(if (part) Kf.FlagBg else Color.Transparent, CircleShape)
+            // design: 32px circle plus its 1.5px border (content-box)
+            Modifier.size(35.dp).background(if (part) Kf.FlagBg else Color.Transparent, CircleShape)
                 .border(1.5.dp, if (part) Color(0xFFC9A77C) else Color(0x4022261F), CircleShape),
             contentAlignment = Alignment.Center,
         ) {

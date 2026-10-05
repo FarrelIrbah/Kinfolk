@@ -196,7 +196,7 @@ fun Onb3(recipientName: String, choose: suspend (perPerson: Boolean) -> Boolean)
             Text(stringResource(Res.string.onb3_head, recipientName), style = serifStyle(30f, 1.1f))
             Text(stringResource(Res.string.onb3_sub), fontSize = 15.sp, lineHeight = (15 * 1.5).sp, color = Kf.Ink2)
         }
-        // design: option 1.5px border (#2F5D4A picked), #FBF8F2, radius 18, padding 16, gap 4; title 16/600, body 14/1.45 muted
+        // design: option 1.5px border (#2F5D4A picked) outside padding 16, #FBF8F2, radius 18, gap 4; title 16/600, body 14/1.45 muted
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             listOf(
                 false to (stringResource(Res.string.privacy_all) to stringResource(Res.string.privacy_all_body, recipientName)),
@@ -204,7 +204,7 @@ fun Onb3(recipientName: String, choose: suspend (perPerson: Boolean) -> Boolean)
             ).forEach { (option, text) ->
                 Column(
                     Modifier.fillMaxWidth().border(1.5.dp, if (perPerson == option) Kf.Green else Color.Transparent, RoundedCornerShape(18.dp))
-                        .background(Kf.Card, RoundedCornerShape(18.dp)).tap { perPerson = option }.padding(16.dp),
+                        .background(Kf.Card, RoundedCornerShape(18.dp)).tap { perPerson = option }.padding(17.5.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(text.first, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)

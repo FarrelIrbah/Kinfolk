@@ -94,9 +94,9 @@ fun NotesScreen(
         )
         // design: #FBF8F2, r18, p16, gap 10
         Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // design: h48, 1px rgba(34,38,31,.14), r12, white, padding 0 12, 15px
+            // design: h48 plus its 1px rgba(34,38,31,.14) border, r12, white, padding 0 12, 15px
             Box(
-                Modifier.fillMaxWidth().height(48.dp).background(Color.White, RoundedCornerShape(12.dp))
+                Modifier.fillMaxWidth().height(50.dp).background(Color.White, RoundedCornerShape(12.dp))
                     .border(1.dp, Color(0x2422261F), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
                 contentAlignment = Alignment.CenterStart,
             ) { HintedInput(draft, { draft = it }, stringResource(Res.string.note_hint), LocalTextStyle.current.copy(fontSize = 15.sp, color = Kf.Ink), singleLine = true) }

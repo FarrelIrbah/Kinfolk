@@ -453,10 +453,10 @@ private fun Costs(c: Costs, today: LocalDate) {
         // design: #FBF8F2, r18, p16, gap 12
         Column(Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(Res.string.add_expense), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            // design: inputs h46, 1px rgba(34,38,31,.14), r12, #fff, padding 0 12px, 15px; the amount 80px wide
+            // design: inputs h46, 1px rgba(34,38,31,.14), r12, #fff, padding 0 12px, 15px; the amount 80px wide, content-box so 106 with padding and border
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 InputBox(Modifier.weight(1f)) { HintedInput(what, { what = it }, stringResource(Res.string.what_ph), field, singleLine = true) }
-                InputBox(Modifier.width(80.dp)) {
+                InputBox(Modifier.width(106.dp)) {
                     BasicTextField(
                         amount, { amount = it }, Modifier.fillMaxWidth(), textStyle = field, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -465,14 +465,14 @@ private fun Costs(c: Costs, today: LocalDate) {
                 }
             }
             Text(stringResource(Res.string.paid_by), fontSize = 12.sp, color = Kf.Muted)
-            // design: wrap, gap 6; chips 1px border, r999, padding 8px 14px, 14px; picked in the payer's colour
+            // design: wrap, gap 6; chips 1px border outside padding 8px 14px, r999, 14px; picked in the payer's colour
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 c.payers.forEach { (id, p) ->
                     val on = id == by
                     Text(
                         p.name, color = if (on) Color.White else Kf.Ink, fontSize = 14.sp,
                         modifier = Modifier.background(if (on) p.color else Color.Transparent, CircleShape)
-                            .border(1.dp, if (on) p.color else Kf.InputBorder, CircleShape).tap { picked = id }.padding(horizontal = 14.dp, vertical = 8.dp),
+                            .border(1.dp, if (on) p.color else Kf.InputBorder, CircleShape).tap { picked = id }.padding(horizontal = 15.dp, vertical = 9.dp),
                     )
                 }
             }
@@ -491,9 +491,10 @@ private fun Costs(c: Costs, today: LocalDate) {
     }
 }
 
+/** `costs` input: height 46 plus its 1px border (`<input>` is content-box). */
 @Composable
 private fun InputBox(modifier: Modifier, input: @Composable () -> Unit) = Box(
-    modifier.height(46.dp).background(Color.White, RoundedCornerShape(12.dp)).border(1.dp, InputLine, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
+    modifier.height(48.dp).background(Color.White, RoundedCornerShape(12.dp)).border(1.dp, InputLine, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
     contentAlignment = Alignment.CenterStart,
 ) { input() }
 

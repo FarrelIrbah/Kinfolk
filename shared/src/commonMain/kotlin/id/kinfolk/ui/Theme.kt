@@ -18,6 +18,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import kinfolk.shared.generated.resources.Res
@@ -102,14 +103,18 @@ fun serifStyle(size: Float, lineHeight: Float? = null, weight: Int = 500): TextS
     fontWeight = FontWeight(weight),
     fontSize = size.sp,
     lineHeight = lineHeight?.let { (size * it).sp } ?: TextUnit.Unspecified,
+    lineHeightStyle = CssLeading,
     color = Kf.Ink,
 )
+
+/** CSS line-height: the extra leading split above and below every line, first and last included (Compose trims those by default). */
+val CssLeading = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
 
 @Composable
 fun KinfolkTheme(content: @Composable () -> Unit) {
     // Browser default body text: 16px Instrument Sans, #22261F.
     CompositionLocalProvider(
-        LocalTextStyle provides TextStyle(fontFamily = sans(), fontSize = 16.sp, color = Kf.Ink),
+        LocalTextStyle provides TextStyle(fontFamily = sans(), fontSize = 16.sp, color = Kf.Ink, lineHeightStyle = CssLeading),
         content = content,
     )
 }

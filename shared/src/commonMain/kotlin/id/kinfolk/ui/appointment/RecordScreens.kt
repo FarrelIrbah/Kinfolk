@@ -162,7 +162,8 @@ fun ConsentScreen(people: List<InRoom>, onBack: () -> Unit, onNotAll: () -> Unit
                     horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
-                        Modifier.size(26.dp).background(if (on) Kf.Green else Color.Transparent, RoundedCornerShape(8.dp))
+                        // design: 26px box plus its 1.5px border (content-box)
+                        Modifier.size(29.dp).background(if (on) Kf.Green else Color.Transparent, RoundedCornerShape(8.dp))
                             .border(1.5.dp, if (on) Kf.Green else Color(0x4D22261F), RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center,
                     ) { if (on) Text("✓", color = Color.White, fontSize = 15.sp) }
@@ -284,8 +285,8 @@ fun ProcessingScreen(seconds: Int) {
     ).value
     // design: min-height:700px; justify-content:center; gap:14px; padding:0 32px
     Column(Modifier.fillMaxWidth().heightIn(min = 700.dp).padding(horizontal = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) {
-        // 48px circle, 3px #D6CEBF border with a #2F5D4A top.
-        Canvas(Modifier.size(48.dp).rotate(turn)) {
+        // 48px circle, 3px #D6CEBF border (content-box, so 54 across) with a #2F5D4A top.
+        Canvas(Modifier.size(54.dp).rotate(turn)) {
             val w = 3.dp.toPx()
             val box = Size(size.width - w, size.height - w)
             drawArc(Kf.Line, 0f, 360f, false, Offset(w / 2, w / 2), box, style = Stroke(w))
@@ -346,7 +347,7 @@ fun SummaryScreen(
     // design: border #2F5D4A selected, else #E0C060 while flagged; the yellow "Cek: …" box under it (gap 10)
     @Composable fun Line(key: String, note: String?, content: @Composable () -> Unit) = Column(
         Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(16.dp))
-            .border(1.5.dp, when { sel.key == key -> Kf.Green; key in flags -> FlagLine; else -> Color.Transparent }, RoundedCornerShape(16.dp)).padding(14.dp),
+            .border(1.5.dp, when { sel.key == key -> Kf.Green; key in flags -> FlagLine; else -> Color.Transparent }, RoundedCornerShape(16.dp)).padding(15.5.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         content()
@@ -398,7 +399,7 @@ fun SummaryScreen(
                 Column(
                     Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(16.dp))
                         .border(1.5.dp, if (sel.key == "mc") Kf.Green else Color.Transparent, RoundedCornerShape(16.dp))
-                        .tap { sel.toggle("mc", refs); sel.expanded = false }.padding(14.dp),
+                        .tap { sel.toggle("mc", refs); sel.expanded = false }.padding(15.5.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     DoseLine(dose, 15, Kf.Green)
@@ -430,7 +431,7 @@ fun SummaryScreen(
         if (unanswered.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionLabel(stringResource(Res.string.not_answered))
             unanswered.forEach { q ->
-                Column(Modifier.fillMaxWidth().dashed().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.fillMaxWidth().dashed().padding(15.5.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                         Avatar(q.askedByName.orEmpty().take(1), askerColor(q.askedBy), 26.dp, 11.sp)
                         Text(q.text, fontSize = 15.sp, lineHeight = (15 * 1.4).sp)

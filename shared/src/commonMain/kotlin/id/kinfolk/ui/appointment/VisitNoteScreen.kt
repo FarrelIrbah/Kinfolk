@@ -145,7 +145,7 @@ fun VisitNoteScreen(
         val open = if (editable) emptyList() else questions.filter { it.answer?.isBlank() == true }
         if (open.isNotEmpty()) Section(stringResource(Res.string.not_answered)) {
             open.forEach { q ->
-                Column(Modifier.fillMaxWidth().dashed().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.fillMaxWidth().dashed().padding(15.5.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Avatar(q.askedByName.orEmpty().take(1), askerColor(q.askedBy), 26.dp, 11.sp)
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

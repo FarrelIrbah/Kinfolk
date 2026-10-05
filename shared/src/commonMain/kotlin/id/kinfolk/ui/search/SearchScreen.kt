@@ -90,9 +90,9 @@ fun SearchScreen(query: String, onQuery: (String) -> Unit, suggestions: List<Str
     // design: padding:4px 20px; gap:16px
     Column(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            // design: h46, 1.5px #2F5D4A, r14, #fff, padding 0 12, gap 8; 18px magnifier muted; input 16px
+            // design: h46 plus 1.5px #2F5D4A border (content-box, so 49), r14, #fff, padding 0 12, gap 8; 18px magnifier muted; input 16px
             Row(
-                Modifier.weight(1f).height(46.dp).background(Color.White, RoundedCornerShape(14.dp))
+                Modifier.weight(1f).height(49.dp).background(Color.White, RoundedCornerShape(14.dp))
                     .border(1.5.dp, Kf.Green, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -111,13 +111,13 @@ fun SearchScreen(query: String, onQuery: (String) -> Unit, suggestions: List<Str
         if (query.trim().length < 2) {
             if (suggestions.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(Res.string.search_try), fontSize = 13.sp, color = Kf.Muted)
-                // design: 1px rgba(34,38,31,.16), #FBF8F2, r999, padding 8 14, 14px
+                // design: 1px rgba(34,38,31,.16) outside padding 8 14, #FBF8F2, r999, 14px
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     suggestions.forEach { s ->
                         Text(
                             s, fontSize = 14.sp,
                             modifier = Modifier.background(Kf.Card, CircleShape).border(1.dp, ChipLine, CircleShape).tap { onQuery(s) }
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                                .padding(horizontal = 15.dp, vertical = 9.dp),
                         )
                     }
                 }

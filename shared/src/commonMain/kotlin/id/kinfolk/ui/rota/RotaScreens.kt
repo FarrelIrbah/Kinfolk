@@ -390,7 +390,7 @@ fun ColumnScope.AwaySheet(asks: List<Pair<DutyTurn, String>>, people: Map<String
                     stringResource(label), color = if (on) Kf.Paper else Kf.Ink, fontSize = 14.sp,
                     modifier = Modifier.background(if (on) Kf.Green else Color.Transparent, CircleShape)
                         .border(1.dp, if (on) Kf.Green else Kf.InputBorder, CircleShape).tap { reason = r }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 15.dp, vertical = 9.dp),
                 )
             }
         }

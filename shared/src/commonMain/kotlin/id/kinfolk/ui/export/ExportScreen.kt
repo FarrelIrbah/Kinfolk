@@ -125,11 +125,11 @@ fun ExportScreen(
             Text(stringResource(Res.string.export_title), style = serifStyle(30f, 1.1f))
             Text(stringResource(Res.string.export_sub), fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Kf.Ink2)
         }
-        // design: gap 6; 13px #6B6A60; input h48, 1px rgba(34,38,31,.14), r12, #FBF8F2, padding 0 12px, 15px
+        // design: gap 6; 13px #6B6A60; input h48 plus its 1px rgba(34,38,31,.14) border, r12, #FBF8F2, padding 0 12px, 15px
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(Res.string.export_for), fontSize = 13.sp, color = Kf.Muted)
             Box(
-                Modifier.fillMaxWidth().height(48.dp).background(Kf.Card, RoundedCornerShape(12.dp))
+                Modifier.fillMaxWidth().height(50.dp).background(Kf.Card, RoundedCornerShape(12.dp))
                     .border(1.dp, InputLine, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
@@ -195,7 +195,8 @@ private fun TickRow(label: String, pages: Int, on: Boolean, onTap: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(24.dp).background(if (on) Kf.Green else Color.Transparent, RoundedCornerShape(7.dp))
+            // design: 24px box plus its 1.5px border (content-box)
+            Modifier.size(27.dp).background(if (on) Kf.Green else Color.Transparent, RoundedCornerShape(7.dp))
                 .border(1.5.dp, if (on) Kf.Green else BoxLine, RoundedCornerShape(7.dp)),
             contentAlignment = Alignment.Center,
         ) { if (on) Text("✓", color = Color.White, fontSize = 13.sp) }
