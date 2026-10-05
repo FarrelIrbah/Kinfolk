@@ -34,3 +34,7 @@ actual fun rememberFileViewer(): (name: String, ext: String, bytes: ByteArray) -
 // ponytail: iOS prints nothing yet; UIPrintInteractionController with the PDF's NSData when iOS ships.
 @Composable
 actual fun rememberPrinter(): (name: String, pdf: ByteArray, onSent: () -> Unit) -> Unit = remember { { _, _, _ -> } }
+
+// ponytail: iOS records nothing yet; AVAudioRecorder with the audio background mode when iOS ships.
+@Composable
+actual fun rememberRecorder(): Recorder = remember { Recorder({ it(false) }, {}, {}, { 0f }, { null }) }

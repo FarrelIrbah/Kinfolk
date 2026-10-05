@@ -1,6 +1,15 @@
 package id.kinfolk.data
 
+import id.kinfolk.ui.appointment.dayMonth
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.delay
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import kotlin.time.Duration.Companion.days
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
@@ -26,6 +35,17 @@ class RecordingTest {
         "next_steps": [{"text": "Antar fisioterapi Selasa", "owner": "budi", "due": "2026-10-13"}, {"text": "MRI ulang", "owner": null, "due": null}],
         "medication": {"name": "clopidogrel", "change": "75 mg → 37,5 mg", "segment": 0}
     }"""
+
+    private fun io.github.jan.supabase.SupabaseClient.inbox() = Providers.to(auth.currentUserOrNull()!!.phone!!)
+    private val Providers.Message.template get() = Regex(""""template":\{"name":"(\w+)"""").find(text)?.groupValues?.get(1)
+    private val Providers.Message.params get() = Regex(""""type":"text","text":"((?:[^"\\]|\\.)*)"""").findAll(text).map { it.groupValues[1] }.toList()
+
+    /** The minute-by-minute WhatsApp job: sends what is waiting. */
+    private fun deliver() {
+        val req = HttpRequest.newBuilder(URI("$URL/functions/v1/whatsapp")).header("authorization", "Bearer local")
+            .POST(HttpRequest.BodyPublishers.ofString("""{"at":"${Clock.System.now()}"}""")).build()
+        assertEquals(200, HttpClient.newHttpClient().send(req, HttpResponse.BodyHandlers.ofString()).statusCode())
+    }
 
     private suspend fun io.github.jan.supabase.SupabaseClient.awaitRecording(appointment: String): Recording {
         repeat(100) { recording(appointment)?.takeIf { it.status != Recording.Status.processing }?.let { return it }; delay(100) }
@@ -59,11 +79,83 @@ class RecordingTest {
         assertEquals(clopidogrel.id, t.medication!!.medicationId)
 
         assertNull(sri.recording(appt))
-        assertFails { sri.shareRecording(appt) }
+        assertNull(sri.visitNote(appt)) // nothing of the summary reaches the circle before sharing
+        assertTrue(sri.search(circle, "cabut").isEmpty())
+        assertEquals(listOf(Hit.Kind.transcript to 1), budi.search(circle, "cabut").map { it.kind to it.segment })
+        assertFails { sri.shareRecording(appt, emptyMap(), emptyList()) }
         sri.setHidden(tukiman, dewi.me(), DataCategory.visit_notes, hidden = true)
-        budi.shareRecording(appt)
+        budi.shareRecording(appt, emptyMap(), t.drafts(budi.me(), LocalDate(2026, 10, 12)))
         assertEquals(t, sri.recording(appt)!!.transcript)
+        assertEquals(listOf("00:06 · Budi · Kontrol neurologi"), sri.search(circle, "cabut").map { it.label })
         assertNull(dewi.recording(appt))
+        assertTrue(dewi.search(circle, "cabut").isEmpty())
+        assertFails { budi.shareRecording(appt, emptyMap(), emptyList()) } // once
+    }
+
+    @Test
+    fun `sharing saves the summary as the Visit Note and tells the circle on WhatsApp, not who can't see recordings`() = runBlocking<Unit> {
+        val sri = signedInNewcomer()
+        val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        val tukiman = sri.careRecipients(circle).single().id
+        val budi = signedInSibling(sri, circle)
+        val dewi = signedInSibling(sri, circle, name = "Dewi")
+        val rina = signedInSibling(sri, circle, name = "Rina")
+        sri.setHidden(tukiman, rina.me(), DataCategory.visit_notes, hidden = true)
+        val provider = sri.addProvider(circle, "Dr. Anand Rao").id
+        val appt = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, provider, "Kontrol neurologi", null, Clock.System.now(), attendeeId = budi.me())).id
+        sri.askQuestion(circle, appt, "Boleh berhenti clopidogrel sebelum perawatan gigi?")
+        dewi.askQuestion(circle, appt, "Kapan Bapak boleh menyetir lagi?")
+
+        Providers.transcript = output
+        budi.transcribe(circle, appt, audio, seconds = 252)
+        val t = budi.awaitRecording(appt).also { assertEquals(252, it.seconds) }.transcript!!
+        val questions = budi.questions(appt)
+        val answers = t.answersTo(questions)
+        assertEquals(listOf("Jangan dihentikan.", ""), questions.map { answers[it.id] })
+        val steps = t.drafts(budi.me(), LocalDate(2026, 10, 12)).let { (a, b) -> listOf(a, b.copy(owner = dewi.me())) }
+        assertEquals(listOf("Sri", "Dewi"), budi.shareRecording(appt, answers, steps))
+        assertEquals(listOf("Sri", "Dewi"), sri.recording(appt)!!.told)
+        deliver()
+
+        val note = sri.visitNote(appt)!!
+        assertEquals(listOf(Triple("Antar fisioterapi Selasa", budi.me(), LocalDate(2026, 10, 13)), Triple("MRI ulang", dewi.me(), LocalDate(2026, 10, 12))),
+            note.steps.map { Triple(it.text, it.owner, it.due) })
+        val message = listOf(listOf("Budi", "Tukiman", "Kontrol neurologi: Antar fisioterapi Selasa, MRI ulang"))
+        assertEquals(message, dewi.inbox().filter { it.template == "kinfolk_visit_note" }.map { it.params })
+        assertTrue(rina.inbox().none { it.template == "kinfolk_visit_note" })
+        assertTrue(budi.inbox().none { it.template == "kinfolk_visit_note" })
+    }
+
+    @Test
+    fun `an unanswered Question moves to the next visit with any Provider, and whoever asked is told`() = runBlocking<Unit> {
+        val sri = signedInNewcomer()
+        val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        val tukiman = sri.careRecipients(circle).single().id
+        val budi = signedInSibling(sri, circle)
+        val rao = sri.addProvider(circle, "Dr. Anand Rao").id
+        val physio = sri.addProvider(circle, "Fisioterapi Sehat").id
+        val now = Clock.System.now()
+        val appt = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, rao, "Kontrol neurologi", null, now, attendeeId = sri.me())).id
+        val later = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, rao, "Kontrol neurologi", null, now + 30.days)).id
+        val next = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, physio, "Fisioterapi", null, now + 2.days, attendeeId = sri.me())).id
+        budi.askQuestion(circle, appt, "Kapan Bapak boleh menyetir lagi?")
+        sri.askQuestion(circle, appt, "Perlu tongkat baru?")
+        val (driving, cane) = sri.questions(appt)
+
+        assertFails { budi.moveQuestion(driving.id, appt) } // the Attendee's
+        val moved = sri.moveQuestion(driving.id, appt)
+        assertEquals(Moved("Fisioterapi", sri.appointment(next)!!.startsAt, "Budi"), moved)
+        assertEquals(null, sri.moveQuestion(cane.id, appt).told) // asked it herself
+        assertEquals(listOf(driving.id, cane.id), sri.questions(next).map { it.id })
+        assertTrue(sri.questions(appt).isEmpty())
+        deliver()
+        val day = dayMonth(sri.appointment(next)!!.startsAt.toLocalDateTime(TimeZone.of("Asia/Jakarta")).date)
+        assertEquals(listOf(listOf("Sri", "Kapan Bapak boleh menyetir lagi?", "fisioterapi $day")),
+            budi.inbox().filter { it.template == "kinfolk_question_moved" }.map { it.params })
+
+        // Unanswered there too, it carries over from the physio visit, not back to Dr. Rao.
+        sri.saveVisitNote(next, emptyMap(), emptyList(), "")
+        assertTrue(sri.questions(later).isEmpty())
     }
 
     @Test
@@ -83,7 +175,7 @@ class RecordingTest {
         Providers.transcript = null
         budi.transcribe(circle, appt, audio)
         assertEquals(Recording.Status.failed, budi.awaitRecording(appt).status)
-        assertFails { budi.shareRecording(appt) }
+        assertFails { budi.shareRecording(appt, emptyMap(), emptyList()) }
 
         Providers.transcript = output
         budi.transcribe(circle, appt, audio)

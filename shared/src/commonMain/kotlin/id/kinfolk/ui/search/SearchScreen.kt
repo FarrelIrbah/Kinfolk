@@ -47,12 +47,14 @@ import kinfolk.shared.generated.resources.search_ph
 import kinfolk.shared.generated.resources.search_try
 import kinfolk.shared.generated.resources.tab_timeline
 import kinfolk.shared.generated.resources.tasks_title
+import kinfolk.shared.generated.resources.transcript
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-/** v3 `search` kinds, their label and colour. Transkrip comes with recording. */
+/** v3 `search` kinds, their label and colour. */
 enum class SearchKind(val label: StringResource, val color: Color) {
     Medicine(Res.string.rec_meds, Color(0xFF9A7A2F)),
+    Transcript(Res.string.transcript, Kf.Green),
     Document(Res.string.rec_docs, Color(0xFF6C5A8E)),
     Timeline(Res.string.tab_timeline, Color(0xFF3E6E8E)),
     Contact(Res.string.contact_form_head, Color(0xFFB0643A)),

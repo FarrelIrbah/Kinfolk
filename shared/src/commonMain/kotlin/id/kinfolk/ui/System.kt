@@ -33,3 +33,19 @@ expect fun rememberFileViewer(): (name: String, ext: String, bytes: ByteArray) -
 /** Opens the system print dialog for [pdf], named [name]; [onSent] runs once it went to a printer, not when cancelled. */
 @Composable
 expect fun rememberPrinter(): (name: String, pdf: ByteArray, onSent: () -> Unit) -> Unit
+
+/**
+ * The visit recorder: audio to a file on the phone, going on with the screen off. [start] asks for the microphone
+ * first and answers whether recording began; [level] is how loud it is now, 0 to 1; [stop] gives the audio (AAC in
+ * MP4), null when nothing was recorded.
+ */
+class Recorder(
+    val start: (onStarted: (Boolean) -> Unit) -> Unit,
+    val pause: () -> Unit,
+    val resume: () -> Unit,
+    val level: () -> Float,
+    val stop: () -> ByteArray?,
+)
+
+@Composable
+expect fun rememberRecorder(): Recorder

@@ -63,7 +63,10 @@ import id.kinfolk.ui.serifStyle
 import id.kinfolk.ui.tap
 import kinfolk.shared.generated.resources.Res
 import kinfolk.shared.generated.resources.appt_form_head
-import kinfolk.shared.generated.resources.write_note
+import kinfolk.shared.generated.resources.notes_by_hand
+import kinfolk.shared.generated.resources.record_this
+import kinfolk.shared.generated.resources.record_this_sub
+import kinfolk.shared.generated.resources.record_visit
 import kinfolk.shared.generated.resources.visit_note_card_sub
 import kinfolk.shared.generated.resources.visit_note_card
 import kinfolk.shared.generated.resources.questions_to_ask
@@ -100,8 +103,9 @@ import kotlin.time.Instant
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * `appt` from design v3 (docs/screen-map.md). The record card became the Visit Note card (#7): "Tulis catatan" for the
- * Attendee, "Buka ringkasan" for everyone once it's saved. [ask] returns false when the server couldn't be reached.
+ * `appt` from design v3 (docs/screen-map.md). The Attendee gets v3's record card (#46), with "Catat manual saja" for the
+ * hand-written Visit Note (#7) until something is recorded; [summaryReady]: a Recording's summary I can read. Once a
+ * hand-written Visit Note is saved, everyone gets its card ("Buka ringkasan"). [ask] returns false when unreachable.
  */
 @Composable
 fun ApptScreen(
@@ -114,10 +118,13 @@ fun ApptScreen(
     askerColor: (String) -> Color,
     isAttendee: Boolean,
     recipientName: String,
+    recorded: Boolean,
+    summaryReady: Boolean,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     ask: suspend (String) -> Boolean,
     onNote: () -> Unit,
+    onRecord: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var draft by rememberSaveable { mutableStateOf("") }
@@ -185,18 +192,21 @@ fun ApptScreen(
             Text(stringResource(Res.string.bring), style = serifStyle(20f))
             Text(a.bring, fontSize = 15.sp, lineHeight = (15 * 1.5).sp, color = Kf.Ink2)
         }
-        if (noteReady || isAttendee) Column(
+        val record = recorded || (isAttendee && !noteReady)
+        if (record || noteReady) Column(
             Modifier.fillMaxWidth().background(Kf.CardAlt, RoundedCornerShape(18.dp)).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(stringResource(Res.string.visit_note_card), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(stringResource(Res.string.visit_note_card_sub), fontSize = 14.sp, lineHeight = (14 * 1.45).sp, color = Kf.Ink2)
+            Text(stringResource(if (record) Res.string.record_this else Res.string.visit_note_card), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(if (record) Res.string.record_this_sub else Res.string.visit_note_card_sub), fontSize = 14.sp, lineHeight = (14 * 1.45).sp, color = Kf.Ink2)
             Box(
-                Modifier.padding(top = 6.dp).fillMaxWidth().height(50.dp).background(Kf.Green, RoundedCornerShape(14.dp)).tap(onNote),
+                Modifier.padding(top = 6.dp).fillMaxWidth().height(50.dp).background(Kf.Green, RoundedCornerShape(14.dp)).tap(if (record) onRecord else onNote),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(stringResource(if (noteReady) Res.string.open_summary else Res.string.write_note), color = Kf.Paper, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(if (noteReady || summaryReady) Res.string.open_summary else Res.string.record_visit), color = Kf.Paper, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
+            // Approved by the owner in #46: the hand-written Visit Note stays reachable until #48 and #50 give it a home.
+            if (record && !recorded) Link(stringResource(Res.string.notes_by_hand), Kf.Green, onNote, Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp))
         }
     }
 }

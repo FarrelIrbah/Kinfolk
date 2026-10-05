@@ -12,8 +12,12 @@ import kotlin.time.Instant
  * most kinds); doses marked together share [at].
  */
 @Serializable
-data class Hit(val kind: Kind, val id: String?, val entry: TimelineEntry.Kind? = null, val at: Instant? = null, val text: String? = null) {
-    @Suppress("EnumEntryName") enum class Kind { medication, document, timeline, contact, task }
+data class Hit(
+    val kind: Kind, val id: String?, val entry: TimelineEntry.Kind? = null, val at: Instant? = null, val text: String? = null,
+    /** A transcript line: its index in the Recording of Appointment [id], and "00:41 · Dr. Anand Rao · Kontrol neurologi". */
+    val segment: Int? = null, val label: String? = null,
+) {
+    @Suppress("EnumEntryName") enum class Kind { medication, transcript, document, timeline, contact, task }
 }
 
 /** Full-text, each word a prefix, over what the signed-in Member can read; v3's order of kinds, at most 14. */

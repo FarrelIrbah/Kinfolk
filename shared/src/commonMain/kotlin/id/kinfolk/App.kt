@@ -270,6 +270,37 @@ import id.kinfolk.ui.emergency.QrScreen
 import id.kinfolk.ui.appointment.ApptFormScreen
 import id.kinfolk.ui.appointment.ApptScreen
 import id.kinfolk.ui.appointment.VisitNoteScreen
+import id.kinfolk.ui.appointment.ConsentScreen
+import id.kinfolk.ui.appointment.InRoom
+import id.kinfolk.ui.appointment.ProcessingScreen
+import id.kinfolk.ui.appointment.RecordingScreen
+import id.kinfolk.ui.appointment.Selection
+import id.kinfolk.ui.appointment.SummaryScreen
+import id.kinfolk.ui.appointment.TranscriptDrawer
+import id.kinfolk.ui.rememberRecorder
+import id.kinfolk.data.Moved
+import id.kinfolk.data.NextStepDraft
+import id.kinfolk.ui.appointment.dayLabel
+import id.kinfolk.ui.appointment.dayMonth
+import id.kinfolk.data.Recording
+import id.kinfolk.data.Speaker
+import id.kinfolk.data.answersTo
+import id.kinfolk.data.drafts
+import id.kinfolk.data.moveQuestion
+import id.kinfolk.data.recording
+import id.kinfolk.data.shareRecording
+import id.kinfolk.data.transcribe
+import kinfolk.shared.generated.resources.consent_first
+import kinfolk.shared.generated.resources.role_doctor
+import kinfolk.shared.generated.resources.role_patient
+import kinfolk.shared.generated.resources.visit_meta
+import kinfolk.shared.generated.resources.shared_circle
+import kinfolk.shared.generated.resources.shared_toast
+import kinfolk.shared.generated.resources.moved_next
+import kinfolk.shared.generated.resources.moved_toast
+import kinfolk.shared.generated.resources.moved_toast_self
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.milliseconds
 import id.kinfolk.ui.appointment.ago
 import id.kinfolk.ui.appointment.countdown
 import id.kinfolk.ui.appointment.hm
@@ -394,13 +425,13 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest, Display }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest, Display, Consent, Recording, Processing, Summary }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
 
-/** An Appointment with its Questions and Visit Note, as `appt` and `summary` show it. */
-private class Visit(val appointment: Appointment, val questions: List<Question>, val note: VisitNote?)
+/** An Appointment with its Questions, Visit Note and Recording (when I may read it), as `appt` and `summary` show it. */
+private class Visit(val appointment: Appointment, val questions: List<Question>, val note: VisitNote?, val recording: Recording? = null)
 
 @Composable
 @Preview
@@ -418,6 +449,11 @@ fun App() {
         var next by remember { mutableStateOf<Appointment?>(null) }
         var questions by remember { mutableStateOf(emptyList<Question>()) } // on next
         var note by remember { mutableStateOf<VisitNote?>(null) } // of next
+        var recording by remember { mutableStateOf<Recording?>(null) } // of next, when I may read it
+        val recorder = rememberRecorder()
+        var recordedSeconds by rememberSaveable { mutableStateOf(0) } // `processing`'s "4 menit"
+        var following by remember { mutableStateOf(false) } // the summarized visit has a next one: "Pindah ke kunjungan berikut"
+        val selection = remember { Selection() }
         var opened by remember { mutableStateOf<Visit?>(null) } // from the Timeline; `appt` and `summary` show next while null
         var timeline by remember { mutableStateOf(emptyList<TimelineEntry>()) }
         var timelineFilter by remember { mutableStateOf<EntryType?>(null) } // kept across tabs, like the prototype
@@ -541,7 +577,7 @@ fun App() {
         }
         // Mode Bapak presses show the Care Recipient, in v3's `col('pak')` (#37).
         fun author(e: TimelineEntry) = if (e.kind == TimelineEntry.Kind.recipient_press) Person(e.byName.orEmpty(), Kf.Ink) else named(e.by, e.byName)
-        fun visit() = opened ?: next?.let { Visit(it, questions, note) }
+        fun visit() = opened ?: next?.let { Visit(it, questions, note, recording) }
         // The Care Recipient while they are a Member: they set restrictions, else the admins (ADR 0004).
         fun owner() = recipient?.memberId?.takeIf { id -> members.any { it.userId == id && it.leftAt == null } }
         fun sees(m: Member): Set<DataCategory> =
@@ -616,15 +652,60 @@ fun App() {
             val id = e.appointmentId ?: return // an access change opens nothing
             opening?.cancel()
             opening = scope.launch {
-                val v = attempt { listOfNotNull(supabase.appointment(id)).map { a -> Visit(a, supabase.questions(a.id), supabase.visitNote(a.id)) } }
+                val v = attempt { listOfNotNull(supabase.appointment(id)).map { a -> Visit(a, supabase.questions(a.id), supabase.visitNote(a.id), supabase.recording(a.id)) } }
                     ?.firstOrNull() ?: return@launch // unreachable, or cancelled meanwhile
                 opened = v
-                go(if (e.kind == TimelineEntry.Kind.visit_note) Screen.VisitNote else Screen.Appt)
+                selection.key = null; selection.refs = emptyList(); selection.expanded = false // shared only: no move button
+                go(when {
+                    e.kind != TimelineEntry.Kind.visit_note -> Screen.Appt
+                    v.recording?.sharedAt != null -> Screen.Summary
+                    else -> Screen.VisitNote
+                })
+            }
+        }
+        fun showRecording(id: String, r: Recording?) {
+            if (id == next?.id) recording = r
+            opened?.takeIf { it.appointment.id == id }?.let { o -> opened = Visit(o.appointment, o.questions, o.note, r) }
+        }
+        // Clears the selection, and finds whether "Pindah ke kunjungan berikut" has somewhere to go: a later visit of the
+        // Care Recipient without a Visit Note yet, as move_question asks.
+        fun openSummary(a: Appointment) {
+            selection.key = null; selection.refs = emptyList(); selection.expanded = false
+            following = false
+            scope.launch {
+                following = attempt {
+                    supabase.appointmentsBetween(a.circleId, a.startsAt + 1.milliseconds, a.startsAt + 3650.days)
+                        .filter { it.recipientId == a.recipientId }.any { supabase.visitNote(it.id) == null }
+                } == true
+            }
+        }
+        // `processing` until the worker answers: then `summary` (v3 empties the stack), or, failed, Home for now (#48 adds `recfail`).
+        suspend fun awaitSummary(a: Appointment) {
+            while (true) {
+                val r = retrying { supabase.recording(a.id) }
+                if (r != null && r.status != Recording.Status.processing) {
+                    showRecording(a.id, r)
+                    if (screen != Screen.Processing) return
+                    if (r.status == Recording.Status.ready) { openSummary(a); reset(Screen.Summary, Nav.Push) } else { toast = noConnection; reset(Screen.Home, Nav.Back) }
+                    return
+                }
+                delay(3000)
+            }
+        }
+        // v3 `startRecordFlow` without the paywall (#50): consent, or where the Recording is up to.
+        fun openRecord() {
+            val v = visit() ?: return
+            val r = v.recording
+            when (r?.status) {
+                Recording.Status.ready -> { openSummary(v.appointment); go(Screen.Summary) }
+                Recording.Status.processing -> { recordedSeconds = r.seconds; go(Screen.Processing); scope.launch { awaitSummary(v.appointment) } }
+                else -> go(Screen.Consent)
             }
         }
         // What stays readable offline (#14); the rest (Invitations, restrictions, rota) waits for a connection.
         fun restore(k: Snapshot) {
             circle = k.circle; recipient = k.recipient; next = k.next; questions = k.questions; note = k.note
+            recording = recording?.takeIf { it.appointmentId == k.next?.id }
             meds = k.medications; members = k.members; timeline = k.timeline; emergency = k.emergency
             contacts = k.contacts; card = k.card; savedAt = k.savedAt; doses = k.doses; checkIn = k.checkIn; tasks = k.tasks
         }
@@ -637,7 +718,8 @@ fun App() {
             kept.write(k?.let { Json.encodeToString(it) })
             if (k == null) { circle = null; return }
             restore(k.with(outbox, me().orEmpty(), Clock.System.now())) // tapped while this was read
-            opened?.appointment?.let { a -> opened = Visit(a, retrying { supabase.questions(a.id) }, retrying { supabase.visitNote(a.id) }) }
+            recording = k.next?.let { a -> retrying { supabase.recording(a.id) } }
+            opened?.appointment?.let { a -> opened = Visit(a, retrying { supabase.questions(a.id) }, retrying { supabase.visitNote(a.id) }, retrying { supabase.recording(a.id) }) }
             sent = retrying { if (supabase.roleIn(k.circle.id) == Role.admin) supabase.invitations(k.circle.id) else null }
             hidden = retrying { supabase.hidden(k.circle.id) }
             changes = retrying { supabase.accessChanges(k.circle.id) }
@@ -797,6 +879,8 @@ fun App() {
                                                 a.withWhom(),
                                                 person(a.driverId), a.departsAt?.let { hm(it.toLocalDateTime(tz).time) },
                                                 questionCount = questions.size, noteReady = note != null,
+                                                recordable = note == null && a.attendeeId == me(),
+                                                summaryReady = recording?.status == Recording.Status.ready,
                                             )
                                         },
                                         invites = sent?.let { all -> all.count { !it.pending } to all.size },
@@ -841,8 +925,15 @@ fun App() {
                                         ),
                                     ),
                                     onSos = { openEmergency() }, onOpenAppointment = { opened = null; go(Screen.Appt) }, onAddAppointment = { openForm(null) },
-                                    // Only the Attendee writes the Visit Note; the others add Questions until it's ready.
-                                    onWriteNote = { opened = null; go(if (note != null || next?.attendeeId == me()) Screen.VisitNote else Screen.Appt) },
+                                    // Only the Attendee records or writes the Visit Note; the others add Questions until it's ready.
+                                    onWriteNote = {
+                                        opened = null
+                                        when {
+                                            recording != null || (note == null && next?.attendeeId == me()) -> openRecord()
+                                            note != null -> go(Screen.VisitNote)
+                                            else -> go(Screen.Appt)
+                                        }
+                                    },
                                     onRota = { pick(Tab.Rota) }, onRecords = { pick(Tab.Records) },
                                     onTimeline = { pick(Tab.Timeline) },
                                     onInvite = { onboarding = false; go(Screen.Onb2) },
@@ -951,6 +1042,7 @@ fun App() {
                             val a = v.appointment
                             ApptScreen(
                                 a, v.questions, v.note != null, now, tz, ::person, ::colorOf, a.attendeeId == me(), recipient?.name.orEmpty(),
+                                recorded = v.recording != null, summaryReady = v.recording?.status == Recording.Status.ready,
                                 onBack = ::back, onEdit = { openForm(a) },
                                 ask = { text ->
                                     val w = Write.Ask(a.circleId, a.id, text)
@@ -964,6 +1056,77 @@ fun App() {
                                     true
                                 },
                                 onNote = { go(Screen.VisitNote) },
+                                onRecord = ::openRecord,
+                            )
+                        }
+                        Screen.Consent -> visit()?.let { v ->
+                            val a = v.appointment
+                            val notAll = stringResource(Res.string.consent_first)
+                            // v3: the doctor, the patient and you.
+                            val room = listOf(
+                                InRoom(a.provider.name, stringResource(Res.string.role_doctor)),
+                                InRoom(recipient?.name.orEmpty(), stringResource(Res.string.role_patient)),
+                                InRoom(named(me().orEmpty()).name, stringResource(Res.string.you)),
+                            )
+                            ConsentScreen(room, onBack = ::back, onNotAll = { toast = notAll }) {
+                                recorder.start { ok -> if (ok && screen == Screen.Consent) go(Screen.Recording) }
+                            }
+                        }
+                        Screen.Recording -> visit()?.let { v ->
+                            RecordingScreen(recorder) { secs ->
+                                val audio = recorder.stop()
+                                recordedSeconds = secs
+                                nav = Nav.Push; screen = Screen.Processing // v3 go('processing', false): not on the stack
+                                val a = v.appointment
+                                scope.launch {
+                                    // ponytail: unsent audio stays on the phone (visit.m4a) for #48's recfail to resend.
+                                    if (audio == null || attempt { supabase.transcribe(a.circleId, a.id, audio, secs) } == null) {
+                                        toast = noConnection; reset(Screen.Home, Nav.Back); return@launch
+                                    }
+                                    awaitSummary(a)
+                                }
+                            }
+                        }
+                        Screen.Processing -> ProcessingScreen(recordedSeconds)
+                        Screen.Summary -> visit()?.let { v ->
+                            val a = v.appointment
+                            val r = v.recording ?: return@let
+                            val t = r.transcript ?: return@let
+                            val mine = r.recordedBy == me() && r.sharedAt == null
+                            val steps = v.note?.steps?.map { NextStepDraft(it.text, it.owner, it.due, it.id) }
+                                ?: t.drafts(r.recordedBy, a.startsAt.toLocalDateTime(tz).date + DatePeriod(days = 7))
+                            val answers = t.answersTo(v.questions)
+                            val unanswered = if (r.sharedAt == null) v.questions.filter { answers[it.id].isNullOrBlank() }
+                                else v.questions.filter { it.answer?.isBlank() == true }
+                            val meta = stringResource(Res.string.visit_meta, dayLabel(a.startsAt, now, tz), a.provider.name, ((r.seconds + 30) / 60).coerceAtLeast(1))
+                            val sharedLabel = stringResource(Res.string.shared_circle, r.told.size)
+                            val toastShared = stringResource(Res.string.shared_toast, "%1\$s")
+                            val movedLabel = stringResource(Res.string.moved_next, "%1\$s", "%2\$s")
+                            val movedToast = stringResource(Res.string.moved_toast, "%1\$s", "%2\$s", "%3\$s")
+                            val movedSelf = stringResource(Res.string.moved_toast_self, "%1\$s", "%2\$s")
+                            fun fill(f: String, vararg x: String) = x.foldIndexed(f) { i, acc, v -> acc.replace("%${i + 1}\$s", v) }
+                            fun where(m: Moved) = inSentence(m.title) to dayMonth(m.startsAt.toLocalDateTime(tz).date)
+                            val move: suspend (Question) -> Moved? = { q ->
+                                attempt { supabase.moveQuestion(q.id, a.id) }?.also { m ->
+                                    val (title, day) = where(m)
+                                    toast = m.told?.let { fill(movedToast, title, day, it) } ?: fill(movedSelf, title, day)
+                                } ?: run { toast = noConnection; null }
+                            }
+                            SummaryScreen(
+                                meta, a.title, t, steps, unanswered, editable = mine, shared = sharedLabel.takeIf { r.sharedAt != null && r.recordedBy == me() },
+                                sel = selection, owners = dutyPeople().keys.toList(), person = { id -> rotaPeople()[id] ?: person(id) }, askerColor = ::colorOf,
+                                onHome = { pick(Tab.Home) }, // v3 `goHome`
+                                move = move.takeIf { following },
+                                movedLabel = { m -> where(m).let { (title, day) -> fill(movedLabel, title, day) } },
+                                share = { kept ->
+                                    val told = attempt { supabase.shareRecording(a.id, answers, kept) }
+                                    if (told == null) { toast = noConnection; false } else {
+                                        toast = told.takeIf { it.isNotEmpty() }?.let { fill(toastShared, names(it)) }
+                                        attempt { listOfNotNull(supabase.recording(a.id)) }?.firstOrNull()?.let { showRecording(a.id, it) }
+                                        scope.launch { loadHome() }
+                                        true
+                                    }
+                                },
                             )
                         }
                         Screen.VisitNote -> visit()?.let { v ->
@@ -1116,6 +1279,20 @@ fun App() {
                                 when (h.kind) {
                                     Hit.Kind.medication -> meds.firstOrNull { it.id == h.id }?.let { m ->
                                         SearchRow(SearchKind.Medicine, "${m.name} ${m.dose}".trim(), medSub(m, bloodThinner)) { pick(Tab.Records); recTab = RecTab.Meds }
+                                    }
+                                    Hit.Kind.transcript -> h.id?.let { id ->
+                                        val day = h.at?.let { at -> if (dayLabel(at, now, tz) == "Hari ini") "hari ini" else dayMonth(at.toLocalDateTime(tz).date) }
+                                        SearchRow(SearchKind.Transcript, h.text.orEmpty(), listOfNotNull(h.label, day).joinToString(", ")) {
+                                            opening?.cancel()
+                                            opening = scope.launch {
+                                                val v = attempt { listOfNotNull(supabase.appointment(id)).map { a -> Visit(a, supabase.questions(a.id), supabase.visitNote(a.id), supabase.recording(a.id)) } }
+                                                    ?.firstOrNull()?.takeIf { it.recording?.transcript != null } ?: return@launch
+                                                opened = v
+                                                openSummary(v.appointment)
+                                                selection.key = "t${h.segment}"; selection.refs = listOfNotNull(h.segment)
+                                                go(Screen.Summary)
+                                            }
+                                        }
                                     }
                                     Hit.Kind.document -> documents.firstOrNull { it.id == h.id }?.let { d ->
                                         SearchRow(SearchKind.Document, d.name, records) { pick(Tab.Records); recTab = RecTab.Docs }
@@ -1372,6 +1549,18 @@ fun App() {
             ConfirmSheet(confirm, stringResource(Res.string.cancel)) { confirm = null }
             if (pickingDocs && screen == Screen.Export) Sheet("docs", { pickingDocs = false }) {
                 DocsPicker(documents.latest().filterNot { it.legal }, exportDocs) { exportDocs = it }
+            }
+            if (screen == Screen.Summary) visit()?.let { v ->
+                val r = v.recording ?: return@let
+                val t = r.transcript ?: return@let
+                val a = v.appointment
+                TranscriptDrawer(t, { s ->
+                    when (s.speaker) {
+                        Speaker.provider -> a.provider.name
+                        Speaker.recipient -> recipient?.name.orEmpty()
+                        Speaker.attendee -> named(r.recordedBy).name
+                    }
+                }, selection, Modifier.align(Alignment.BottomCenter))
             }
             if (offline && screen != null) OfflineBanner(stringResource(Res.string.offline), Modifier.align(Alignment.TopCenter))
             if (screen == Screen.Home) TabBar(tab, ::pick, backdrop, Modifier.align(Alignment.BottomCenter))

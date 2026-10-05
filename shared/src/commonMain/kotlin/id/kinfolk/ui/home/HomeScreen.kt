@@ -62,6 +62,9 @@ import kinfolk.shared.generated.resources.sos
 import kinfolk.shared.generated.resources.inbox
 import kinfolk.shared.generated.resources.this_week
 import kinfolk.shared.generated.resources.write_note
+import kinfolk.shared.generated.resources.record_short
+import kinfolk.shared.generated.resources.summary_ready
+import kinfolk.shared.generated.resources.summary_short
 import kinfolk.shared.generated.resources.digest_row
 import kinfolk.shared.generated.resources.all_given
 import kinfolk.shared.generated.resources.dose_due
@@ -95,6 +98,10 @@ data class NextAppointment(
     val leavesAt: String?,
     val questionCount: Int,
     val noteReady: Boolean,
+    /** v3 "Rekam" (#46): I'm the Attendee and nothing is written yet. */
+    val recordable: Boolean = false,
+    /** v3 "Ringkasan siap": a Recording's summary I can read. */
+    val summaryReady: Boolean = false,
 )
 
 /** v3's main Home cards, in priority order (#22). */
@@ -326,7 +333,11 @@ private fun AppointmentCard(a: NextAppointment, onOpen: () -> Unit, onWriteNote:
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(a.whenLabel, fontSize = 13.sp, color = Cream.copy(alpha = .85f))
             Text(
-                if (a.noteReady) stringResource(Res.string.note_ready) else a.countdown,
+                when {
+                    a.summaryReady -> stringResource(Res.string.summary_ready)
+                    a.noteReady -> stringResource(Res.string.note_ready)
+                    else -> a.countdown
+                },
                 fontSize = 12.sp, color = Cream,
                 modifier = Modifier.background(CreamTint, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
             )
@@ -347,7 +358,13 @@ private fun AppointmentCard(a: NextAppointment, onOpen: () -> Unit, onWriteNote:
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CardButton(stringResource(Res.string.questions_count, a.questionCount), CreamBtn, Cream, onOpen, Modifier.weight(1f))
-            CardButton(stringResource(if (a.noteReady) Res.string.open_summary else Res.string.write_note), Cream, Kf.Green, onWriteNote, Modifier.weight(1f))
+            val label = when {
+                a.summaryReady -> Res.string.summary_short
+                a.noteReady -> Res.string.open_summary
+                a.recordable -> Res.string.record_short
+                else -> Res.string.write_note
+            }
+            CardButton(stringResource(label), Cream, Kf.Green, onWriteNote, Modifier.weight(1f))
         }
     }
 }

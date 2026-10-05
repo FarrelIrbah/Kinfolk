@@ -2,7 +2,7 @@
 
 Input (from supabase/functions/transcribe): audio_url, language, provider, members, medications, questions.
 Output (saved by public.finish_recording): segments [{t, speaker, text, flagged}], qa [{question, answer, segments}],
-next_steps [{text, owner, due}], medication {name, change, segment} or null.
+next_steps [{text, owner, due, segments}], medication {name, change, segment} or null.
 
 Whisper large-v3 with WhisperX alignment and pyannote diarisation, then an open-weight LLM (vLLM) labels the
 speakers and pulls out the rest. Nothing leaves the worker.
@@ -55,7 +55,7 @@ Jawab hanya dengan JSON:
 {{"speakers": {{"<label pembicara>": "provider" | "recipient" (pasien) | "attendee" (keluarga yang hadir)}},
  "flagged": [nomor baris yang kurang jelas atau perlu dicek ulang],
  "qa": [{{"question": pertanyaan keluarga di atas atau yang ditanyakan saat kunjungan, "answer": jawaban dokter singkat, "segments": [nomor baris]}}],
- "next_steps": [{{"text": langkah berikutnya, "owner": nama anggota keluarga yang disebut atau null, "due": "YYYY-MM-DD" atau null}}],
+ "next_steps": [{{"text": langkah berikutnya, "owner": nama anggota keluarga yang disebut atau null, "due": "YYYY-MM-DD" atau null, "segments": [nomor baris]}}],
  "medication": {{"name": nama obat, "change": perubahan dosis singkat, "segment": nomor baris}} atau null}}"""
 
 
@@ -89,7 +89,8 @@ def shape(segments, answer):
                       "text": s["text"], "flagged": i in flagged} for i, s in enumerate(segments)],
         "qa": [{"question": text(q.get("question")), "answer": text(q.get("answer")), "segments": lines(q.get("segments"))}
                for q in answer.get("qa") or [] if isinstance(q, dict) and text(q.get("question"))],
-        "next_steps": [{"text": text(s.get("text")), "owner": text(s.get("owner")) or None, "due": due(s.get("due"))}
+        "next_steps": [{"text": text(s.get("text")), "owner": text(s.get("owner")) or None, "due": due(s.get("due")),
+                        "segments": lines(s.get("segments"))}
                        for s in answer.get("next_steps") or [] if isinstance(s, dict) and text(s.get("text"))],
         "medication": med if med and med["name"] and med["change"] else None,
     }

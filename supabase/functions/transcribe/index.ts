@@ -1,4 +1,4 @@
-// Transcription (#45, ADR 0005). POST {appointment_id}, as the Attendee after uploading the audio to `recordings`:
+// Transcription (#45, ADR 0005). POST {appointment_id, seconds}, as the Attendee after uploading the audio to `recordings`:
 // sends the job to our Whisper + LLM worker on RunPod Serverless (Singapore) and answers 202 at once; the Recording
 // stays `processing`. POST ?appointment=…&secret=…, by RunPod when the job ends: saves its output (or the failure).
 import { env, rpc } from "../_shared/send.ts";
@@ -16,8 +16,8 @@ Deno.serve(async (req) => {
     return json(res.ok ? 200 : 500, res.body);
   }
 
-  const { appointment_id } = await req.json().catch(() => ({}));
-  const started = await rpc("start_recording", { appointment: appointment_id }, req.headers.get("authorization") ?? "");
+  const { appointment_id, seconds } = await req.json().catch(() => ({}));
+  const started = await rpc("start_recording", { appointment: appointment_id, seconds: Math.round(seconds ?? 0) }, req.headers.get("authorization") ?? "");
   if (!started.ok) return json(started.status === 400 ? 403 : started.status, started.body);
   const { path, ...context } = started.body;
 
