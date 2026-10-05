@@ -2,6 +2,7 @@ package id.kinfolk.data
 
 import id.kinfolk.ui.appointment.dayMonth
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -181,6 +182,35 @@ class RecordingTest {
         budi.transcribe(circle, appt, audio)
         assertEquals(Recording.Status.ready, budi.awaitRecording(appt).status)
         assertFails { budi.transcribe(circle, appt, audio) } // a finished one stays
+    }
+
+    @Test
+    fun `after sharing the Attendee deletes the audio, and the transcript and summary stay`() = runBlocking<Unit> {
+        val sri = signedInNewcomer()
+        val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        val tukiman = sri.careRecipients(circle).single().id
+        val budi = signedInSibling(sri, circle)
+        val provider = sri.addProvider(circle, "Dr. Anand Rao").id
+        val appt = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, provider, "Kontrol neurologi", null, Clock.System.now(), attendeeId = budi.me())).id
+        val path = "$circle/$appt"
+
+        Providers.transcript = output
+        budi.transcribe(circle, appt, audio)
+        val t = budi.awaitRecording(appt).transcript!!
+        assertFails { budi.deleteRecordingAudio(circle, appt) } // not before sharing
+        budi.shareRecording(appt, emptyMap(), t.drafts(budi.me(), LocalDate(2026, 10, 12)))
+
+        assertFails { sri.deleteRecordingAudio(circle, appt) } // only who recorded
+        assertTrue(budi.storage.from("recordings").downloadAuthenticated(path).isNotEmpty())
+
+        budi.deleteRecordingAudio(circle, appt)
+        assertFails { budi.storage.from("recordings").downloadAuthenticated(path) }
+        assertFails { budi.transcribe(circle, appt, audio) } // it doesn't come back
+        assertFails { budi.storage.from("recordings").downloadAuthenticated(path) }
+        val kept = sri.recording(appt)!!
+        assertTrue(kept.audioDeletedAt != null)
+        assertEquals(t, kept.transcript)
+        assertEquals(listOf("Antar fisioterapi Selasa", "MRI ulang"), sri.visitNote(appt)!!.steps.map { it.text })
     }
 
     @Test

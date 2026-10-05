@@ -37,4 +37,4 @@ actual fun rememberPrinter(): (name: String, pdf: ByteArray, onSent: () -> Unit)
 
 // ponytail: iOS records nothing yet; AVAudioRecorder with the audio background mode when iOS ships.
 @Composable
-actual fun rememberRecorder(): Recorder = remember { Recorder({ it(false) }, {}, {}, { 0f }, { null }) }
+actual fun rememberRecorder(): Recorder = remember { Recorder({ _, it -> it(false) }, {}, {}, { 0f }, { false }, {}, { emptyList() }, { false }, {}) }

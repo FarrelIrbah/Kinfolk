@@ -292,6 +292,14 @@ import id.kinfolk.ui.appointment.ConsentScreen
 import id.kinfolk.ui.appointment.InRoom
 import id.kinfolk.ui.appointment.ProcessingScreen
 import id.kinfolk.ui.appointment.RecordingScreen
+import id.kinfolk.ui.appointment.RecfailScreen
+import id.kinfolk.ui.SavedAudio
+import id.kinfolk.ui.saved
+import id.kinfolk.data.deleteRecordingAudio
+import kinfolk.shared.generated.resources.delete_recording_action
+import kinfolk.shared.generated.resources.delete_recording_body
+import kinfolk.shared.generated.resources.delete_recording_title
+import kinfolk.shared.generated.resources.delete_recording_toast
 import id.kinfolk.ui.appointment.Selection
 import id.kinfolk.ui.appointment.SummaryScreen
 import id.kinfolk.ui.appointment.TranscriptDrawer
@@ -421,7 +429,9 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -443,7 +453,7 @@ enum class Tab(val label: StringResource, val icon: String, val fillsWhenActive:
     Circle(Res.string.tab_circle, "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0zM16 4.3a3.5 3.5 0 0 1 0 6.4M18 13.8a6.5 6.5 0 0 1 3.5 6.2", true),
 }
 
-private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest, Display, Consent, Recording, Processing, Summary }
+private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, Appt, ApptForm, VisitNote, MedForm, Contacts, ContactForm, Emergency, Qr, EmergencyForm, Member, DutyForm, CheckIn, Tasks, TaskForm, Notes, DocForm, Inbox, Search, Export, Bapak, Digest, Display, Consent, Recording, Processing, Summary, RecFail }
 
 /** How the prototype animates the incoming screen: push slides from the right, back from the left, tab rises. */
 private enum class Nav { Push, Back, Tab }
@@ -474,6 +484,8 @@ fun App() {
         var appliedDoses by remember { mutableStateOf(emptyList<AppliedDoseChange>()) } // newest first
         val recorder = rememberRecorder()
         var recordedSeconds by rememberSaveable { mutableStateOf(0) } // `processing`'s "4 menit"
+        var recordFrom by rememberSaveable { mutableStateOf(0) } // where `recording`'s clock starts: resumed after `recfail`
+        var cutOff by remember { mutableStateOf<SavedAudio?>(null) } // what `recfail` shows
         var following by remember { mutableStateOf(false) } // the summarized visit has a next one: "Pindah ke kunjungan berikut"
         val selection = remember { Selection() }
         var opened by remember { mutableStateOf<Visit?>(null) } // from the Timeline; `appt` and `summary` show next while null
@@ -703,7 +715,7 @@ fun App() {
                 } == true
             }
         }
-        // `processing` until the worker answers: then `summary` (v3 empties the stack), or, failed, Home for now (#48 adds `recfail`).
+        // `processing` until the worker answers: then `summary` (v3 empties the stack), or, failed, Home.
         suspend fun awaitSummary(a: Appointment) {
             while (true) {
                 val r = retrying { supabase.recording(a.id) }
@@ -716,14 +728,37 @@ fun App() {
                 delay(3000)
             }
         }
-        // v3 `startRecordFlow` without the paywall (#50): consent, or where the Recording is up to.
+        // Sends what is saved on the phone (v3 go('processing', false): not on the stack). Unsent, it stays there: toast
+        // and Home, and "Rekam" sends it again (or opens `recfail`, when it was cut off).
+        // The saved files are read off the main thread: an hour is ~30 MB.
+        suspend fun savedOf(id: String) = withContext(Dispatchers.Default) { recorder.saved(id) }
+        fun upload(a: Appointment, saved: SavedAudio) {
+            recordedSeconds = saved.seconds
+            nav = Nav.Push; screen = Screen.Processing
+            scope.launch {
+                if (attempt { supabase.transcribe(a.circleId, a.id, saved.audio, saved.seconds) } == null) {
+                    toast = noConnection; reset(Screen.Home, Nav.Back); return@launch
+                }
+                recorder.discard(a.id)
+                awaitSummary(a)
+            }
+        }
+        // v3 `startRecordFlow` without the paywall (#50): consent, or where the Recording is up to; audio still on the
+        // phone goes out again, or, cut off by a lost microphone or a crash, opens `recfail` (#48).
         fun openRecord() {
             val v = visit() ?: return
             val r = v.recording
             when (r?.status) {
                 Recording.Status.ready -> { openSummary(v.appointment); go(Screen.Summary) }
                 Recording.Status.processing -> { recordedSeconds = r.seconds; go(Screen.Processing); scope.launch { awaitSummary(v.appointment) } }
-                else -> go(Screen.Consent)
+                else -> scope.launch {
+                    val saved = savedOf(v.appointment.id)
+                    when {
+                        saved == null -> go(Screen.Consent)
+                        saved.stopped -> upload(v.appointment, saved)
+                        else -> { cutOff = saved; go(Screen.RecFail) }
+                    }
+                }
             }
         }
         // What stays readable offline (#14); the rest (Invitations, restrictions, rota) waits for a connection.
@@ -1141,23 +1176,44 @@ fun App() {
                                 InRoom(named(me().orEmpty()).name, stringResource(Res.string.you)),
                             )
                             ConsentScreen(room, onBack = ::back, onNotAll = { toast = notAll }) {
-                                recorder.start { ok -> if (ok && screen == Screen.Consent) go(Screen.Recording) }
+                                recorder.discard(a.id)
+                                recordFrom = 0
+                                recorder.start(a.id) { ok -> if (ok && screen == Screen.Consent) go(Screen.Recording) }
                             }
                         }
                         Screen.Recording -> visit()?.let { v ->
-                            RecordingScreen(recorder) { secs ->
-                                val audio = recorder.stop()
-                                recordedSeconds = secs
-                                nav = Nav.Push; screen = Screen.Processing // v3 go('processing', false): not on the stack
-                                val a = v.appointment
-                                scope.launch {
-                                    // ponytail: unsent audio stays on the phone (visit.m4a) for #48's recfail to resend.
-                                    if (audio == null || attempt { supabase.transcribe(a.circleId, a.id, audio, secs) } == null) {
-                                        toast = noConnection; reset(Screen.Home, Nav.Back); return@launch
+                            val a = v.appointment
+                            RecordingScreen(
+                                recorder, recordFrom,
+                                // Nothing whole saved yet: nothing to resume or summarize.
+                                onFail = {
+                                    scope.launch {
+                                        cutOff = savedOf(a.id)
+                                        if (cutOff == null) { recorder.discard(a.id); toast = noConnection; reset(Screen.Home, Nav.Back) }
+                                        else { nav = Nav.Push; screen = Screen.RecFail }
                                     }
-                                    awaitSummary(a)
-                                }
+                                },
+                            ) {
+                                recorder.stop()
+                                scope.launch { savedOf(a.id)?.let { upload(a, it) } ?: run { toast = noConnection; reset(Screen.Home, Nav.Back) } }
                             }
+                        }
+                        // v3 `recfail`: what is saved on the phone; "Lanjutkan merekam" adds to it.
+                        Screen.RecFail -> visit()?.let { v ->
+                            val a = v.appointment
+                            // Read again after the app was restarted on this screen.
+                            LaunchedEffect(a.id) { if (cutOff == null) cutOff = savedOf(a.id) ?: return@LaunchedEffect reset(Screen.Home, Nav.Back) }
+                            val saved = cutOff ?: return@let
+                            RecfailScreen(
+                                saved.seconds,
+                                onResume = {
+                                    recordFrom = saved.seconds
+                                    recorder.start(a.id) { ok -> if (ok && screen == Screen.RecFail) { nav = Nav.Push; screen = Screen.Recording } }
+                                },
+                                onSummarize = { upload(a, saved) },
+                                // ponytail: the audio stays on the phone; the record card is gone once the Visit Note is saved.
+                                onNotes = { go(Screen.VisitNote) },
+                            )
                         }
                         Screen.Processing -> ProcessingScreen(recordedSeconds)
                         Screen.Summary -> visit()?.let { v ->
@@ -1176,6 +1232,10 @@ fun App() {
                             val movedLabel = stringResource(Res.string.moved_next, "%1\$s", "%2\$s")
                             val movedToast = stringResource(Res.string.moved_toast, "%1\$s", "%2\$s", "%3\$s")
                             val movedSelf = stringResource(Res.string.moved_toast_self, "%1\$s", "%2\$s")
+                            val deleteTitle = stringResource(Res.string.delete_recording_title)
+                            val deleteBody = stringResource(Res.string.delete_recording_body)
+                            val deleteAction = stringResource(Res.string.delete_recording_action)
+                            val deleted = stringResource(Res.string.delete_recording_toast)
                             fun fill(f: String, vararg x: String) = x.foldIndexed(f) { i, acc, v -> acc.replace("%${i + 1}\$s", v) }
                             fun where(m: Moved) = inSentence(m.title) to dayMonth(m.startsAt.toLocalDateTime(tz).date)
                             val move: suspend (Question) -> Moved? = { q ->
@@ -1211,6 +1271,16 @@ fun App() {
                                     }
                                 },
                                 onToast = { toast = it },
+                                onDelete = {
+                                    confirm = Confirm(deleteTitle, deleteBody, deleteAction) {
+                                        scope.launch {
+                                            if (attempt { supabase.deleteRecordingAudio(a.circleId, a.id) } == null) { toast = noConnection; return@launch }
+                                            recorder.discard(a.id)
+                                            showRecording(a.id, r.copy(audioDeletedAt = Clock.System.now()))
+                                            toast = deleted
+                                        }
+                                    }
+                                }.takeIf { r.recordedBy == me() && r.sharedAt != null && r.audioDeletedAt == null },
                             )
                         }
                         Screen.VisitNote -> visit()?.let { v ->
@@ -1640,10 +1710,7 @@ fun App() {
                     }
                 }
             }
-            ConfirmSheet(confirm, stringResource(Res.string.cancel)) { confirm = null }
-            if (pickingDocs && screen == Screen.Export) Sheet("docs", { pickingDocs = false }) {
-                DocsPicker(documents.latest().filterNot { it.legal }, exportDocs) { exportDocs = it }
-            }
+            // Under the confirm sheet ("Hapus rekaman").
             if (screen == Screen.Summary) visit()?.let { v ->
                 val r = v.recording ?: return@let
                 val t = r.transcript ?: return@let
@@ -1655,6 +1722,10 @@ fun App() {
                         Speaker.attendee -> named(r.recordedBy).name
                     }
                 }, selection, Modifier.align(Alignment.BottomCenter))
+            }
+            ConfirmSheet(confirm, stringResource(Res.string.cancel)) { confirm = null }
+            if (pickingDocs && screen == Screen.Export) Sheet("docs", { pickingDocs = false }) {
+                DocsPicker(documents.latest().filterNot { it.legal }, exportDocs) { exportDocs = it }
             }
             if (offline && screen != null) OfflineBanner(stringResource(Res.string.offline), Modifier.align(Alignment.TopCenter))
             if (screen == Screen.Home) TabBar(tab, ::pick, backdrop, Modifier.align(Alignment.BottomCenter))

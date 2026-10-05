@@ -43,59 +43,74 @@ class RecordingService : Service() {
 /** One recording at a time, outliving the screen that started it. */
 private object Mic {
     var recorder: MediaRecorder? = null
+    var appointment: String? = null
+    var failed = false
 }
 
 @Composable
 actual fun rememberRecorder(): Recorder {
     val context = LocalContext.current
-    val file = remember(context) { File(context.filesDir, "visit.m4a") }
+    // <appointment>-<n>.aac, one part per start; <appointment>.stopped once ended with Stop.
+    val dir = remember(context) { File(context.filesDir, "visits").apply { mkdirs() } }
+    fun parts(id: String) = dir.listFiles { f -> f.name.startsWith("$id-") }.orEmpty().sortedBy { it.name.substringAfterLast('-').substringBefore('.').toInt() }
+    fun done(id: String) = File(dir, "$id.stopped")
     val started = remember { arrayOfNulls<(Boolean) -> Unit>(1) } // who asked, until the permission answer
-    // The microphone first: the service is only started once recording runs, so it always reaches startForeground.
-    fun begin(): Boolean = try {
+    val asked = remember { arrayOfNulls<String>(1) }
+    fun end() {
         Mic.recorder?.release()
         Mic.recorder = null
-        file.delete()
+        context.stopService(Intent(context, RecordingService::class.java))
+    }
+    // The microphone first: the service is only started once recording runs, so it always reaches startForeground.
+    fun begin(id: String): Boolean = try {
+        end()
+        Mic.failed = false
+        Mic.appointment = id
+        done(id).delete()
+        val file = File(dir, "$id-${parts(id).size}.aac")
         @Suppress("DEPRECATION")
         Mic.recorder = (if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else MediaRecorder()).apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             // ~0.5 MB a minute: an hour fits the 50 MB bucket limit.
             setAudioChannels(1); setAudioSamplingRate(16_000); setAudioEncodingBitRate(64_000)
             setOutputFile(file.absolutePath)
+            setOnErrorListener { _, _, _ -> Mic.failed = true; end() } // e.g. the microphone went away
             prepare()
             start()
         }
         ContextCompat.startForegroundService(context, Intent(context, RecordingService::class.java))
         true
     } catch (_: Exception) {
-        Mic.recorder?.release()
-        Mic.recorder = null
+        end()
         false
     }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-        started[0]?.invoke(granted[Manifest.permission.RECORD_AUDIO] == true && begin())
+        started[0]?.invoke(granted[Manifest.permission.RECORD_AUDIO] == true && begin(asked[0]!!))
     }
     return remember(context) {
         Recorder(
-            start = { onStarted ->
+            start = { id, onStarted ->
                 started[0] = onStarted
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) onStarted(begin())
+                asked[0] = id
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) onStarted(begin(id))
                 // The notification is only shown with permission (Android 13+); recording goes on without it.
                 else ask.launch(listOfNotNull(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT >= 33 }).toTypedArray())
             },
             pause = { runCatching { Mic.recorder?.pause() } },
             resume = { runCatching { Mic.recorder?.resume() } },
             level = { Mic.recorder?.let { r -> runCatching { sqrt(r.maxAmplitude / 32767f) }.getOrNull() } ?: 0f },
+            failed = { Mic.failed },
             stop = {
-                val r = Mic.recorder
-                Mic.recorder = null
-                val ok = r != null && runCatching { r.stop() }.isSuccess
-                r?.release()
-                context.stopService(Intent(context, RecordingService::class.java))
-                // ponytail: the file stays until the next recording, for #48 to resume or resend it.
-                if (ok) file.readBytes() else null
+                Mic.recorder?.let { r -> runCatching { r.stop() } }
+                Mic.appointment?.takeUnless { Mic.failed }?.let { done(it).createNewFile() }
+                end()
             },
+            // Not while that recording is still running.
+            parts = { id -> if (Mic.recorder != null && Mic.appointment == id) emptyList() else parts(id).map { it.readBytes() } },
+            stopped = { id -> done(id).exists() },
+            discard = { id -> if (Mic.appointment == id) end(); parts(id).forEach { it.delete() }; done(id).delete() },
         )
     }
 }

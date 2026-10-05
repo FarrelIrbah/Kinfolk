@@ -36,6 +36,8 @@ data class Recording(
     val checked: List<String> = emptyList(),
     /** When the transcript was ready: Home's "15.10 · ringkasan kunjungan siap". */
     @SerialName("ready_at") val readyAt: Instant? = null,
+    /** "Hapus rekaman" (#48): the audio is gone from Storage; the transcript stays. */
+    @SerialName("audio_deleted_at") val audioDeletedAt: Instant? = null,
 ) {
     /** The lines the worker asked to check that are not confirmed yet, as in [checked]. */
     val unchecked: List<String> get() = transcript?.let { t ->
@@ -92,6 +94,12 @@ suspend fun SupabaseClient.transcribe(circleId: String, appointmentId: String, a
         contentType = ContentType("audio", "mp4")
     }
     functions.invoke("transcribe", buildJsonObject { put("appointment_id", appointmentId); put("seconds", seconds) })
+}
+
+/** "Hapus rekaman", by who recorded it, after sharing: the audio leaves Storage, the transcript and summary stay. */
+suspend fun SupabaseClient.deleteRecordingAudio(circleId: String, appointmentId: String) {
+    storage.from("recordings").delete("$circleId/$appointmentId") // silent when refused; the RPC then refuses
+    postgrest.rpc("recording_audio_deleted", buildJsonObject { put("appointment", appointmentId) })
 }
 
 /** Null until there is one the signed-in Member may read. */

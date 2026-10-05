@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,6 +67,7 @@ import id.kinfolk.ui.Avatar
 import id.kinfolk.ui.Kf
 import id.kinfolk.ui.KfEase
 import id.kinfolk.ui.LocalReduceMotion
+import id.kinfolk.ui.Link
 import id.kinfolk.ui.Pill
 import id.kinfolk.ui.Recorder
 import id.kinfolk.ui.SectionLabel
@@ -98,6 +100,15 @@ import kinfolk.shared.generated.resources.rec_paused
 import kinfolk.shared.generated.resources.rec_recording
 import kinfolk.shared.generated.resources.rec_resume
 import kinfolk.shared.generated.resources.rec_stop
+import kinfolk.shared.generated.resources.delete_recording
+import kinfolk.shared.generated.resources.notes_by_hand
+import kinfolk.shared.generated.resources.rf_body
+import kinfolk.shared.generated.resources.rf_minutes
+import kinfolk.shared.generated.resources.rf_resume
+import kinfolk.shared.generated.resources.rf_saved
+import kinfolk.shared.generated.resources.rf_seconds
+import kinfolk.shared.generated.resources.rf_summarize
+import kinfolk.shared.generated.resources.rf_title
 import kinfolk.shared.generated.resources.self_hosted
 import kinfolk.shared.generated.resources.share_circle
 import kinfolk.shared.generated.resources.start_recording
@@ -163,12 +174,13 @@ fun ConsentScreen(people: List<InRoom>, onBack: () -> Unit, onNotAll: () -> Unit
 
 /**
  * v3 `recording`, without "Ditranskripsi sambil berjalan" (approved by the owner in #46: the worker transcribes after
- * Stop). The waveform is the microphone's level. [onStop] gets how long was recorded, pauses left out.
+ * Stop). The waveform is the microphone's level. The clock starts at [from] (resuming after `recfail`), pauses left
+ * out. [onFail]: the microphone gave up (#48).
  */
 @Composable
-fun RecordingScreen(recorder: Recorder, onStop: (seconds: Int) -> Unit) {
+fun RecordingScreen(recorder: Recorder, from: Int, onFail: () -> Unit, onStop: () -> Unit) {
     var paused by remember { mutableStateOf(false) }
-    var ms by remember { mutableStateOf(0L) }
+    var ms by remember { mutableStateOf(from * 1000L) }
     val levels = remember { mutableStateListOf(*Array(36) { 0f }) }
     // Wall-clock, so it keeps counting while the screen is off and frames stop.
     LaunchedEffect(Unit) {
@@ -176,6 +188,7 @@ fun RecordingScreen(recorder: Recorder, onStop: (seconds: Int) -> Unit) {
         while (true) {
             delay(120)
             val t = Clock.System.now()
+            if (recorder.failed()) return@LaunchedEffect onFail()
             if (!paused) { ms += (t - last).inWholeMilliseconds; levels.removeAt(0); levels.add(recorder.level()) }
             last = t
         }
@@ -206,10 +219,49 @@ fun RecordingScreen(recorder: Recorder, onStop: (seconds: Int) -> Unit) {
                 contentAlignment = Alignment.Center,
             ) { Text(stringResource(if (paused) Res.string.rec_resume else Res.string.rec_pause), fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
             Box(
-                Modifier.weight(1f).height(54.dp).background(Kf.Sos, RoundedCornerShape(16.dp)).tap { onStop(secs) },
+                Modifier.weight(1f).height(54.dp).background(Kf.Sos, RoundedCornerShape(16.dp)).tap(onStop),
                 contentAlignment = Alignment.Center,
             ) { Text(stringResource(Res.string.rec_stop), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         }
+    }
+}
+
+/** "2:14", as v3 `recfail` writes it. */
+private fun clock(seconds: Int) = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+
+/** v3 `recfail`: [seconds] are saved on the phone. "2 menit 14 detik", the zero part left out. */
+@Composable
+fun RecfailScreen(seconds: Int, onResume: () -> Unit, onSummarize: () -> Unit, onNotes: () -> Unit) {
+    val m = seconds / 60
+    val sec = seconds % 60
+    val length = listOfNotNull(
+        stringResource(Res.string.rf_minutes, m).takeIf { m > 0 },
+        stringResource(Res.string.rf_seconds, sec).takeIf { sec > 0 || m == 0 },
+    ).joinToString(" ")
+    // design: padding:16px 20px; gap:18px
+    Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Box(Modifier.size(52.dp).background(Color(0xFFF0DDD3), CircleShape), contentAlignment = Alignment.Center) {
+            Text("!", color = Kf.Sos, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Text(stringResource(Res.string.rf_title, clock(seconds)), style = serifStyle(30f, 1.1f))
+        Text(stringResource(Res.string.rf_body, length), fontSize = 15.sp, lineHeight = (15 * 1.5).sp, color = Kf.Ink2)
+        Row(
+            Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(Res.string.rf_saved), fontSize = 14.sp)
+            Text(clock(seconds), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Box(Modifier.fillMaxWidth().height(54.dp).background(Kf.Green, RoundedCornerShape(16.dp)).tap(onResume), contentAlignment = Alignment.Center) {
+            Text(stringResource(Res.string.rf_resume), color = Kf.Paper, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Box(Modifier.fillMaxWidth().height(50.dp).border(1.dp, Color(0x2E22261F), RoundedCornerShape(16.dp)).tap(onSummarize), contentAlignment = Alignment.Center) {
+            Text(stringResource(Res.string.rf_summarize), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Text(
+            stringResource(Res.string.notes_by_hand), Modifier.fillMaxWidth().tap(onNotes).padding(vertical = 6.dp),
+            color = Kf.Green, fontSize = 15.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -246,6 +298,7 @@ class Selection {
  * lines in [unchecked] ([check], #47), moves unanswered Questions ([move], null without a next visit) and shares
  * ([share] gets the steps, false when unreachable; locked while a line is unchecked, [onToast] then says why).
  * After sharing [shared] is the button's "Dibagikan · …" label; others see no button. [dose]: "Perubahan obat".
+ * [onDelete]: "Hapus rekaman" under the button (#48), null when there is no audio to delete or it's not mine.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -269,6 +322,7 @@ fun SummaryScreen(
     share: suspend (List<NextStepDraft>) -> Boolean,
     check: (String) -> Unit,
     onToast: (String) -> Unit,
+    onDelete: (() -> Unit)?,
 ) {
     val scope = rememberCoroutineScope()
     val owned = remember(steps) { mutableStateListOf(*steps.toTypedArray()) }
@@ -384,18 +438,22 @@ fun SummaryScreen(
         }
         val locked = shared == null && flags.isNotEmpty()
         val checkFirst = stringResource(Res.string.check_yellow_first)
-        if (editable || shared != null) Box(
-            Modifier.fillMaxWidth().height(52.dp).background(when { shared != null -> Kf.Muted; locked -> Locked; else -> Kf.Green }, RoundedCornerShape(16.dp)).tap {
-                if (shared != null || busy) return@tap
-                if (locked) return@tap onToast(checkFirst)
-                scope.launch { busy = true; share(owned.toList()); busy = false }
-            },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                shared ?: if (locked) stringResource(Res.string.confirm_flagged, flags.size) else stringResource(Res.string.share_circle),
-                color = Kf.Paper, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-            )
+        // design: "Batalkan janji" under its button, gap 10
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (editable || shared != null) Box(
+                Modifier.fillMaxWidth().height(52.dp).background(when { shared != null -> Kf.Muted; locked -> Locked; else -> Kf.Green }, RoundedCornerShape(16.dp)).tap {
+                    if (shared != null || busy) return@tap
+                    if (locked) return@tap onToast(checkFirst)
+                    scope.launch { busy = true; share(owned.toList()); busy = false }
+                },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    shared ?: if (locked) stringResource(Res.string.confirm_flagged, flags.size) else stringResource(Res.string.share_circle),
+                    color = Kf.Paper, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
+            if (onDelete != null) Link(stringResource(Res.string.delete_recording), Kf.Sos, onDelete, Modifier.align(Alignment.CenterHorizontally))
         }
         Spacer(Modifier.height(220.dp)) // v3 bottomPad 250 on `summary`: room under the drawer
     }

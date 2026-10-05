@@ -35,17 +35,45 @@ expect fun rememberFileViewer(): (name: String, ext: String, bytes: ByteArray) -
 expect fun rememberPrinter(): (name: String, pdf: ByteArray, onSent: () -> Unit) -> Unit
 
 /**
- * The visit recorder: audio to a file on the phone, going on with the screen off. [start] asks for the microphone
- * first and answers whether recording began; [level] is how loud it is now, 0 to 1; [stop] gives the audio (AAC in
- * MP4), null when nothing was recorded.
+ * The visit recorder: audio of an Appointment to files on the phone (app-private, so under Android's file-based
+ * encryption), going on with the screen off. [start] asks for the microphone first, answers whether recording began,
+ * and adds a part to what is saved for that Appointment ([discard] it first for a fresh recording); [level] is how
+ * loud it is now, 0 to 1; [failed]: the microphone gave up mid-recording. [stop] ends it cleanly. [parts]: what is
+ * saved, oldest first (AAC in ADTS, so a part cut off by a crash still plays); [stopped]: whether it ended with [stop].
  */
 class Recorder(
-    val start: (onStarted: (Boolean) -> Unit) -> Unit,
+    val start: (appointmentId: String, onStarted: (Boolean) -> Unit) -> Unit,
     val pause: () -> Unit,
     val resume: () -> Unit,
     val level: () -> Float,
-    val stop: () -> ByteArray?,
+    val failed: () -> Boolean,
+    val stop: () -> Unit,
+    val parts: (appointmentId: String) -> List<ByteArray>,
+    val stopped: (appointmentId: String) -> Boolean,
+    val discard: (appointmentId: String) -> Unit,
 )
+
+/** What is on the phone for one Appointment: the audio to upload, how long it is, whether it ended cleanly. */
+class SavedAudio(val audio: ByteArray, val seconds: Int, val stopped: Boolean)
+
+fun Recorder.saved(appointmentId: String): SavedAudio? = savedAudio(parts(appointmentId), stopped(appointmentId))
+
+/** [parts] joined, each cut to its whole ADTS frames; the length counted from the frames. Null without a whole frame. */
+fun savedAudio(parts: List<ByteArray>, stopped: Boolean): SavedAudio? {
+    val rates = intArrayOf(96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350)
+    var samples = 0.0
+    val audio = parts.fold(ByteArray(0)) { acc, b ->
+        var i = 0
+        while (i + 7 <= b.size && b[i].toInt() and 0xFF == 0xFF && b[i + 1].toInt() and 0xF0 == 0xF0) {
+            val len = (b[i + 3].toInt() and 3 shl 11) or (b[i + 4].toInt() and 0xFF shl 3) or (b[i + 5].toInt() and 0xFF ushr 5)
+            if (len < 7 || i + len > b.size) break
+            samples += 1024.0 * ((b[i + 6].toInt() and 3) + 1) / rates.getOrElse(b[i + 2].toInt() ushr 2 and 0xF) { 16000 }
+            i += len
+        }
+        acc + b.copyOf(i)
+    }
+    return if (audio.isEmpty()) null else SavedAudio(audio, samples.toInt(), stopped)
+}
 
 @Composable
 expect fun rememberRecorder(): Recorder
