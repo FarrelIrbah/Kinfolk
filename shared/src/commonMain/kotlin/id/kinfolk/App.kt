@@ -1,5 +1,23 @@
 package id.kinfolk
 
+import kinfolk.shared.generated.resources.inbox_dose_sub
+import kinfolk.shared.generated.resources.inbox_dose
+import kinfolk.shared.generated.resources.inbox_flags_sub
+import kinfolk.shared.generated.resources.inbox_flags
+import kinfolk.shared.generated.resources.mc_applied_alone
+import kinfolk.shared.generated.resources.mc_applied
+import kinfolk.shared.generated.resources.mc_source_no_time
+import kinfolk.shared.generated.resources.mc_source
+import kinfolk.shared.generated.resources.after_title
+import id.kinfolk.ui.appointment.stamp
+import id.kinfolk.ui.home.AfterVisit
+import id.kinfolk.data.checkLine
+import id.kinfolk.data.appliedDoseChanges
+import id.kinfolk.data.doseChanges
+import id.kinfolk.data.undoDoseChange
+import id.kinfolk.data.applyDoseChange
+import id.kinfolk.data.AppliedDoseChange
+import id.kinfolk.data.DoseChange
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.runtime.CompositionLocalProvider
@@ -431,6 +449,8 @@ private enum class Screen { Onb0, Phone, Code, Onb1, Onb2, Onb3, Invitee, Home, 
 private enum class Nav { Push, Back, Tab }
 
 /** An Appointment with its Questions, Visit Note and Recording (when I may read it), as `appt` and `summary` show it. */
+private val FlagGold = Color(0xFF9A7A2F)
+
 private class Visit(val appointment: Appointment, val questions: List<Question>, val note: VisitNote?, val recording: Recording? = null)
 
 @Composable
@@ -450,6 +470,8 @@ fun App() {
         var questions by remember { mutableStateOf(emptyList<Question>()) } // on next
         var note by remember { mutableStateOf<VisitNote?>(null) } // of next
         var recording by remember { mutableStateOf<Recording?>(null) } // of next, when I may read it
+        var doseChanges by remember { mutableStateOf(emptyList<DoseChange>()) } // heard in Recordings I read (#47)
+        var appliedDoses by remember { mutableStateOf(emptyList<AppliedDoseChange>()) } // newest first
         val recorder = rememberRecorder()
         var recordedSeconds by rememberSaveable { mutableStateOf(0) } // `processing`'s "4 menit"
         var following by remember { mutableStateOf(false) } // the summarized visit has a next one: "Pindah ke kunjungan berikut"
@@ -643,7 +665,9 @@ fun App() {
             away = retrying { supabase.isAway(c.id, today) }
             swapsToMe = retrying { supabase.swapsToMe(c.id, today) }
         }
-        fun inboxItems() = inbox(swapsToMe, questions, note != null, tasks, me().orEmpty(), today)
+        // My summary's lines to check, before I share it.
+        fun flagsToCheck() = recording?.takeIf { it.recordedBy == me() && it.sharedAt == null }?.unchecked?.size ?: 0
+        fun inboxItems() = inbox(swapsToMe, flagsToCheck(), doseChanges, questions, note != null, tasks, me().orEmpty(), today)
         // Refill Tasks come from the minute job, so the list refreshes on the way in.
         fun openTasks() { go(Screen.Tasks); scope.launch { attempt { supabase.taskList(circle!!.id) }?.let { tasks = it } } }
         // Not retried: offline, the tap does nothing rather than jumping there later. The latest tap wins.
@@ -727,6 +751,8 @@ fun App() {
             expenses = retrying { supabase.expenses(k.circle.id) }
             documents = retrying { supabase.documents(k.circle.id) }
             digest = retrying { supabase.lastDigest(k.circle.id) }
+            doseChanges = retrying { supabase.doseChanges(k.circle.id) }
+            appliedDoses = retrying { supabase.appliedDoseChanges(k.circle.id) }
             loadRota()
         }
         suspend fun land(how: Nav) {
@@ -864,7 +890,7 @@ fun App() {
                             Tab.Home -> {
                                 val morningMeds = meds.current().morning()
                                 val card = homeCard(
-                                    now.toLocalDateTime(tz), next?.startsAt?.toLocalDateTime(tz)?.date, note != null,
+                                    now.toLocalDateTime(tz), next?.startsAt?.toLocalDateTime(tz)?.date, recording?.status == Recording.Status.ready,
                                     holdsTonight = tonight != null,
                                     morningDue = morningMeds.any { it.id !in given } || (morningMeds.isNotEmpty() && markedMorning == today),
                                 )
@@ -911,6 +937,19 @@ fun App() {
                                         evening = if (card != HomeCard.Evening) null else Evening(
                                             hm(tonight!!.timeOfDay), recipient?.name.orEmpty(), checkIn?.takeIf { it.day == today }?.let { it.sys to it.dia },
                                         ),
+                                        // Owner-approved in #47: the Next Steps as written, flags for me before sharing.
+                                        after = if (card != HomeCard.AfterVisit) null else recording?.transcript?.let { t ->
+                                            val r = recording!!
+                                            val steps = note?.steps?.map { it.text } ?: t.steps.map { it.text }
+                                            val unanswered = if (r.sharedAt == null) t.answersTo(questions).values.count { it.isBlank() }
+                                                else questions.count { it.answer?.isBlank() == true }
+                                            AfterVisit(
+                                                hm((r.readyAt ?: next!!.startsAt).toLocalDateTime(tz).time),
+                                                stringResource(Res.string.after_title, inSentence(next!!.title)),
+                                                steps.takeIf { it.isNotEmpty() }?.joinToString(", ")?.trimEnd('.')?.plus("."),
+                                                flagsToCheck(), unanswered,
+                                            )
+                                        },
                                         morning = if (card != HomeCard.Morning) null else Morning(
                                             hm(morningMeds.first().timeOfDay), recipient?.name.orEmpty(),
                                             morningMeds.map { MorningDose("${it.name} ${it.dose}".trim(), it.id in given) },
@@ -1014,8 +1053,41 @@ fun App() {
                                         Unit
                                     }
                                 }
+                                val sourceAt = stringResource(Res.string.mc_source, "%1\$s", "%2\$s")
+                                val sourceNoTime = stringResource(Res.string.mc_source_no_time, "%1\$s")
+                                val appliedMsg = stringResource(Res.string.mc_applied, "%1\$s", "%2\$s")
+                                val appliedAlone = stringResource(Res.string.mc_applied_alone, "%1\$s")
                                 RecordsScreen(
                                     meds, given, checkIns, docs, costs, today, recTab, { recTab = it }, { id -> rotaPeople()[id]?.name }, bring,
+                                    pending = doseChanges.filterNot { it.applied },
+                                    changed = { m -> appliedDoses.firstOrNull { it.medicationId == m.id }?.let { it to it.at.toLocalDateTime(tz).date } },
+                                    source = { d ->
+                                        d.t?.let { sourceAt.replace("%1\$s", d.saidBy.orEmpty()).replace("%2\$s", stamp(it)) }
+                                            ?: sourceNoTime.replace("%1\$s", d.saidBy.orEmpty())
+                                    },
+                                    // Not retried: offline, the tap does nothing but say so.
+                                    onApply = { d ->
+                                        scope.launch {
+                                            val told = attempt { supabase.applyDoseChange(d.appointmentId) } ?: run { toast = noConnection; return@launch }
+                                            val msg = if (told.isEmpty()) appliedAlone.replace("%1\$s", d.toDose)
+                                                else appliedMsg.replace("%1\$s", d.toDose).replace("%2\$s", names(told))
+                                            undo = msg to { scope.launch { if (attempt { supabase.undoDoseChange(d.appointmentId) } == null) toast = noConnection; loadHome() } }
+                                            toast = msg
+                                            loadHome()
+                                        }
+                                    },
+                                    // v3 `viewMcSource`: the summary, with the line it was said on.
+                                    onView = { d ->
+                                        opening?.cancel()
+                                        opening = scope.launch {
+                                            val v = attempt { listOfNotNull(supabase.appointment(d.appointmentId)).map { a -> Visit(a, supabase.questions(a.id), supabase.visitNote(a.id), supabase.recording(a.id)) } }
+                                                ?.firstOrNull()?.takeIf { it.recording?.transcript != null } ?: return@launch
+                                            opened = v
+                                            openSummary(v.appointment)
+                                            selection.key = "mc"; selection.refs = listOfNotNull(v.recording?.transcript?.medication?.segment)
+                                            go(Screen.Summary)
+                                        }
+                                    },
                                     onToggle = { m ->
                                         val on = m.id in given
                                         markDoses(listOf(m), !on)
@@ -1114,7 +1186,7 @@ fun App() {
                             }
                             SummaryScreen(
                                 meta, a.title, t, steps, unanswered, editable = mine, shared = sharedLabel.takeIf { r.sharedAt != null && r.recordedBy == me() },
-                                sel = selection, owners = dutyPeople().keys.toList(), person = { id -> rotaPeople()[id] ?: person(id) }, askerColor = ::colorOf,
+                                sel = selection, unchecked = r.unchecked, dose = doseChanges.firstOrNull { it.appointmentId == a.id }, owners = dutyPeople().keys.toList(), person = { id -> rotaPeople()[id] ?: person(id) }, askerColor = ::colorOf,
                                 onHome = { pick(Tab.Home) }, // v3 `goHome`
                                 move = move.takeIf { following },
                                 movedLabel = { m -> where(m).let { (title, day) -> fill(movedLabel, title, day) } },
@@ -1127,6 +1199,18 @@ fun App() {
                                         true
                                     }
                                 },
+                                // "Sudah benar" shows at once; put back if it can't be saved.
+                                check = { line ->
+                                    showRecording(a.id, r.copy(checked = r.checked + line))
+                                    scope.launch {
+                                        if (attempt { supabase.checkLine(a.id, line) } == null) {
+                                            // From what's shown now: lines ticked meanwhile stay ticked.
+                                            visit()?.recording?.let { now -> showRecording(a.id, now.copy(checked = now.checked - line)) }
+                                            toast = noConnection
+                                        }
+                                    }
+                                },
+                                onToast = { toast = it },
                             )
                         }
                         Screen.VisitNote -> visit()?.let { v ->
@@ -1236,9 +1320,19 @@ fun App() {
                             val declined = swapsToMe.associate { a -> a.swapId to stringResource(Res.string.swap_declined, person(a.from)?.name.orEmpty()) }
                             val askedFor = next?.provider?.name.orEmpty()
                             val asked = questions.associate { q -> q.id to stringResource(Res.string.inbox_asked, (person(q.askedBy)?.name ?: q.askedByName).orEmpty(), askedFor) }
+                            val flagsTitle = stringResource(Res.string.inbox_flags, flagsToCheck())
+                            val flagsSub = stringResource(Res.string.inbox_flags_sub, inSentence(next?.title.orEmpty()))
+                            val doseTitle = doseChanges.associate { d -> d.appointmentId to stringResource(Res.string.inbox_dose, inSentence(d.name)) }
+                            val doseSub = doseChanges.associate { d -> d.appointmentId to stringResource(Res.string.inbox_dose_sub, d.fromDose) }
                             InboxScreen(
                                 inboxItems().map { item ->
                                     when (item) {
+                                        // v3: "!" in #9A7A2F to `summary`, "Rx" in #2F5D4A to Obat.
+                                        is InboxItem.Flags -> InboxRow(Person("", FlagGold), flagsTitle, flagsSub, onOpen = { opened = null; openRecord() }, mark = "!")
+                                        is InboxItem.Dose -> InboxRow(
+                                            Person("", Kf.Green), doseTitle[item.change.appointmentId].orEmpty(), doseSub[item.change.appointmentId].orEmpty(),
+                                            onOpen = { pick(Tab.Records); recTab = RecTab.Meds }, mark = "Rx",
+                                        )
                                         is InboxItem.Swap -> {
                                             val a = item.ask
                                             // Not retried: offline, the answer waits for another tap.

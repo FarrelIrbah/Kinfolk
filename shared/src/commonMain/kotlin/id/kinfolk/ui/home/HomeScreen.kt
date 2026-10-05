@@ -77,6 +77,9 @@ import kinfolk.shared.generated.resources.edit
 import kinfolk.shared.generated.resources.evening_body
 import kinfolk.shared.generated.resources.evening_body_logged
 import kinfolk.shared.generated.resources.evening_eyebrow
+import kinfolk.shared.generated.resources.after_eyebrow
+import kinfolk.shared.generated.resources.after_flags
+import kinfolk.shared.generated.resources.after_unans
 import kinfolk.shared.generated.resources.evening_title
 import kinfolk.shared.generated.resources.evening_title_logged
 import kinfolk.shared.generated.resources.log_checkin
@@ -108,12 +111,12 @@ data class NextAppointment(
 enum class HomeCard { AfterVisit, VisitToday, Evening, Morning, Next, Empty }
 
 /**
- * Which card Home shows at [now]: after-visit > appointment today without a Visit Note > evening (from 17.00, if I
- * hold tonight's Duty) > morning (before 11.00, while morning doses are due) > next appointment > empty.
- * [visitOn] is the day of the next Appointment, today's included until the day ends.
+ * Which card Home shows at [now]: after-visit (a summary of today's visit I can read, #47) > appointment today >
+ * evening (from 17.00, if I hold tonight's Duty) > morning (before 11.00, while morning doses are due) > next
+ * appointment > empty. [visitOn] is the day of the next Appointment, today's included until the day ends.
  */
-fun homeCard(now: LocalDateTime, visitOn: LocalDate?, noteReady: Boolean, holdsTonight: Boolean, morningDue: Boolean) = when {
-    visitOn == now.date && noteReady -> HomeCard.AfterVisit
+fun homeCard(now: LocalDateTime, visitOn: LocalDate?, summaryReady: Boolean, holdsTonight: Boolean, morningDue: Boolean) = when {
+    visitOn == now.date && summaryReady -> HomeCard.AfterVisit
     visitOn == now.date -> HomeCard.VisitToday
     now.time >= LocalTime(17, 0) && holdsTonight -> HomeCard.Evening
     now.time < LocalTime(11, 0) && morningDue -> HomeCard.Morning
@@ -125,6 +128,12 @@ data class MorningDose(val name: String, val given: Boolean)
 
 /** v3's morning card: "08.00 · obat pagi", each dose, and the next visit (null hides the line). */
 data class Morning(val at: String, val recipient: String, val doses: List<MorningDose>, val nextVisit: String?)
+
+/**
+ * v3's after-visit card (#47, owner-approved): "15.10 · ringkasan kunjungan siap", "Catatan kontrol neurologi", the
+ * Next Steps (null hides them), and pills for [flags] lines to check and [unanswered] Questions (0 hides each).
+ */
+data class AfterVisit(val at: String, val title: String, val body: String?, val flags: Int, val unanswered: Int)
 
 /** v3's evening card: "19.00 · cek malam"; [bp] (sys to dia) once tonight's Check-in is logged. */
 data class Evening(val at: String, val recipient: String, val bp: Pair<Int, Int>?)
@@ -150,6 +159,7 @@ data class HomeState(
     /** Shown in place of the Appointment card when [homeCard] picks it. */
     val morning: Morning? = null,
     val evening: Evening? = null,
+    val after: AfterVisit? = null,
     /** v3's Tasks row: "3 tugas belum selesai", and [tasksSub] in red while [tasksLate]. */
     val tasksTitle: String = "",
     val tasksSub: String = "",
@@ -225,8 +235,8 @@ fun HomeScreen(
             SvgPath(Magnifier, 18.dp, Kf.Muted)
             Text(stringResource(Res.string.search_ph), fontSize = 15.sp, color = Kf.Muted)
         }
-        // ponytail: the after-visit card falls back to these until its ticket lands.
-        if (s.evening != null) EveningCard(s.evening, onCall, onCheckIn)
+        if (s.after != null) AfterVisitCard(s.after, onWriteNote)
+        else if (s.evening != null) EveningCard(s.evening, onCall, onCheckIn)
         else if (s.morning != null) MorningCard(s.morning, onMarkMorning)
         else s.next?.let { AppointmentCard(it, onOpenAppointment, onWriteNote) } ?: EmptySteps(s.invites, onAddAppointment, onRecords, onInvite, onFillEmergency)
 
@@ -365,6 +375,29 @@ private fun AppointmentCard(a: NextAppointment, onOpen: () -> Unit, onWriteNote:
                 else -> Res.string.write_note
             }
             CardButton(stringResource(label), Cream, Kf.Green, onWriteNote, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun AfterVisitCard(a: AfterVisit, onOpen: () -> Unit) {
+    // design: #2F5D4A, radius 22, padding 20, gap 12
+    Column(
+        Modifier.fillMaxWidth().background(Kf.Green, RoundedCornerShape(22.dp)).tap(onOpen).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(stringResource(Res.string.after_eyebrow, a.at), fontSize = 13.sp, color = Cream.copy(alpha = .85f))
+        Text(a.title, style = serifStyle(26f, 1.15f).copy(color = Cream))
+        a.body?.let { Text(it, fontSize = 14.sp, lineHeight = (14 * 1.5).sp, color = Cream.copy(alpha = .9f)) }
+        if (a.flags > 0 || a.unanswered > 0) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (a.flags > 0) Text(
+                stringResource(Res.string.after_flags, a.flags), Modifier.background(Kf.FlagBg, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
+                fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Kf.FlagInk,
+            )
+            if (a.unanswered > 0) Text(
+                stringResource(Res.string.after_unans, a.unanswered), Modifier.background(CreamTint, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
+                fontSize = 12.sp, color = Cream,
+            )
         }
     }
 }

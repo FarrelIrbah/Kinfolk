@@ -62,7 +62,7 @@ fun text(e: TimelineEntry, tz: TimeZone): String = when (e.kind) {
         else -> e.title.orEmpty()
     }
     TimelineEntry.Kind.drive_confirmed, TimelineEntry.Kind.access_change, TimelineEntry.Kind.dose_given,
-    TimelineEntry.Kind.check_in, TimelineEntry.Kind.document, TimelineEntry.Kind.export, TimelineEntry.Kind.recipient_press -> e.text
+    TimelineEntry.Kind.check_in, TimelineEntry.Kind.document, TimelineEntry.Kind.export, TimelineEntry.Kind.recipient_press, TimelineEntry.Kind.dose_change -> e.text
 }
 
 /** The v3 kinds, with their uppercase label and colour (`timeline()` in the prototype). */
@@ -78,7 +78,7 @@ fun type(kind: TimelineEntry.Kind) = when (kind) {
     TimelineEntry.Kind.appointment, TimelineEntry.Kind.visit_note -> EntryType.Visit
     TimelineEntry.Kind.drive_confirmed -> EntryType.Rota
     TimelineEntry.Kind.access_change -> EntryType.CheckIn // #20
-    TimelineEntry.Kind.dose_given -> EntryType.Medicine // #21
+    TimelineEntry.Kind.dose_given, TimelineEntry.Kind.dose_change -> EntryType.Medicine // #21, #47
     TimelineEntry.Kind.check_in -> EntryType.CheckIn // #24
     TimelineEntry.Kind.document -> EntryType.Document // #29
     TimelineEntry.Kind.export -> EntryType.Document // #33, v3's "doc" entry

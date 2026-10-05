@@ -33,7 +33,7 @@ class RecordingTest {
         ],
         "qa": [{"question": "Boleh berhenti clopidogrel sebelum perawatan gigi?", "answer": "Jangan dihentikan.", "segments": [1]}],
         "next_steps": [{"text": "Antar fisioterapi Selasa", "owner": "budi", "due": "2026-10-13"}, {"text": "MRI ulang", "owner": null, "due": null}],
-        "medication": {"name": "clopidogrel", "change": "75 mg → 37,5 mg", "segment": 0}
+        "medication": {"name": "clopidogrel", "dose": "37,5 mg", "segment": 0}
     }"""
 
     private fun io.github.jan.supabase.SupabaseClient.inbox() = Providers.to(auth.currentUserOrNull()!!.phone!!)
@@ -181,5 +181,74 @@ class RecordingTest {
         budi.transcribe(circle, appt, audio)
         assertEquals(Recording.Status.ready, budi.awaitRecording(appt).status)
         assertFails { budi.transcribe(circle, appt, audio) } // a finished one stays
+    }
+
+    @Test
+    fun `lines to check lock sharing until the Attendee confirms each`() = runBlocking<Unit> {
+        val sri = signedInNewcomer()
+        val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        val tukiman = sri.careRecipients(circle).single().id
+        val provider = sri.addProvider(circle, "Dr. Anand Rao").id
+        val appt = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, provider, "Kontrol neurologi", null, Clock.System.now(), attendeeId = sri.me())).id
+
+        Providers.transcript = output.replace(""""segments": [1]}]""", """"segments": [1], "check": "Cek: berlaku untuk cabut gigi?"}]""")
+            .replace(""""owner": null, "due": null}""", """"owner": null, "due": null, "check": "Cek tanggal."}""")
+        sri.transcribe(circle, appt, audio)
+        assertEquals(listOf("q0", "n1"), sri.awaitRecording(appt).unchecked)
+        assertFails { sri.shareRecording(appt, emptyMap(), emptyList()) }
+        sri.checkLine(appt, "q0")
+        assertFails { sri.checkLine(appt, "n0") } // nothing to check there
+        assertEquals(listOf("n1"), sri.recording(appt)!!.unchecked)
+        sri.checkLine(appt, "n1")
+        assertTrue(sri.recording(appt)!!.unchecked.isEmpty())
+        sri.shareRecording(appt, emptyMap(), emptyList())
+    }
+
+    @Test
+    fun `applying the dose change updates the Medication, logs a Timeline entry and tells who sees Obat`() = runBlocking<Unit> {
+        val sri = signedInNewcomer()
+        val circle = sri.createCareCircle("Tukiman", null, emptySet(), myName = "Sri")
+        val tukiman = sri.careRecipients(circle).single().id
+        val budi = signedInSibling(sri, circle)
+        val dewi = signedInSibling(sri, circle, name = "Dewi")
+        val rina = signedInSibling(sri, circle, name = "Rina")
+        sri.setHidden(tukiman, rina.me(), DataCategory.medications, hidden = true)
+        val clopidogrel = sri.addMedication(MedicationDraft(circle, tukiman, "Clopidogrel", "75 mg", "pagi", LocalTime(7, 0)))
+        val provider = sri.addProvider(circle, "Dr. Anand Rao").id
+        val appt = sri.scheduleAppointment(AppointmentDraft(circle, tukiman, provider, "Kontrol neurologi", null, Clock.System.now(), attendeeId = budi.me())).id
+
+        Providers.transcript = output.replace(""""t": 0.0""", """"t": 130.4""")
+        budi.transcribe(circle, appt, audio)
+        budi.awaitRecording(appt)
+        val pending = DoseChange(appt, clopidogrel.id, "Clopidogrel", "75 mg", "37,5 mg", 130.4, applied = false, saidBy = "Dr. Anand Rao")
+        assertEquals(listOf(pending), budi.doseChanges(circle))
+        assertTrue(sri.doseChanges(circle).isEmpty()) // not shared yet
+        assertFails { sri.applyDoseChange(appt) }
+
+        assertEquals(listOf("Sri", "Dewi"), budi.applyDoseChange(appt))
+        assertEquals("37,5 mg", sri.medications(circle).single().dose)
+        assertEquals(listOf(pending.copy(applied = true)), budi.doseChanges(circle))
+        assertFails { budi.applyDoseChange(appt) } // once
+        val entry = sri.timeline(circle).first()
+        assertEquals(TimelineEntry.Kind.dose_change to "Clopidogrel dari 75 mg ke 37,5 mg (Dr. Anand Rao, menit 02:10 rekaman). Pengingat diperbarui.", entry.kind to entry.text)
+        assertEquals(budi.me(), entry.by)
+        assertTrue(rina.timeline(circle).none { it.kind == TimelineEntry.Kind.dose_change })
+        assertEquals(listOf(AppliedDoseChange(clopidogrel.id, "75 mg", "Dr. Anand Rao", entry.at)), sri.appliedDoseChanges(circle))
+
+        // "Urungkan": back to 75 mg, the entry and the unsent WhatsApp go.
+        budi.undoDoseChange(appt)
+        assertEquals("75 mg", sri.medications(circle).single().dose)
+        assertTrue(sri.timeline(circle).none { it.kind == TimelineEntry.Kind.dose_change })
+        budi.applyDoseChange(appt)
+        deliver()
+        val message = listOf(listOf("Budi", "Tukiman", "Clopidogrel", "75 mg", "37,5 mg", "Dr. Anand Rao"))
+        assertEquals(message, dewi.inbox().filter { it.template == "kinfolk_dose_change" }.map { it.params })
+        assertTrue(rina.inbox().none { it.template == "kinfolk_dose_change" })
+        assertTrue(budi.inbox().none { it.template == "kinfolk_dose_change" })
+
+        // Edited since: "Urungkan" doesn't overwrite it.
+        sri.editMedication(clopidogrel.id, clopidogrel.draft().copy(dose = "50 mg"))
+        assertFails { budi.undoDoseChange(appt) }
+        assertEquals("50 mg", sri.medications(circle).single().dose)
     }
 }

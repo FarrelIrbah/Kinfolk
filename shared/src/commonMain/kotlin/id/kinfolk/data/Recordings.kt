@@ -4,6 +4,8 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.functions.functions
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
 import io.ktor.http.ContentType
 import kotlinx.datetime.LocalDate
@@ -30,7 +32,16 @@ data class Recording(
     val seconds: Int = 0,
     /** Who the share went to on WhatsApp, in join order. */
     val told: List<String> = emptyList(),
+    /** The lines confirmed with "Sudah benar" (#47): "q0" is [Transcript.qa]'s first, "n1" the second Next Step. */
+    val checked: List<String> = emptyList(),
+    /** When the transcript was ready: Home's "15.10 · ringkasan kunjungan siap". */
+    @SerialName("ready_at") val readyAt: Instant? = null,
 ) {
+    /** The lines the worker asked to check that are not confirmed yet, as in [checked]. */
+    val unchecked: List<String> get() = transcript?.let { t ->
+        t.qa.mapIndexedNotNull { i, q -> "q$i".takeIf { q.check != null } } + t.steps.mapIndexedNotNull { i, s -> "n$i".takeIf { s.check != null } }
+    }.orEmpty() - checked.toSet()
+
     @Suppress("EnumEntryName")
     enum class Status { processing, ready, failed }
 }
@@ -49,11 +60,11 @@ data class Transcript(
     @Serializable
     data class Segment(val t: Double, val speaker: Speaker, val text: String, val flagged: Boolean = false)
 
-    /** [segments]: indexes into [Transcript.segments] the answer comes from. */
+    /** [segments]: indexes into [Transcript.segments] the answer comes from; [check]: the yellow "Cek: …", if any (#47). */
     @Serializable
-    data class Answer(val question: String, val answer: String, val segments: List<Int> = emptyList())
+    data class Answer(val question: String, val answer: String, val segments: List<Int> = emptyList(), val check: String? = null)
 
-    /** [ownerId]: the Member named [owner], when exactly one has that name; [segments] as for [Answer]. */
+    /** [ownerId]: the Member named [owner], when exactly one has that name; [segments] and [check] as for [Answer]. */
     @Serializable
     data class SuggestedStep(
         val text: String,
@@ -61,13 +72,14 @@ data class Transcript(
         @SerialName("owner_id") val ownerId: String? = null,
         val due: LocalDate? = null,
         val segments: List<Int> = emptyList(),
+        val check: String? = null,
     )
 
-    /** [medicationId]: the Care Recipient's Medication named [name], when there is one. */
+    /** The new [dose] of [name]; [medicationId]: the Care Recipient's Medication of that name, when there is one. */
     @Serializable
     data class MedicationChange(
         val name: String,
-        val change: String,
+        val dose: String = "", // blank before #47's worker
         val segment: Int? = null,
         @SerialName("medication_id") val medicationId: String? = null,
     )
@@ -121,3 +133,52 @@ fun Transcript.answersTo(questions: List<Question>): Map<String, String> {
 /** The worker's Next Steps as the Attendee starts from: unnamed ones theirs ([attendee]), undated ones due [due]. */
 fun Transcript.drafts(attendee: String, due: LocalDate) =
     steps.map { NextStepDraft(it.text, it.ownerId ?: attendee, it.due ?: due) }
+
+/** "Sudah benar" on [line] ("q0", "n1"), by the Attendee before sharing. */
+suspend fun SupabaseClient.checkLine(appointmentId: String, line: String) {
+    postgrest.rpc("check_summary_line", buildJsonObject { put("appointment", appointmentId); put("line", line) })
+}
+
+/** "Perubahan obat" (#47): [name] from [fromDose] to [toDose], said by [saidBy] [t] seconds into the Recording of [appointmentId]. */
+@Serializable
+data class DoseChange(
+    @SerialName("appointment_id") val appointmentId: String,
+    @SerialName("medication_id") val medicationId: String,
+    val name: String,
+    @SerialName("from_dose") val fromDose: String,
+    @SerialName("to_dose") val toDose: String,
+    val t: Double? = null,
+    val applied: Boolean,
+    @SerialName("said_by") val saidBy: String? = null,
+)
+
+/** The dose change of each Recording I read in [circleId], of an active Medication I see. */
+suspend fun SupabaseClient.doseChanges(circleId: String): List<DoseChange> =
+    from("recording_dose_changes").select(Columns.list("appointment_id", "medication_id", "name", "from_dose", "to_dose", "t", "applied", "said_by")) {
+        filter { eq("circle_id", circleId) }
+    }.decodeList()
+
+/** "Perbarui pengingat": the Medication takes the new dose. Returns who was told on WhatsApp, in join order. */
+suspend fun SupabaseClient.applyDoseChange(appointmentId: String): List<String> =
+    postgrest.rpc("apply_dose_change", buildJsonObject { put("appointment", appointmentId) }).decodeAs()
+
+/** "Urungkan", by whoever applied it. */
+suspend fun SupabaseClient.undoDoseChange(appointmentId: String) {
+    postgrest.rpc("undo_dose_change", buildJsonObject { put("appointment", appointmentId) })
+}
+
+/** An applied change of [medicationId]'s dose, from [fromDose], as [saidBy] said it: Obat's "Diubah dari 5 mg pada 5 Okt · Dr. Anand Rao". */
+@Serializable
+data class AppliedDoseChange(
+    @SerialName("medication_id") val medicationId: String,
+    @SerialName("from_dose") val fromDose: String,
+    @SerialName("said_by") val saidBy: String,
+    val at: Instant,
+)
+
+/** Newest first. */
+suspend fun SupabaseClient.appliedDoseChanges(circleId: String): List<AppliedDoseChange> =
+    from("dose_changes").select(Columns.list("medication_id", "from_dose", "said_by", "at")) {
+        filter { eq("circle_id", circleId) }
+        order("at", Order.DESCENDING)
+    }.decodeList()

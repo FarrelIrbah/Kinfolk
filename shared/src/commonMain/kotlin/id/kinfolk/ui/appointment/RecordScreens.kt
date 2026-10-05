@@ -52,10 +52,12 @@ import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import id.kinfolk.data.DoseChange
 import id.kinfolk.data.Moved
 import id.kinfolk.data.NextStepDraft
 import id.kinfolk.data.Question
@@ -75,11 +77,17 @@ import kinfolk.shared.generated.resources.Res
 import kinfolk.shared.generated.resources.asked_answered
 import kinfolk.shared.generated.resources.back
 import kinfolk.shared.generated.resources.back_home
+import kinfolk.shared.generated.resources.check_yellow_first
 import kinfolk.shared.generated.resources.collapse
+import kinfolk.shared.generated.resources.confirm_flagged
 import kinfolk.shared.generated.resources.consent_head
 import kinfolk.shared.generated.resources.consent_note
 import kinfolk.shared.generated.resources.consent_sub
 import kinfolk.shared.generated.resources.expand
+import kinfolk.shared.generated.resources.looks_right
+import kinfolk.shared.generated.resources.mc_status_done
+import kinfolk.shared.generated.resources.mc_status_pending
+import kinfolk.shared.generated.resources.med_change
 import kinfolk.shared.generated.resources.move_next
 import kinfolk.shared.generated.resources.next_steps_reassign
 import kinfolk.shared.generated.resources.not_answered
@@ -234,9 +242,10 @@ class Selection {
 }
 
 /**
- * v3 `summary` of a Recording. [editable]: the Attendee before sharing, who reassigns owners, moves unanswered
- * Questions ([move], null without a next visit) and shares ([share] gets the steps, false when unreachable).
- * After sharing [shared] is the button's "Dibagikan · …" label; others see no button.
+ * v3 `summary` of a Recording. [editable]: the Attendee before sharing, who reassigns owners, confirms the yellow
+ * lines in [unchecked] ([check], #47), moves unanswered Questions ([move], null without a next visit) and shares
+ * ([share] gets the steps, false when unreachable; locked while a line is unchecked, [onToast] then says why).
+ * After sharing [shared] is the button's "Dibagikan · …" label; others see no button. [dose]: "Perubahan obat".
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -249,6 +258,8 @@ fun SummaryScreen(
     editable: Boolean,
     shared: String?,
     sel: Selection,
+    unchecked: List<String>,
+    dose: DoseChange?,
     owners: List<String>,
     person: (String) -> Person?,
     askerColor: (String) -> Color,
@@ -256,16 +267,32 @@ fun SummaryScreen(
     move: (suspend (Question) -> Moved?)?,
     movedLabel: (Moved) -> String,
     share: suspend (List<NextStepDraft>) -> Boolean,
+    check: (String) -> Unit,
+    onToast: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val owned = remember(steps) { mutableStateListOf(*steps.toTypedArray()) }
     val moved = remember { mutableStateMapOf<String, String>() }
     var busy by remember { mutableStateOf(false) }
     val times = { refs: List<Int> -> refs.mapNotNull { transcript.segments.getOrNull(it)?.let { s -> stamp(s.t) } } }
-    @Composable fun Line(key: String, content: @Composable () -> Unit) = Column(
+    val flags = if (editable) unchecked else emptyList()
+    // design: border #2F5D4A selected, else #E0C060 while flagged; the yellow "Cek: …" box under it (gap 10)
+    @Composable fun Line(key: String, note: String?, content: @Composable () -> Unit) = Column(
         Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(16.dp))
-            .border(1.5.dp, if (sel.key == key) Kf.Green else Color.Transparent, RoundedCornerShape(16.dp)).padding(14.dp),
-    ) { content() }
+            .border(1.5.dp, when { sel.key == key -> Kf.Green; key in flags -> FlagLine; else -> Color.Transparent }, RoundedCornerShape(16.dp)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        content()
+        if (key in flags && note != null) Row(
+            Modifier.fillMaxWidth().background(Kf.FlagBg, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(note, Modifier.weight(1f), fontSize = 13.sp, lineHeight = (13 * 1.4).sp, color = Kf.FlagInk)
+            Box(Modifier.height(32.dp).background(Kf.Ink, CircleShape).tap { check(key) }.padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+                Text(stringResource(Res.string.looks_right), color = Kf.Paper, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
 
     // design: padding:4px 20px 0; gap:18px
     Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -284,7 +311,7 @@ fun SummaryScreen(
         if (transcript.qa.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionLabel(stringResource(Res.string.asked_answered))
             transcript.qa.forEachIndexed { i, q ->
-                Line("q$i") {
+                Line("q$i", q.check) {
                     Column(Modifier.fillMaxWidth().tap { sel.toggle("q$i", q.segments); sel.expanded = false }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(q.question, fontSize = 14.sp, lineHeight = (14 * 1.4).sp, color = Kf.Muted)
                         Text(q.answer, fontSize = 15.sp, lineHeight = (15 * 1.45).sp)
@@ -297,11 +324,26 @@ fun SummaryScreen(
                 }
             }
         }
-        if (owned.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionLabel(stringResource(Res.string.next_steps_reassign))
+        if (dose != null || owned.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (dose != null) {
+                SectionLabel(stringResource(Res.string.med_change))
+                val refs = listOfNotNull(transcript.medication?.segment)
+                Column(
+                    Modifier.fillMaxWidth().background(Kf.Card, RoundedCornerShape(16.dp))
+                        .border(1.5.dp, if (sel.key == "mc") Kf.Green else Color.Transparent, RoundedCornerShape(16.dp))
+                        .tap { sel.toggle("mc", refs); sel.expanded = false }.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    DoseLine(dose, 15, Kf.Green)
+                    Text(if (dose.applied) stringResource(Res.string.mc_status_done, dose.toDose) else stringResource(Res.string.mc_status_pending), fontSize = 13.sp, color = Kf.Ink2)
+                    dose.t?.let { Text(stamp(it), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Kf.Muted) }
+                }
+            }
+            // design: margin-top:10px under "Perubahan obat"
+            if (owned.isNotEmpty()) Box(Modifier.padding(top = if (dose != null) 10.dp else 0.dp)) { SectionLabel(stringResource(Res.string.next_steps_reassign)) }
             owned.forEachIndexed { i, step ->
                 val refs = transcript.steps.getOrNull(i)?.segments.orEmpty()
-                Line("n$i") {
+                Line("n$i", transcript.steps.getOrNull(i)?.check) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f).tap { sel.toggle("n$i", refs) }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(step.text, fontSize = 15.sp, lineHeight = (15 * 1.4).sp)
@@ -340,14 +382,38 @@ fun SummaryScreen(
                 }
             }
         }
+        val locked = shared == null && flags.isNotEmpty()
+        val checkFirst = stringResource(Res.string.check_yellow_first)
         if (editable || shared != null) Box(
-            Modifier.fillMaxWidth().height(52.dp).background(if (shared != null) Kf.Muted else Kf.Green, RoundedCornerShape(16.dp)).tap {
+            Modifier.fillMaxWidth().height(52.dp).background(when { shared != null -> Kf.Muted; locked -> Locked; else -> Kf.Green }, RoundedCornerShape(16.dp)).tap {
                 if (shared != null || busy) return@tap
+                if (locked) return@tap onToast(checkFirst)
                 scope.launch { busy = true; share(owned.toList()); busy = false }
             },
             contentAlignment = Alignment.Center,
-        ) { Text(shared ?: stringResource(Res.string.share_circle), color = Kf.Paper, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+        ) {
+            Text(
+                shared ?: if (locked) stringResource(Res.string.confirm_flagged, flags.size) else stringResource(Res.string.share_circle),
+                color = Kf.Paper, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            )
+        }
         Spacer(Modifier.height(220.dp)) // v3 bottomPad 250 on `summary`: room under the drawer
+    }
+}
+
+private val FlagLine = Color(0xFFE0C060)
+private val Locked = Color(0xFFA9ADA2)
+
+/** "Amlodipine ~~5 mg~~ → 10 mg" in [size]sp, the new dose in [toColor]. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DoseLine(d: DoseChange, size: Int, toColor: Color) {
+    // design: display:flex; align-items:baseline; gap:8px; flex-wrap:wrap
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(d.name, Modifier.alignByBaseline(), fontSize = size.sp, fontWeight = FontWeight.SemiBold)
+        Text(d.fromDose, Modifier.alignByBaseline(), fontSize = size.sp, color = Kf.Muted, textDecoration = TextDecoration.LineThrough)
+        Text("→", Modifier.alignByBaseline(), fontSize = size.sp)
+        Text(d.toDose, Modifier.alignByBaseline(), fontSize = size.sp, fontWeight = FontWeight.SemiBold, color = toColor)
     }
 }
 

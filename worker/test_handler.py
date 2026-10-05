@@ -9,15 +9,16 @@ segments = [
 answer = {
     "speakers": {"SPEAKER_00": "provider", "SPEAKER_01": "attendee", "SPEAKER_02": "dokter"},
     "flagged": [1, 7, "x"],
-    "qa": [{"question": "Boleh berhenti clopidogrel?", "answer": "Jangan.", "segments": [1, 9]}, {"question": ""}, "junk"],
-    "next_steps": [{"text": "Antar fisioterapi", "owner": "Budi", "due": "2026-10-13", "segments": [0, 5]}, {"text": "MRI ulang", "owner": "", "due": "Selasa"}],
-    "medication": {"name": "Clopidogrel", "change": "75 mg → 37,5 mg", "segment": 0},
+    "qa": [{"question": "Boleh berhenti clopidogrel?", "answer": "Jangan.", "segments": [1, 9], "check": " Cek: berlaku untuk cabut gigi? "}, {"question": ""}, "junk"],
+    "next_steps": [{"text": "Antar fisioterapi", "owner": "Budi", "due": "2026-10-13", "segments": [0, 5]}, {"text": "MRI ulang", "owner": "", "due": "Selasa", "check": 3}],
+    "medication": {"name": "Clopidogrel", "dose": "37,5 mg", "segment": 0},
 }
 out = shape(segments, answer)
 assert [(s["t"], s["speaker"], s["flagged"]) for s in out["segments"]] == [(0.0, "provider", False), (6.5, "attendee", True), (9.0, "attendee", False)]
-assert out["qa"] == [{"question": "Boleh berhenti clopidogrel?", "answer": "Jangan.", "segments": [1]}]
-assert out["next_steps"] == [{"text": "Antar fisioterapi", "owner": "Budi", "due": "2026-10-13", "segments": [0]}, {"text": "MRI ulang", "owner": None, "due": None, "segments": []}]
-assert out["medication"] == {"name": "Clopidogrel", "change": "75 mg → 37,5 mg", "segment": 0}
+assert out["qa"] == [{"question": "Boleh berhenti clopidogrel?", "answer": "Jangan.", "segments": [1], "check": "Cek: berlaku untuk cabut gigi?"}]
+assert out["next_steps"] == [{"text": "Antar fisioterapi", "owner": "Budi", "due": "2026-10-13", "segments": [0], "check": None},
+                             {"text": "MRI ulang", "owner": None, "due": None, "segments": [], "check": None}]
+assert out["medication"] == {"name": "Clopidogrel", "dose": "37,5 mg", "segment": 0}
 assert shape(segments, {"medication": {"name": "X"}, "qa": None})["medication"] is None
 assert "[1] SPEAKER_01: Boleh berhenti" in prompt(segments, {"members": ["Sri", "Budi"]}, "2026-10-05")
 print("ok")

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import id.kinfolk.data.DoseChange
 import id.kinfolk.data.Question
 import id.kinfolk.data.SwapAsk
 import id.kinfolk.data.Task
@@ -44,21 +45,27 @@ import kotlinx.datetime.daysUntil
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
 
-// v3 `inbox` ("Menunggu Anda"), derived from data the app already reads (#31). Summary and dose-change items come
-// with their own tickets.
+// v3 `inbox` ("Menunggu Anda"), derived from data the app already reads (#31, #47).
 
 sealed interface InboxItem {
     data class Swap(val ask: SwapAsk) : InboxItem
+    /** [count] lines of my unshared summary to check. */
+    data class Flags(val count: Int) : InboxItem
+    data class Dose(val change: DoseChange) : InboxItem
     data class Asked(val question: Question) : InboxItem
     data class Late(val task: Task) : InboxItem
 }
 
 /**
- * v3's order: swaps asked of me; the others' Questions on the next Appointment, newest first, until its Visit Note
- * (carried-over ones aren't new); overdue Tasks of anyone, oldest first (approved in #31).
+ * v3's order: swaps asked of me; [flags] lines of my summary to check; dose changes not applied yet ([doses]); the
+ * others' Questions on the next Appointment, newest first, until its Visit Note (carried-over ones aren't new);
+ * overdue Tasks of anyone, oldest first (approved in #31).
  */
-fun inbox(swaps: List<SwapAsk>, questions: List<Question>, noteReady: Boolean, tasks: List<Task>, me: String, today: LocalDate): List<InboxItem> =
-    swaps.map(InboxItem::Swap) +
+fun inbox(
+    swaps: List<SwapAsk>, flags: Int, doses: List<DoseChange>, questions: List<Question>, noteReady: Boolean, tasks: List<Task>, me: String, today: LocalDate,
+): List<InboxItem> =
+    swaps.map(InboxItem::Swap) + listOfNotNull(InboxItem.Flags(flags).takeIf { flags > 0 }) +
+        doses.filterNot { it.applied }.map(InboxItem::Dose) +
         (if (noteReady) emptyList() else questions.filter { it.askedBy != me && !it.carried }.reversed().map(InboxItem::Asked)) +
         tasks.overdue(today).map(InboxItem::Late)
 
@@ -80,8 +87,11 @@ fun lateSub(t: Task, me: String, owner: String, canRemind: Boolean) = when {
     else -> "Tugas $owner · Anda bisa mengingatkan"
 }
 
-/** One row as v3 draws it; [onAccept]/[onDecline] only on a swap. */
-class InboxRow(val who: Person, val title: String, val sub: String, val onOpen: () -> Unit, val onAccept: (() -> Unit)? = null, val onDecline: (() -> Unit)? = null)
+/** One row as v3 draws it; [onAccept]/[onDecline] only on a swap. [mark] replaces the avatar's initial (v3's "!", "Rx"). */
+class InboxRow(
+    val who: Person, val title: String, val sub: String, val onOpen: () -> Unit,
+    val onAccept: (() -> Unit)? = null, val onDecline: (() -> Unit)? = null, val mark: String? = null,
+)
 
 @Composable
 fun InboxScreen(rows: List<InboxRow>, onBack: () -> Unit) {
@@ -108,7 +118,7 @@ private fun InboxCard(r: InboxRow) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(Modifier.fillMaxWidth().tap(r.onOpen), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-            Avatar(r.who.initial, r.who.color, 32.dp, 13.sp)
+            Avatar(r.mark ?: r.who.initial, r.who.color, 32.dp, 13.sp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(r.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = (15 * 1.35).sp)
                 Text(r.sub, fontSize = 13.sp, lineHeight = (13 * 1.4).sp, color = Kf.Muted)

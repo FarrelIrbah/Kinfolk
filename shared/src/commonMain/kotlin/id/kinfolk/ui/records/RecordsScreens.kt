@@ -1,5 +1,12 @@
 package id.kinfolk.ui.records
 
+import androidx.compose.ui.unit.em
+import kinfolk.shared.generated.resources.mc_view
+import kinfolk.shared.generated.resources.mc_label
+import kinfolk.shared.generated.resources.mc_apply
+import id.kinfolk.ui.appointment.DoseLine
+import id.kinfolk.data.DoseChange
+import id.kinfolk.data.AppliedDoseChange
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.width
@@ -135,9 +142,10 @@ fun Medication.doseLine() = listOf(dose, schedule).filter { it.isNotBlank() }.jo
 
 /**
  * The card's coloured line (owner-approved in #21): a blood thinner first, then a refill due within a week (by
- * [refiller]), then the Catatan; null when there's nothing to say.
+ * [refiller]), then a dose [changed] at a visit within a week (#47, with its day), then the Catatan; null when
+ * there's nothing to say.
  */
-fun Medication.noteLine(today: LocalDate, refiller: String?): Pair<String, Color>? {
+fun Medication.noteLine(today: LocalDate, refiller: String?, changed: Pair<AppliedDoseChange, LocalDate>? = null): Pair<String, Color>? {
     // ponytail: an overdue refill reads "hari ini"; its own copy if families leave them overdue.
     val days = refillOn?.let { (today.daysUntil(it)).coerceAtLeast(0) }
     return when {
@@ -146,10 +154,34 @@ fun Medication.noteLine(today: LocalDate, refiller: String?): Pair<String, Color
             val due = when (days) { 0 -> "Isi ulang hari ini"; 1 -> "Isi ulang besok"; else -> "Isi ulang $days hari lagi" }
             (listOfNotNull(due, refiller).joinToString(" · ")) to Gold
         }
+        // ponytail: a week, like the refill line; v3 never says how long "Naik dari 5 mg" stays.
+        changed != null && changed.second.daysUntil(today) <= 7 ->
+            "Diubah dari ${changed.first.fromDose} pada ${dayMonth(changed.second)} · ${changed.first.saidBy}" to Kf.Green
         note.isNotBlank() -> note to Kf.Muted
         else -> null
     }
 }
+
+/** v3's yellow "Dosis diubah di kunjungan hari ini" banner on Obat, [source] its "Dr. Rao mengatakannya …" line. */
+@Composable
+private fun DoseBanner(d: DoseChange, source: String, onApply: () -> Unit, onView: () -> Unit) {
+    // design: #F4E4B0, radius 18, padding 16, gap 10
+    Column(Modifier.fillMaxWidth().background(Kf.FlagBg, RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(stringResource(Res.string.mc_label).uppercase(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = .08.em, color = Kf.FlagInk)
+        DoseLine(d, 17, Kf.Ink)
+        Text(source, fontSize = 13.sp, lineHeight = (13 * 1.45).sp, color = Kf.FlagInk)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.weight(1f).height(42.dp).background(Kf.Ink, RoundedCornerShape(12.dp)).tap(onApply), contentAlignment = Alignment.Center) {
+                Text(stringResource(Res.string.mc_apply), color = Kf.Paper, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Box(Modifier.weight(1f).height(42.dp).border(1.dp, DashLine, RoundedCornerShape(12.dp)).tap(onView), contentAlignment = Alignment.Center) {
+                Text(stringResource(Res.string.mc_view), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+private val DashLine = Color(0x4022261F) // rgba(34,38,31,.25)
 
 /** Approved deviation: Rupiah, not v3's dollars. "Rp 250.000" */
 fun rupiah(amount: Long) = "Rp " + amount.toString().reversed().chunked(3).joinToString(".").reversed()
@@ -191,6 +223,13 @@ fun RecordsScreen(
     onPick: (RecTab) -> Unit,
     nameOf: (String) -> String?,
     bring: Pair<String, () -> Unit>?,
+    /** Dose changes heard at a visit and not applied yet (#47): the yellow banner. */
+    pending: List<DoseChange>,
+    /** The newest applied change of a Medication, with its day. */
+    changed: (Medication) -> Pair<AppliedDoseChange, LocalDate>?,
+    source: (DoseChange) -> String,
+    onApply: (DoseChange) -> Unit,
+    onView: (DoseChange) -> Unit,
     onToggle: (Medication) -> Unit,
     onOpen: (Medication?) -> Unit,
 ) {
@@ -211,8 +250,9 @@ fun RecordsScreen(
         if (tab == RecTab.Meds) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(Res.string.tap_taken), fontSize = 13.sp, color = Kf.Muted)
+                pending.forEach { DoseBanner(it, source(it), { onApply(it) }) { onView(it) } }
                 meds.filter { it.active }.forEach { m ->
-                    MedCard(m, m.noteLine(today, m.refillBy?.let(nameOf)), onOpen) { GivenButton(m.id in given) { onToggle(m) } }
+                    MedCard(m, m.noteLine(today, m.refillBy?.let(nameOf), changed(m)), onOpen) { GivenButton(m.id in given) { onToggle(m) } }
                 }
                 DashedButton(stringResource(Res.string.add_med)) { onOpen(null) }
             }

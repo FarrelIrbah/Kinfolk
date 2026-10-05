@@ -1,8 +1,9 @@
 """Kinfolk transcription worker (ADR 0005), run on RunPod Serverless in Singapore.
 
 Input (from supabase/functions/transcribe): audio_url, language, provider, members, medications, questions.
-Output (saved by public.finish_recording): segments [{t, speaker, text, flagged}], qa [{question, answer, segments}],
-next_steps [{text, owner, due, segments}], medication {name, change, segment} or null.
+Output (saved by public.finish_recording): segments [{t, speaker, text, flagged}], qa [{question, answer, segments, check}],
+next_steps [{text, owner, due, segments, check}], medication {name, dose, segment} or null. [check]: the yellow "Cek: …"
+the Attendee confirms before sharing (#47), or null.
 
 Whisper large-v3 with WhisperX alignment and pyannote diarisation, then an open-weight LLM (vLLM) labels the
 speakers and pulls out the rest. Nothing leaves the worker.
@@ -54,9 +55,12 @@ Transkrip (nomor baris dalam kurung siku):
 Jawab hanya dengan JSON:
 {{"speakers": {{"<label pembicara>": "provider" | "recipient" (pasien) | "attendee" (keluarga yang hadir)}},
  "flagged": [nomor baris yang kurang jelas atau perlu dicek ulang],
- "qa": [{{"question": pertanyaan keluarga di atas atau yang ditanyakan saat kunjungan, "answer": jawaban dokter singkat, "segments": [nomor baris]}}],
- "next_steps": [{{"text": langkah berikutnya, "owner": nama anggota keluarga yang disebut atau null, "due": "YYYY-MM-DD" atau null, "segments": [nomor baris]}}],
- "medication": {{"name": nama obat, "change": perubahan dosis singkat, "segment": nomor baris}} atau null}}"""
+ "qa": [{{"question": pertanyaan keluarga di atas atau yang ditanyakan saat kunjungan, "answer": jawaban dokter singkat, "segments": [nomor baris], "check": catatan cek atau null}}],
+ "next_steps": [{{"text": langkah berikutnya, "owner": nama anggota keluarga yang disebut atau null, "due": "YYYY-MM-DD" atau null, "segments": [nomor baris], "check": catatan cek atau null}}],
+ "medication": {{"name": nama obat yang dosisnya diubah, "dose": dosis baru (mis. "10 mg"), "segment": nomor baris}} atau null}}
+
+"check" hanya bila ringkasan mungkin salah menangkap transkrip, satu kalimat untuk keluarga yang memeriksa, diawali "Cek:",
+mis. "Cek tanggal: \"sekitar tiga bulan\" menjadi \"akhir Desember\"." atau "Cek: Dr. Rao bilang \"untuk tambal gigi biasanya\". Pastikan berlaku untuk tindakannya."."""
 
 
 def ask(text):
@@ -81,18 +85,19 @@ def shape(segments, answer):
             return None
 
     med = answer.get("medication")
-    med = {"name": text(med.get("name")), "change": text(med.get("change")),
+    med = {"name": text(med.get("name")), "dose": text(med.get("dose")),
            "segment": (lines([med.get("segment")]) or [None])[0]} if isinstance(med, dict) else None
     return {
         # ponytail: an unlabelled voice counts as the family member present; the Attendee checks before sharing.
         "segments": [{"t": round(s["start"], 1), "speaker": speakers.get(s["speaker"]) if speakers.get(s["speaker"]) in SPEAKERS else "attendee",
                       "text": s["text"], "flagged": i in flagged} for i, s in enumerate(segments)],
-        "qa": [{"question": text(q.get("question")), "answer": text(q.get("answer")), "segments": lines(q.get("segments"))}
+        "qa": [{"question": text(q.get("question")), "answer": text(q.get("answer")), "segments": lines(q.get("segments")),
+                "check": text(q.get("check")) or None}
                for q in answer.get("qa") or [] if isinstance(q, dict) and text(q.get("question"))],
         "next_steps": [{"text": text(s.get("text")), "owner": text(s.get("owner")) or None, "due": due(s.get("due")),
-                        "segments": lines(s.get("segments"))}
+                        "segments": lines(s.get("segments")), "check": text(s.get("check")) or None}
                        for s in answer.get("next_steps") or [] if isinstance(s, dict) and text(s.get("text"))],
-        "medication": med if med and med["name"] and med["change"] else None,
+        "medication": med if med and med["name"] and med["dose"] else None,
     }
 
 

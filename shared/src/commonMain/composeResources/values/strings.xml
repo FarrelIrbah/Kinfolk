@@ -495,4 +495,26 @@
     <string name="collapse">Perkecil</string>
     <string name="transcript_hint">Ketuk baris ringkasan untuk melompat ke sini</string>
     <string name="transcript_hint_sel">Menampilkan baris sesuai pilihan Anda</string>
+    <!-- #47: summary checks and the medication change -->
+    <string name="looks_right">Sudah benar</string>
+    <string name="confirm_flagged">Konfirmasi %1$d baris bertanda untuk membagikan</string>
+    <string name="check_yellow_first">Cek dulu baris kuning dengan transkrip.</string>
+    <string name="med_change">Perubahan obat</string>
+    <string name="mc_status_done">Pengingat sudah %1$s</string>
+    <string name="mc_status_pending">Pengingat belum diperbarui · tab Obat</string>
+    <string name="mc_label">Dosis diubah di kunjungan hari ini</string>
+    <string name="mc_source">%1$s mengatakannya di menit %2$s rekaman. Pengingat masih menampilkan dosis lama.</string>
+    <string name="mc_source_no_time">%1$s mengatakannya di rekaman. Pengingat masih menampilkan dosis lama.</string>
+    <string name="mc_apply">Perbarui pengingat</string>
+    <string name="mc_view">Lihat di transkrip</string>
+    <string name="mc_applied">Pengingat kini %1$s. %2$s diberi tahu via WhatsApp.</string>
+    <string name="mc_applied_alone">Pengingat kini %1$s.</string>
+    <string name="after_eyebrow">%1$s · ringkasan kunjungan siap</string>
+    <string name="after_title">Catatan %1$s</string>
+    <string name="after_flags">%1$d baris perlu dicek</string>
+    <string name="after_unans">%1$d pertanyaan belum terjawab</string>
+    <string name="inbox_flags">%1$d baris ringkasan perlu dicek</string>
+    <string name="inbox_flags_sub">Sebelum ringkasan %1$s bisa dibagikan</string>
+    <string name="inbox_dose">Perubahan dosis %1$s perlu diterapkan</string>
+    <string name="inbox_dose_sub">Pengingat masih %1$s</string>
 </resources>

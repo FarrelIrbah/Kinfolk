@@ -1,5 +1,6 @@
 package id.kinfolk.ui.inbox
 
+import id.kinfolk.data.DoseChange
 import id.kinfolk.data.Question
 import id.kinfolk.data.SwapAsk
 import id.kinfolk.data.Task
@@ -20,16 +21,17 @@ class InboxTest {
         Task(id, "c", "r", "Perpanjangan izin parkir", owner, due, Task.Source.added, null, owner, done)
 
     @Test
-    fun `swaps first, then the others' new Questions newest first, then overdue Tasks oldest first`() {
+    fun `swaps first, then lines to check, dose changes to apply, the others' new Questions newest first, then overdue Tasks oldest first`() {
+        val dose = DoseChange("a", "m", "Amlodipine", "5 mg", "10 mg", 130.0, applied = false)
         val items = inbox(
-            listOf(swap),
+            listOf(swap), 2, listOf(dose, dose.copy(appointmentId = "b", applied = true)),
             listOf(question("q1", "rina"), question("mine", "sri"), question("old", "rina", askedIn = "earlier"), question("q2", "budi")),
             noteReady = false,
             listOf(task("late", LocalDate(2026, 9, 30)), task("later", LocalDate(2026, 9, 20)), task("due", today), task("done", LocalDate(2026, 9, 1), done = true)),
             me = "sri", today,
         )
         assertEquals(
-            listOf(InboxItem.Swap(swap), InboxItem.Asked(question("q2", "budi")), InboxItem.Asked(question("q1", "rina")),
+            listOf(InboxItem.Swap(swap), InboxItem.Flags(2), InboxItem.Dose(dose), InboxItem.Asked(question("q2", "budi")), InboxItem.Asked(question("q1", "rina")),
                 InboxItem.Late(task("later", LocalDate(2026, 9, 20))), InboxItem.Late(task("late", LocalDate(2026, 9, 30)))),
             items,
         )
@@ -37,7 +39,7 @@ class InboxTest {
 
     @Test
     fun `Questions drop off once the Visit Note is written`() {
-        assertEquals(emptyList(), inbox(emptyList(), listOf(question("q1", "rina")), noteReady = true, emptyList(), "sri", today))
+        assertEquals(emptyList(), inbox(emptyList(), 0, emptyList(), listOf(question("q1", "rina")), noteReady = true, emptyList(), "sri", today))
     }
 
     @Test
