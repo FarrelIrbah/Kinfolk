@@ -264,8 +264,8 @@ if run; then
 fi
 
 # ──────────────────────────────────────────────────────────────────────────
-stage "Meta: submit the 15 message templates"
-say "Copy is owner-approved (#3, #4, #13, #23, #24, #26, #37, #38) and matches template_body(). Don't edit it here."
+stage "Meta: submit the 21 message templates"
+say "Copy is owner-approved (#3, #4, #13, #23, #24, #26, #37, #38, #40, #46, #47, #49) and matches template_body(). Don't edit it here."
 note "A rejection is kept for the summary; bring it back before changing any copy."
 if run; then
   WABA_ID=$(_existing WABA_ID || true); WHATSAPP_TOKEN=$(_existing WHATSAPP_TOKEN || true)
@@ -286,6 +286,10 @@ if run; then
   submit kinfolk_recipient_help UTILITY "[$(body '{{1}} butuh bantuan. {{2}} sedang dihubungi.' '["Tukiman","Sri dan Budi"]')]"
   submit kinfolk_dose_reminder UTILITY "[$(body '{{1}}: {{2}} jam {{3}}. Balas 1 jika sudah diberikan.' '["Malam ini","atorvastatin","21.00"]')]"
   submit kinfolk_digest UTILITY "[$(body 'Kinfolk · Minggu {{1}}, {{2}}\n• {{3}}\n• {{4}}\n• {{5}}\n• {{6}}\nBerikutnya: {{7}}.\nKosong: {{8}}.' '["Tukiman","21–27 Sept","7 dari 7 telepon malam selesai","Rata-rata tensi 131/83","27 dari 28 dosis tercatat","Kontrol neurologi: fisioterapi 2x/minggu","Kontrol neurologi Sel 14.30, Budi mengantar","telepon cek malam Minggu 4 Okt"]')]"
+  submit kinfolk_question_moved UTILITY "[$(body '{{1}} memindahkan pertanyaan Anda \"{{2}}\" ke kunjungan {{3}}.' '["Sri","Kapan Bapak boleh menyetir lagi?","fisioterapi 9 Okt"]')]"
+  submit kinfolk_dose_change UTILITY "[$(body '{{1}} memperbarui pengingat obat {{2}}: {{3}} dari {{4}} ke {{5}}, sesuai {{6}}.' '["Sri","Tukiman","Amlodipine","5 mg","10 mg","Dr. Anand Rao"]')]"
+  submit kinfolk_handoff UTILITY "[$(body 'Serah terima dari {{1}}, setelah {{2}}.\nYang terjadi: {{3}}\nPerubahan obat: {{4}}\nSiapa mengerjakan apa: {{5}}' '["Sri","kontrol neurologi","Fisioterapi 2x/minggu; MRI ulang 3 bulan lagi","Amlodipine dari 5 mg ke 10 mg. Pengingat belum diperbarui","Budi: Jadwalkan MRI ulang, 1 Des"]')]"
+  submit kinfolk_handoff_nomed UTILITY "[$(body 'Serah terima dari {{1}}, setelah {{2}}.\nYang terjadi: {{3}}\nSiapa mengerjakan apa: {{4}}' '["Sri","kontrol neurologi","Fisioterapi 2x/minggu; MRI ulang 3 bulan lagi","Budi: Jadwalkan MRI ulang, 1 Des"]')]"
   pause "Press Enter when you've read the results"
 fi
 
@@ -451,7 +455,7 @@ fi
 # ──────────────────────────────────────────────────────────────────────────
 stage "Wait for Meta template approval"
 open_url "https://business.facebook.com/wa/manage/message-templates/"
-say "All 15 kinfolk_* templates must show Active before the real-number tests."
+say "All 21 kinfolk_* templates must show Active before the real-number tests."
 pause "Press Enter when they're approved"
 
 # ──────────────────────────────────────────────────────────────────────────
