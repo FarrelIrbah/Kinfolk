@@ -67,6 +67,7 @@ open_url() {
   local url="$1"
   printf '  %s↗ opening%s %s\n' "$GREEN" "$RESET" "$url"
   { if   command -v wslview     >/dev/null 2>&1; then wslview "$url"
+    elif [[ -n "${COMSPEC:-}" ]]; then "$COMSPEC" //c start "" "${url//&/^&}"
     elif command -v explorer.exe >/dev/null 2>&1; then explorer.exe "$url"
     elif command -v xdg-open    >/dev/null 2>&1; then xdg-open "$url"
     elif command -v open        >/dev/null 2>&1; then open "$url"
@@ -208,9 +209,10 @@ fn_url() { printf 'https://%s.supabase.co/functions/v1/%s' "$PROJECT_REF" "$1"; 
 # submit NAME CATEGORY COMPONENTS_JSON asks Meta to review one template.
 submit() {
   local name="$1" category="$2" components="$3" res
-  res=$(curl -sS -X POST "https://graph.facebook.com/v23.0/$WABA_ID/message_templates" \
-    -H "Authorization: Bearer $WHATSAPP_TOKEN" -H "Content-Type: application/json" \
-    -d "{\"name\":\"$name\",\"language\":\"id\",\"category\":\"$category\",\"components\":$components}" || true)
+  # Body goes through stdin: on Windows, curl arguments lose non-ASCII (· and • became ?).
+  res=$(printf '{"name":"%s","language":"id","category":"%s","components":%s}' "$name" "$category" "$components" |
+    curl -sS -X POST "https://graph.facebook.com/v23.0/$WABA_ID/message_templates" \
+    -H "Authorization: Bearer $WHATSAPP_TOKEN" -H "Content-Type: application/json" --data-binary @- || true)
   if [[ "$res" == *'"id"'* ]]; then
     printf '  %s✓ submitted%s %s\n' "$GREEN" "$RESET" "$name"
   else
@@ -265,31 +267,31 @@ fi
 
 # ──────────────────────────────────────────────────────────────────────────
 stage "Meta: submit the 21 message templates"
-say "Copy is owner-approved (#3, #4, #13, #23, #24, #26, #37, #38, #40, #46, #47, #49) and matches template_body(). Don't edit it here."
+say "Copy is owner-approved (#3, #4, #13, #23, #24, #26, #37, #38, #40, #46, #47, #49) and is template_body() plus the Meta additions in docs/whatsapp-templates.md. Don't edit it here."
 note "A rejection is kept for the summary; bring it back before changing any copy."
 if run; then
   WABA_ID=$(_existing WABA_ID || true); WHATSAPP_TOKEN=$(_existing WHATSAPP_TOKEN || true)
   submit kinfolk_otp AUTHENTICATION '[{"type":"BODY","add_security_recommendation":true},{"type":"FOOTER","code_expiration_minutes":10},{"type":"BUTTONS","buttons":[{"type":"OTP","otp_type":"COPY_CODE"}]}]'
-  submit kinfolk_invite UTILITY "[$(body '{{1}} mengundang Anda ke lingkaran perawatan {{2}} di Kinfolk. Buka tautan ini untuk bergabung, tanpa perlu pasang app: {{3}}' '["Sri","Tukiman","https://kinfolk.id/undangan?t=contoh"]')]"
-  submit kinfolk_swap_ask UTILITY "[$(body '{{1}} bertanya: bisa ambil {{2}} {{3}}? Balas YA atau TIDAK.' '["Sri","telepon cek malam Tukiman","Minggu 4 Okt, 19.00"]'),$YA_TIDAK]"
-  submit kinfolk_swap_yes UTILITY "[$(body '{{1}} pegang {{2}} hari {{3}}.' '["Budi","telepon cek malam","Minggu 4 Okt"]')]"
-  submit kinfolk_swap_no UTILITY "[$(body '{{1}} tidak bisa ambil {{2}} hari {{3}}.' '["Budi","telepon cek malam","Minggu 4 Okt"]')]"
-  submit kinfolk_drive_ask UTILITY "[$(body '{{1}} bertanya: bisa mengantar {{2}} ke {{3}}, {{4}}? Balas YA atau TIDAK.' '["Sri","Tukiman","Kontrol neurologi","Kam, 1 Okt · 09.00, berangkat 08.15"]'),$YA_TIDAK]"
-  submit kinfolk_drive_yes UTILITY "[$(body '{{1}} mengantar {{2}} {{3}}.' '["Budi","Tukiman","Kam, 1 Okt · 09.00"]')]"
-  submit kinfolk_drive_no UTILITY "[$(body '{{1}} tidak bisa mengantar {{2}} {{3}}.' '["Budi","Tukiman","Kam, 1 Okt · 09.00"]')]"
-  submit kinfolk_drive_reminder UTILITY "[$(body 'Hari ini: antar {{1}} ke {{2}} jam {{3}}.' '["Tukiman","Kontrol neurologi","09.00, berangkat 08.15. Bawa: KTP, kartu BPJS"]')]"
-  submit kinfolk_duty_reminder UTILITY "[$(body 'Hari ini: {{1}} jam {{2}}.' '["telepon cek malam","19.00"]')]"
-  submit kinfolk_visit_note UTILITY "[$(body '{{1}} menulis catatan kunjungan {{2}}. {{3}}.' '["Sri","Tukiman","Kontrol neurologi: fisioterapi 2x/minggu, MRI ulang 3 bulan lagi"]')]"
-  submit kinfolk_bp_high UTILITY "[$(body 'Tensi {{1}} malam ini {{2}}, 140 ke atas. Dicatat oleh {{3}}.' '["Tukiman","152/90","Sri"]')]"
-  submit kinfolk_task_reminder UTILITY "[$(body '{{1}} mengingatkan: {{2}}, tenggat {{3}}.' '["Sri","Perpanjang izin parkir disabilitas","6 Okt"]')]"
-  submit kinfolk_recipient_ok UTILITY "[$(body '{{1}} baik-baik saja. Dikirim dari Mode {{1}}.' '["Tukiman"]')]"
-  submit kinfolk_recipient_help UTILITY "[$(body '{{1}} butuh bantuan. {{2}} sedang dihubungi.' '["Tukiman","Sri dan Budi"]')]"
-  submit kinfolk_dose_reminder UTILITY "[$(body '{{1}}: {{2}} jam {{3}}. Balas 1 jika sudah diberikan.' '["Malam ini","atorvastatin","21.00"]')]"
-  submit kinfolk_digest UTILITY "[$(body 'Kinfolk · Minggu {{1}}, {{2}}\n• {{3}}\n• {{4}}\n• {{5}}\n• {{6}}\nBerikutnya: {{7}}.\nKosong: {{8}}.' '["Tukiman","21–27 Sept","7 dari 7 telepon malam selesai","Rata-rata tensi 131/83","27 dari 28 dosis tercatat","Kontrol neurologi: fisioterapi 2x/minggu","Kontrol neurologi Sel 14.30, Budi mengantar","telepon cek malam Minggu 4 Okt"]')]"
-  submit kinfolk_question_moved UTILITY "[$(body '{{1}} memindahkan pertanyaan Anda \"{{2}}\" ke kunjungan {{3}}.' '["Sri","Kapan Bapak boleh menyetir lagi?","fisioterapi 9 Okt"]')]"
-  submit kinfolk_dose_change UTILITY "[$(body '{{1}} memperbarui pengingat obat {{2}}: {{3}} dari {{4}} ke {{5}}, sesuai {{6}}.' '["Sri","Tukiman","Amlodipine","5 mg","10 mg","Dr. Anand Rao"]')]"
-  submit kinfolk_handoff UTILITY "[$(body 'Serah terima dari {{1}}, setelah {{2}}.\nYang terjadi: {{3}}\nPerubahan obat: {{4}}\nSiapa mengerjakan apa: {{5}}' '["Sri","kontrol neurologi","Fisioterapi 2x/minggu; MRI ulang 3 bulan lagi","Amlodipine dari 5 mg ke 10 mg. Pengingat belum diperbarui","Budi: Jadwalkan MRI ulang, 1 Des"]')]"
-  submit kinfolk_handoff_nomed UTILITY "[$(body 'Serah terima dari {{1}}, setelah {{2}}.\nYang terjadi: {{3}}\nSiapa mengerjakan apa: {{4}}' '["Sri","kontrol neurologi","Fisioterapi 2x/minggu; MRI ulang 3 bulan lagi","Budi: Jadwalkan MRI ulang, 1 Des"]')]"
+  submit kinfolk_invite UTILITY "[$(body 'Kinfolk: {{1}} mengundang Anda ke lingkaran perawatan {{2}} di Kinfolk. Buka tautan ini untuk bergabung, tanpa perlu pasang app: {{3}}\nBuka Kinfolk untuk detailnya.' '["Sri","Tukiman","https://kinfolk.id/undangan?t=contoh"]')]"
+  submit kinfolk_swap_ask UTILITY "[$(body 'Kinfolk: {{1}} bertanya: bisa ambil {{2}} {{3}}? Balas YA atau TIDAK.' '["Sri","telepon cek malam Tukiman","Minggu 4 Okt, 19.00"]'),$YA_TIDAK]"
+  submit kinfolk_swap_yes UTILITY "[$(body 'Kinfolk: {{1}} pegang {{2}} hari {{3}}.\nBuka Kinfolk untuk detailnya.' '["Budi","telepon cek malam","Minggu 4 Okt"]')]"
+  submit kinfolk_swap_no UTILITY "[$(body 'Kinfolk: {{1}} tidak bisa ambil {{2}} hari {{3}}.\nBuka Kinfolk untuk detailnya.' '["Budi","telepon cek malam","Minggu 4 Okt"]')]"
+  submit kinfolk_drive_ask UTILITY "[$(body 'Kinfolk: {{1}} bertanya: bisa mengantar {{2}} ke {{3}}, {{4}}? Balas YA atau TIDAK.' '["Sri","Tukiman","Kontrol neurologi","Kam, 1 Okt · 09.00, berangkat 08.15"]'),$YA_TIDAK]"
+  submit kinfolk_drive_yes UTILITY "[$(body 'Kinfolk: {{1}} mengantar {{2}} {{3}}.\nBuka aplikasi Kinfolk untuk melihat detailnya.' '["Budi","Tukiman","Kam, 1 Okt · 09.00"]')]"
+  submit kinfolk_drive_no UTILITY "[$(body 'Kinfolk: {{1}} tidak bisa mengantar {{2}} {{3}}.\nBuka Kinfolk untuk detailnya.' '["Budi","Tukiman","Kam, 1 Okt · 09.00"]')]"
+  submit kinfolk_drive_reminder UTILITY "[$(body 'Kinfolk: Hari ini: antar {{1}} ke {{2}} jam {{3}}.\nBuka Kinfolk untuk detailnya.' '["Tukiman","Kontrol neurologi","09.00, berangkat 08.15. Bawa: KTP, kartu BPJS"]')]"
+  submit kinfolk_duty_reminder UTILITY "[$(body 'Kinfolk: Hari ini: {{1}} jam {{2}}.\nBuka Kinfolk untuk detailnya.' '["telepon cek malam","19.00"]')]"
+  submit kinfolk_visit_note UTILITY "[$(body 'Kinfolk: {{1}} menulis catatan kunjungan {{2}}. {{3}}.\nBuka Kinfolk untuk detailnya.' '["Sri","Tukiman","Kontrol neurologi: fisioterapi 2x/minggu, MRI ulang 3 bulan lagi"]')]"
+  submit kinfolk_bp_high UTILITY "[$(body 'Kinfolk: Tensi {{1}} malam ini {{2}}, 140 ke atas. Dicatat oleh {{3}}.\nBuka Kinfolk untuk detailnya.' '["Tukiman","152/90","Sri"]')]"
+  submit kinfolk_task_reminder UTILITY "[$(body 'Kinfolk: {{1}} mengingatkan: {{2}}, tenggat {{3}}.\nBuka Kinfolk untuk detailnya.' '["Sri","Perpanjang izin parkir disabilitas","6 Okt"]')]"
+  submit kinfolk_recipient_ok UTILITY "[$(body 'Kinfolk: {{1}} baik-baik saja. Dikirim dari Mode {{1}}.\nBuka Kinfolk untuk detailnya.' '["Tukiman"]')]"
+  submit kinfolk_recipient_help UTILITY "[$(body 'Kinfolk: {{1}} butuh bantuan. {{2}} sedang dihubungi.' '["Tukiman","Sri dan Budi"]')]"
+  submit kinfolk_dose_reminder UTILITY "[$(body 'Kinfolk: {{1}}: {{2}} jam {{3}}. Balas 1 jika sudah diberikan.' '["Malam ini","atorvastatin","21.00"]')]"
+  submit kinfolk_digest UTILITY "[$(body 'Kinfolk · Minggu {{1}}, {{2}}\n• {{3}}\n• {{4}}\n• {{5}}\n• {{6}}\nBerikutnya: {{7}}.\nKosong: {{8}}.\nIni ringkasan mingguan lingkaran perawatan Anda. Buka aplikasi Kinfolk untuk melihat detailnya.' '["Tukiman","21–27 Sept","7 dari 7 telepon malam selesai","Rata-rata tensi 131/83","27 dari 28 dosis tercatat","Kontrol neurologi: fisioterapi 2x/minggu","Kontrol neurologi Sel 14.30, Budi mengantar","telepon cek malam Minggu 4 Okt"]')]"
+  submit kinfolk_question_moved UTILITY "[$(body 'Kinfolk: {{1}} memindahkan pertanyaan Anda \"{{2}}\" ke kunjungan {{3}}.\nBuka Kinfolk untuk detailnya.' '["Sri","Kapan Bapak boleh menyetir lagi?","fisioterapi 9 Okt"]')]"
+  submit kinfolk_dose_change UTILITY "[$(body 'Kinfolk: {{1}} memperbarui pengingat obat {{2}}: {{3}} dari {{4}} ke {{5}}, sesuai {{6}}.\nBuka aplikasi Kinfolk untuk melihat detailnya.' '["Sri","Tukiman","Amlodipine","5 mg","10 mg","Dr. Anand Rao"]')]"
+  submit kinfolk_handoff UTILITY "[$(body 'Kinfolk: Serah terima dari {{1}}, setelah {{2}}.\nYang terjadi: {{3}}\nPerubahan obat: {{4}}\nSiapa mengerjakan apa: {{5}}\nBuka Kinfolk untuk detailnya.' '["Sri","kontrol neurologi","Fisioterapi 2x/minggu; MRI ulang 3 bulan lagi","Amlodipine dari 5 mg ke 10 mg. Pengingat belum diperbarui","Budi: Jadwalkan MRI ulang, 1 Des"]')]"
+  submit kinfolk_handoff_nomed UTILITY "[$(body 'Kinfolk: Serah terima dari {{1}}, setelah {{2}}.\nYang terjadi: {{3}}\nSiapa mengerjakan apa: {{4}}\nBuka Kinfolk untuk detailnya.' '["Sri","kontrol neurologi","Fisioterapi 2x/minggu; MRI ulang 3 bulan lagi","Budi: Jadwalkan MRI ulang, 1 Des"]')]"
   pause "Press Enter when you've read the results"
 fi
 

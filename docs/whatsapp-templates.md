@@ -92,6 +92,19 @@ curl -X POST "https://graph.facebook.com/v23.0/$WABA_ID/message_templates"   -H 
   }'
 ```
 
+## Teks yang diajukan ke Meta (#15)
+
+Meta menolak variabel di awal/akhir isi dan isi yang terlalu sedikit kata per variabel. Teks yang diajukan = isi di atas (`template_body()`) dengan tambahan berikut, disetujui pemilik di #15. Hanya WhatsApp yang memakai teks Meta; SMS cadangan dan pratinjau di app tetap memakai `template_body()`. `scripts/go-live.sh` mengajukan teks ini.
+
+| Tambahan | Template |
+|---|---|
+| Pembuka `Kinfolk: ` | `kinfolk_swap_ask`, `kinfolk_drive_ask`, `kinfolk_recipient_help`, `kinfolk_dose_reminder` |
+| Pembuka `Kinfolk: ` + baris `Buka Kinfolk untuk detailnya.` | `kinfolk_invite`, `kinfolk_swap_yes`, `kinfolk_swap_no`, `kinfolk_drive_no`, `kinfolk_drive_reminder`, `kinfolk_duty_reminder`, `kinfolk_visit_note`, `kinfolk_bp_high`, `kinfolk_task_reminder`, `kinfolk_recipient_ok`, `kinfolk_question_moved`, `kinfolk_handoff`, `kinfolk_handoff_nomed` |
+| Pembuka `Kinfolk: ` + baris `Buka aplikasi Kinfolk untuk melihat detailnya.` | `kinfolk_drive_yes`, `kinfolk_dose_change` |
+| Baris `Ini ringkasan mingguan lingkaran perawatan Anda. Buka aplikasi Kinfolk untuk melihat detailnya.` | `kinfolk_digest` |
+
+`kinfolk_otp` (AUTHENTICATION) isinya ditetapkan Meta, tanpa tambahan.
+
 ## Produksi
 
 0. `npx supabase link --project-ref <project>` lalu `npx supabase db push` (semua migrasi).

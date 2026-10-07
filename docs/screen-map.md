@@ -32,6 +32,7 @@ Diputuskan pemilik pada 1 Okt 2026 (celah lengkap di `docs/gap-v3.md`). Semua la
 - Sub kanal Member: "App + WhatsApp" / "Hanya WhatsApp".
 - Tab bar blur: `RenderEffect` di Android 12+, selain itu 94% opak.
 - Cek ringkasan dan perubahan obat (#47, disetujui pemilik): teks "Cek: …" ditulis worker per baris ringkasan; dosis baru dari worker, dosis lama = dosis Medication; entri Linimasa dan baris hijau Obat dengan "dari … ke" (bukan "naik"); WhatsApp `kinfolk_dose_change`; kartu Beranda sesudah kunjungan dari data (lihat `home`).
+- Template WhatsApp (#15, disetujui pemilik): teks yang diajukan ke Meta diberi pembuka "Kinfolk: " dan/atau baris penutup agar lolos aturan Meta (variabel tidak boleh di awal/akhir, rasio kata per variabel). SMS cadangan dan pratinjau di app tetap memakai teks prototype (`template_body()`). Daftar di `docs/whatsapp-templates.md`.
 - Rekaman (#46, disetujui pemilik): `recording` tanpa "Ditranskripsi sambil berjalan" dan kartu baris live (transkripsi baru jalan setelah "Stop & ringkas"); Member yang disembunyikan dari Rekaman kunjungan tidak menerima apa pun saat dibagikan; "Pindah ke kunjungan berikut" ke Appointment berikutnya dengan Provider mana pun; tautan "Catat manual saja" di kartu rekam `appt` sampai #50 (tetap di #48, disetujui pemilik).
 
 ### Deviasi v1 yang dibatalkan (kembali ke v3)
